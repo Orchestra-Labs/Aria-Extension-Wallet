@@ -116,6 +116,8 @@ export const CHAIN_ENDPOINTS = {
   exchangeRequirements: '/osmosis/market/v1beta1/exchange_requirements',
   getStakingParams: '/cosmos/staking/v1beta1/params',
   getUptime: '/cosmos/slashing/v1beta1/signing_infos/',
+  getIBCConnections: '/ibc/core/channel/v1/connections',
+  sendIbcMessage: '/ibc/apps/transfer/v1/transactions',
 };
 
 export const LOCAL_CHAIN_REGISTRY = {

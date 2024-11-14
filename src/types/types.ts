@@ -1,3 +1,5 @@
+import { IBCConnectionState } from '@/constants';
+
 export interface SessionToken {
   mnemonic: string;
   accountID: string;
@@ -202,4 +204,12 @@ export interface StakingParams {
   max_entries: number;
   historical_entries: number;
   bond_denom: string;
+}
+
+export interface IBCConnection {
+  id: string;
+  client_id: string;
+  counterparty_client_id: string;
+  counterparty_connection_id: string;
+  state: IBCConnectionState;
 }
