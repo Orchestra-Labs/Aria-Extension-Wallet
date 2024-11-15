@@ -1,13 +1,13 @@
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
 import React, { useState } from 'react';
 
-import { BinanceLogo, Check, Link, LogoIcon, UniswapLogo } from '@/assets/icons';
+import { Check, Link, LogoIcon } from '@/assets/icons';
 import { Button, DialogContent } from '@/ui-kit';
 
 const EXAMPLE_SERVICES = [
   { id: 1, name: 'Symphony labs', logo: <LogoIcon width="24px" /> },
-  { id: 2, name: 'Uniswap', logo: <UniswapLogo className="w-full h-full" /> },
-  { id: 3, name: 'Binance', logo: <BinanceLogo className="w-full h-full" /> },
+  { id: 2, name: 'Uniswap', logo: <LogoIcon className="w-full h-full" /> },
+  { id: 3, name: 'Binance', logo: <LogoIcon className="w-full h-full" /> },
 ];
 
 export const ConnectedServicesDialog: React.FC = () => {

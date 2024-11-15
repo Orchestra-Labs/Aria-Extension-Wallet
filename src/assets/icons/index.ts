@@ -1,9 +1,9 @@
 export * from './ArrowLeft';
-export * from './BinanceLogo';
 export * from './Check';
 export * from './Copy';
 export * from './Discord';
 export * from './DotsVertical';
+export * from './Edit';
 export * from './Expand';
 export * from './EyeClose';
 export * from './EyeOpen';
@@ -22,6 +22,5 @@ export * from './Spinner';
 export * from './Success';
 export * from './Support';
 export * from './Swap';
-export * from './UniswapLogo';
 export * from './VerifySuccess';
 export * from './X';

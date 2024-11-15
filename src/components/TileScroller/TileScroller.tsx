@@ -11,21 +11,23 @@ import { AssetTiles } from '../TileScroller/AssetTiles';
 import { useRefreshData } from '@/hooks';
 
 interface TileScrollerProps {
-  activeIndex: number;
+  activeIndex?: number;
   isSelectable?: boolean;
   onSelectAsset?: (asset: Asset) => void;
   onSelectValidator?: (validator: CombinedStakingInfo) => void;
   isDialog?: boolean;
   isReceiveDialog?: boolean;
+  multiSelectEnabled?: boolean;
 }
 
 export const TileScroller: React.FC<TileScrollerProps> = ({
-  activeIndex,
+  activeIndex = 0,
   isSelectable = false,
   onSelectAsset,
   onSelectValidator,
   isDialog = false,
   isReceiveDialog = false,
+  multiSelectEnabled = false,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const { refreshData } = useRefreshData();
@@ -188,6 +190,7 @@ export const TileScroller: React.FC<TileScrollerProps> = ({
             onClick={allowOnClick ? onSelectAsset : () => {}}
             isDialog={isDialog}
             isReceiveDialog={isReceiveDialog}
+            multiSelectEnabled={multiSelectEnabled}
           />
         ) : (
           <ValidatorTiles

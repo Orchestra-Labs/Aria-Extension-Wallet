@@ -3,7 +3,6 @@ import { SlideTray } from '@/ui-kit';
 import { TileScroller } from '../TileScroller';
 import { LogoIcon } from '@/assets/icons';
 import { Asset } from '@/types';
-import { cn } from '@/helpers';
 import { SortDialog } from '../SortDialog';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -52,20 +51,19 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
     <SlideTray
       ref={slideTrayRef}
       triggerComponent={
-        <div
-          className={cn(
-            `rounded-full h-7 w-7 bg-neutral-2 ${dialogSelectedAsset.logo ? '' : 'p-1'} flex items-center justify-center hover:bg-blue-hover hover:text-blue-dark cursor-pointer`,
-          )}
-        >
-          {dialogSelectedAsset.logo ? (
-            <img
-              src={dialogSelectedAsset.logo}
-              alt={dialogSelectedAsset.symbol || 'Unknown Asset'}
-            />
-          ) : (
-            <LogoIcon />
-          )}
-        </div>
+        dialogSelectedAsset.logo ? (
+          <img
+            src={dialogSelectedAsset.logo}
+            alt={dialogSelectedAsset.symbol || 'Unknown Asset'}
+            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
+            width={20}
+          />
+        ) : (
+          <LogoIcon
+            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
+            width={20}
+          />
+        )
       }
       title={isReceiveDialog ? 'Receive' : 'Send'}
       onClose={resetDefaults}

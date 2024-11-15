@@ -48,11 +48,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               className={cn(
                 'flex items-center w-full rounded-md border bg-transparent group',
                 'hover:border-neutral-1',
-                'focus-within:outline-0 focus-within:!border-blue',
+                'focus-within:outline-0',
                 isError && 'border-error text-error hover:border-error focus-within:border-error',
                 isSuccess &&
                   'border-success text-success hover:border-success focus-within:border-success',
-                !isError && !isSuccess && !isInfo && 'border-neutral-3',
+                !isError && !isSuccess && !isInfo && 'border-neutral-3 focus-within:!border-blue',
                 className,
               )}
             >
@@ -62,11 +62,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                   'select-text',
                   `flex-grow ${reducedHeight ? 'h-8' : 'h-10'} bg-transparent px-2 py-1.5 text-base text-neutral-3`,
                   'border-none focus:outline-0',
-                  'hover:text-neutral-1 focus:text-white',
                   'placeholder:text-xs placeholder:text-neutral-3',
                   isError && 'text-error hover:text-error focus:text-error',
                   isSuccess && 'text-success hover:text-success focus:text-success',
-                  !isError && !isSuccess && !isInfo && 'text-neutral-3',
+                  !isError &&
+                    !isSuccess &&
+                    !isInfo &&
+                    'text-neutral-3 focus:text-white hover:text-neutral-1',
                   icon && 'pr-2',
                 )}
                 ref={ref}
@@ -77,10 +79,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 <div
                   className={cn(
                     'h-[57%] min-h-[21px] w-[1px]',
-                    'group-hover:bg-neutral-1 group-focus-within:!bg-blue',
+                    'group-hover:bg-neutral-1',
                     isError && 'bg-error group-hover:bg-error group-focus-within:bg-error',
                     isSuccess && 'bg-success group-hover:bg-success group-focus-within:bg-success',
-                    !isError && !isSuccess && !isInfo && 'bg-neutral-3',
+                    !isError && !isSuccess && !isInfo && 'bg-neutral-3 group-focus-within:!bg-blue',
                   )}
                 />
               )}

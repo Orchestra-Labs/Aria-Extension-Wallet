@@ -1,12 +1,7 @@
 import { atom } from 'jotai';
-import {
-  dialogSearchTermAtom,
-  assetDialogSortOrderAtom,
-  assetDialogSortTypeAtom,
-} from '@/atoms';
+import { dialogSearchTermAtom, assetDialogSortOrderAtom, assetDialogSortTypeAtom } from '@/atoms';
 import { filterAndSortAssets } from '@/helpers';
 import { Asset } from '@/types';
-
 
 export const exchangeAssetsAtom = atom<Asset[]>([]);
 

@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import { Asset } from '@/types';
+import { Asset, WalletRecord } from '@/types';
 import {
   searchTermAtom,
   assetSortOrderAtom,
@@ -10,6 +10,10 @@ import {
   assetDialogSortTypeAtom,
 } from '@/atoms';
 import { filterAndSortAssets } from '@/helpers';
+import { userAccountAtom } from './accountAtom';
+import { DEFAULT_ASSET } from '@/constants';
+
+export const userWalletAtom = atom<WalletRecord | null>(null);
 
 export const walletAddressAtom = atom<string>('');
 export const walletAssetsAtom = atom<Array<Asset>>([]);
@@ -25,8 +29,12 @@ export const filteredAssetsAtom = atom(get => {
   const sortOrder = get(assetSortOrderAtom);
   const sortType = get(assetSortTypeAtom);
   const showAllAssets = get(showAllAssetsAtom);
+  const userAccount = get(userAccountAtom);
 
-  return filterAndSortAssets(walletState.assets, searchTerm, sortType, sortOrder, showAllAssets);
+  const visibleCoins = new Set(userAccount?.settings.visibleCoins || [DEFAULT_ASSET.denom]);
+  const visibleAssets = walletState.assets.filter(asset => visibleCoins.has(asset.denom));
+
+  return filterAndSortAssets(visibleAssets, searchTerm, sortType, sortOrder, showAllAssets);
 });
 
 export const filteredDialogAssetsAtom = atom(get => {
@@ -34,6 +42,10 @@ export const filteredDialogAssetsAtom = atom(get => {
   const searchTerm = get(dialogSearchTermAtom);
   const sortOrder = get(assetDialogSortOrderAtom);
   const sortType = get(assetDialogSortTypeAtom);
+  const userAccount = get(userAccountAtom);
 
-  return filterAndSortAssets(walletState.assets, searchTerm, sortType, sortOrder);
+  const visibleCoins = new Set(userAccount?.settings.visibleCoins || [DEFAULT_ASSET.denom]);
+  const visibleAssets = walletState.assets.filter(asset => visibleCoins.has(asset.denom));
+
+  return filterAndSortAssets(visibleAssets, searchTerm, sortType, sortOrder);
 });

@@ -4,11 +4,12 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { walletAddressAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
 import { isLoggedInAtom } from '@/atoms/isLoggedInAtom';
+import { getAccountByID } from '@/helpers/dataHelpers/account';
+import { userAccountAtom } from '@/atoms/accountAtom';
 
 interface AuthContextType {
   canLogIn: boolean;
   isLoggedIn: boolean;
-  initializeWallet: () => Promise<void>;
 }
 
 interface AuthProviderProps {
@@ -26,6 +27,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const isLoggedIn = useAtomValue(isLoggedInAtom);
   const setWalletAddress = useSetAtom(walletAddressAtom);
+  const setUserAccount = useSetAtom(userAccountAtom);
 
   const initializeWallet = async () => {
     const sessionToken = getSessionToken();
@@ -37,6 +39,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const address = await getAddress(sessionToken.mnemonic);
       setWalletAddress(address);
       refreshData({ address });
+
+      const accountData = getAccountByID(sessionToken.accountID);
+      setUserAccount(accountData);
     } catch (error) {
       console.error('Error initializing wallet address:', error);
     }
@@ -48,11 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [isLoggedIn]);
 
-  return (
-    <AuthContext.Provider value={{ canLogIn, isLoggedIn, initializeWallet }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ canLogIn, isLoggedIn }}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {

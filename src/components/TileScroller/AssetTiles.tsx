@@ -16,6 +16,7 @@ interface AssetTilesProps {
   onClick?: (asset: Asset) => void;
   isDialog?: boolean;
   isReceiveDialog?: boolean;
+  multiSelectEnabled?: boolean;
 }
 
 export const AssetTiles: React.FC<AssetTilesProps> = ({
@@ -23,6 +24,7 @@ export const AssetTiles: React.FC<AssetTilesProps> = ({
   onClick,
   isDialog = false,
   isReceiveDialog = false,
+  multiSelectEnabled = false,
 }) => {
   const filteredAssets = useAtomValue(
     isDialog
@@ -57,6 +59,7 @@ export const AssetTiles: React.FC<AssetTilesProps> = ({
           asset={asset}
           isSelectable={isSelectable}
           isReceiveDialog={isReceiveDialog}
+          multiSelectEnabled={multiSelectEnabled}
           onClick={onClick}
         />
       ))}

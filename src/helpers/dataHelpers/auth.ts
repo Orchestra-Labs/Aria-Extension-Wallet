@@ -64,7 +64,7 @@ export const tryAuthorizeAccess = async (
     const wallet = getWalletByID(account, walletID);
     if (!wallet) return 'error';
 
-    const mnemonic = decryptMnemonic(wallet.mnemonic, password);
+    const mnemonic = decryptMnemonic(wallet.encryptedMnemonic, password);
     const decryptedWallet = await getWallet(mnemonic);
     console.log('Wallet retrieved:', decryptedWallet);
 

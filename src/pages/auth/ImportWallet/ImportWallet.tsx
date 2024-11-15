@@ -6,6 +6,7 @@ import { Button, Stepper } from '@/ui-kit';
 import { useAtom, useSetAtom } from 'jotai';
 import {
   confirmPasswordAtom,
+  isLoggedInAtom,
   mnemonic12State,
   mnemonic24State,
   mnemonicVerifiedState,
@@ -14,6 +15,8 @@ import {
   use24WordsState,
 } from '@/atoms';
 import { createAccount } from '@/helpers/dataHelpers/account';
+import { createWallet, saveSessionData } from '@/helpers';
+import { AccountRecord } from '@/types';
 
 const STEPS_LABELS = ['Enter Passphrase', 'Create password'];
 
@@ -27,8 +30,15 @@ export const ImportWallet = () => {
   const setConfirmPassword = useSetAtom(confirmPasswordAtom);
   const [passwordsVerified, setPasswordsVerified] = useAtom(passwordsVerifiedAtom);
 
+  const setIsLoggedIn = useSetAtom(isLoggedInAtom);
+
   const [activeScreen, setActiveScreen] = useState(0);
   const [fullyVerified, setFullyVerified] = useState(false);
+
+  const [accountRecord, setAccountRecord] = useState<AccountRecord | null>(null);
+  const [stringMnemonic, setStringMnemonic] = useState<string>('');
+
+  const walletName = 'Aria';
 
   // Proceed to next step
   const nextStep = () => setActiveScreen(current => (current < 2 ? current + 1 : current));
@@ -57,16 +67,24 @@ export const ImportWallet = () => {
   const getCurrentMnemonic = () => (use24Words ? mnemonic24 : mnemonic12);
   const getStringMnemonic = () => getCurrentMnemonic().join(' ');
 
+  const logIn = async (mnemonic: string, walletName: string, accountID: string) => {
+    const { wallet } = await createWallet(mnemonic, password, walletName);
+    await saveSessionData(wallet, accountID, false);
+    setIsLoggedIn(true);
+  };
+
   // Check everything is completed properly and pass to confirmation screen
   const handleCreateWallet = async () => {
     try {
       console.log('trying to create wallet');
       // Generate wallet from the mnemonic and create the token
       const mnemonic = getStringMnemonic();
-      const walletName = 'Aria';
       // TODO: make create/add wallet depending on source of origin
-      await createAccount(mnemonic, password, walletName);
+      const accountRecord = await createAccount(mnemonic, password, walletName);
       console.log('create wallet function ended');
+
+      setAccountRecord(accountRecord);
+      setStringMnemonic(mnemonic);
 
       // Clear state and navigate to confirmation page after wallet creation
       clearState();
@@ -117,7 +135,14 @@ export const ImportWallet = () => {
         </Stepper>
       ) : (
         // Wallet success screen outside the Stepper
-        <WalletSuccessScreen caption="Your wallet was imported successfully" />
+        <WalletSuccessScreen
+          caption="Your wallet was imported successfully"
+          onClick={() => {
+            if (accountRecord) {
+              logIn(stringMnemonic, walletName, accountRecord.id);
+            }
+          }}
+        />
       )}
     </div>
   );

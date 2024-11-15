@@ -28,7 +28,7 @@ export const createWallet = async (
     const walletRecord: WalletRecord = {
       id: walletID,
       name: walletName,
-      mnemonic: encryptedMnemonic,
+      encryptedMnemonic,
       settings: {},
     };
 

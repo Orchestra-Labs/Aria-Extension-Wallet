@@ -10,6 +10,7 @@ import {
   selectedAssetAtom,
   dialogSelectedAssetAtom,
   sendStateAtom,
+  selectedCoinListAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
 
@@ -17,6 +18,7 @@ interface AssetScrollTileProps {
   asset: Asset;
   isSelectable?: boolean;
   isReceiveDialog?: boolean;
+  multiSelectEnabled?: boolean;
   onClick?: (asset: Asset) => void;
 }
 
@@ -24,11 +26,13 @@ export const AssetScrollTile = ({
   asset,
   isSelectable = false,
   isReceiveDialog = false,
+  multiSelectEnabled = false,
   onClick,
 }: AssetScrollTileProps) => {
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
+  const selectedCoins = useAtomValue(selectedCoinListAtom);
 
   const navigate = useNavigate();
 
@@ -69,8 +73,9 @@ export const AssetScrollTile = ({
     }
   };
 
-  const isSelected = asset.denom === dialogSelectedAsset.denom;
-
+  const isSelected = multiSelectEnabled
+    ? selectedCoins.some(selectedCoin => selectedCoin.denom === asset.denom)
+    : asset.denom === dialogSelectedAsset.denom;
   return (
     <>
       {isSelectable ? (
@@ -99,8 +104,8 @@ export const AssetScrollTile = ({
         >
           <>
             <div className="text-center mb-2">
-              <div className="truncate text-base font-medium text-neutral-1">
-                Amount: <span className="text-blue line-clamp-1">{value}</span>
+              <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
+                Amount: <span className="text-blue">{value}</span>
               </div>
               <span className="text-grey-dark text-xs text-base">
                 Current Chain: <span className="text-blue">Symphony</span>

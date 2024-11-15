@@ -70,7 +70,8 @@ export const createAccount = async (
   mnemonic: string,
   password: string,
   walletName: string,
-  visibleNetworks: string[] = [],
+  visibleNetworks: string[] = [], // list of network IDs
+  visibleCoins: string[] = [], // list of coin denoms
   persist: boolean = true,
 ): Promise<AccountRecord> => {
   console.log('Creating new account with walletName:', walletName);
@@ -91,6 +92,7 @@ export const createAccount = async (
     settings: {
       activeNetworkID: networkID,
       visibleNetworks,
+      visibleCoins,
       activeWalletID: walletRecord.id,
     },
     wallets: [walletRecord],

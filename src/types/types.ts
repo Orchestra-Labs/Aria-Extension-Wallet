@@ -10,6 +10,7 @@ export interface AccountRecord {
   settings: {
     activeNetworkID: string;
     visibleNetworks: string[];
+    visibleCoins: string[];
     activeWalletID: string;
   };
   wallets: WalletRecord[];
@@ -18,7 +19,7 @@ export interface AccountRecord {
 export interface WalletRecord {
   id: string;
   name: string;
-  mnemonic: string;
+  encryptedMnemonic: string;
   settings: {};
 }
 

@@ -6,3 +6,4 @@ export const showAllAssetsAtom = atom<boolean>(false);
 
 export const selectedAssetAtom = atom<Asset>(DEFAULT_ASSET);
 export const dialogSelectedAssetAtom = atom<Asset>(DEFAULT_ASSET);
+export const selectedCoinListAtom = atom<Asset[]>([]);
