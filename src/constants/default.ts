@@ -94,7 +94,6 @@ export const DEFAULT_ASSET = LOCAL_ASSET_REGISTRY.note;
 
 export const CHAIN_NODES = {
   symphonytestnet: [
-    // TODO: comment out Kleomedes when ready to ttest latest Symphony-js package
     {
       rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
       rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',
@@ -125,8 +124,8 @@ export const CHAIN_ENDPOINTS = {
   delegateToValidator: '/cosmos.staking.v1beta1.MsgDelegate',
   undelegateFromValidator: '/cosmos.staking.v1beta1.MsgUndelegate',
   sendMessage: '/cosmos.bank.v1beta1.MsgSend',
-  swap: '/osmosis/market/v1beta1/swap?',
-  exchangeRequirements: '/osmosis/market/v1beta1/exchange_requirements',
+  swap: '/symphony/market/v1beta1/swap?',
+  exchangeRequirements: '/symphony/market/v1beta1/exchange_requirements',
   getStakingParams: '/cosmos/staking/v1beta1/params',
   getUptime: '/cosmos/slashing/v1beta1/signing_infos/',
 };
