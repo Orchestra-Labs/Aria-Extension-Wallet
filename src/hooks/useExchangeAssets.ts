@@ -8,7 +8,7 @@ import {
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { sendStateAtom } from '@/atoms';
+import { sendStateAtom, walletAssetsAtom } from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -28,6 +28,7 @@ interface ExchangeRequirementResponse {
 export const useExchangeAssets = () => {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const sendState = useAtomValue(sendStateAtom);
+  const walletAssets = useAtomValue(walletAssetsAtom);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,18 +39,35 @@ export const useExchangeAssets = () => {
     try {
       const defaultAsset = DEFAULT_ASSET;
       const sendAsset = sendState.asset;
+      console.log('send asset', sendAsset);
 
       const response = (await queryRestNode({
         endpoint: `${CHAIN_ENDPOINTS.exchangeRequirements}`,
         queryType: 'GET',
       })) as unknown as ExchangeRequirementResponse;
 
+      console.log('exchange requirements response', response);
+
       if (!response.exchange_requirements) {
         throw new Error('Invalid response format');
       }
 
-      let adjustmentRate = 1;
+      const mergedExchangeRequirements = [...response.exchange_requirements];
+      if (
+        !response.exchange_requirements.some(req => req.base_currency.denom === defaultAsset.denom)
+      ) {
+        mergedExchangeRequirements.push({
+          base_currency: {
+            denom: defaultAsset.denom,
+            amount: '0',
+          },
+          exchange_rate: defaultAsset.amount, // Default exchange rate for the default asset
+        });
+      }
 
+      console.log('merged exchange requirements', mergedExchangeRequirements);
+
+      let adjustmentRate = 1;
       // If sendAsset is different from DEFAULT_ASSET, get the exchange rate from sendAsset to DEFAULT_ASSET
       if (sendAsset.denom !== defaultAsset.denom) {
         const exchangeRateResponse = await queryRestNode({
@@ -60,33 +78,60 @@ export const useExchangeAssets = () => {
         adjustmentRate = parseFloat(exchangeRateResponse.return_coin.amount) / 1000000;
       }
 
-      const exchangeAssets = Object.values(LOCAL_ASSET_REGISTRY).map(registryAsset => {
-        const exchangeRequirement = response.exchange_requirements.find(
-          req => req.base_currency.denom === registryAsset.denom,
-        );
+      console.log('Adjustment Rate:', adjustmentRate);
+
+      const exchangeAssets = mergedExchangeRequirements.map(requirement => {
+        const { denom, amount } = requirement.base_currency;
+
+        // Check if the asset exists in the local registry
+        const registryAsset = LOCAL_ASSET_REGISTRY[denom];
+
+        const symbol = registryAsset
+          ? registryAsset.symbol!
+          : `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
+
+        const logo = registryAsset ? registryAsset.logo : defaultAsset.logo;
+        const exponent = registryAsset ? registryAsset.exponent! : GREATER_EXPONENT_DEFAULT;
+        const isIbc = registryAsset ? registryAsset.isIbc : false;
+        const baseExchangeRate = parseFloat(requirement.exchange_rate || '1');
+        console.log(`Denom: ${denom}, Base Exchange Rate: ${baseExchangeRate}`);
 
         let exchangeRate;
-
-        if (registryAsset.denom === sendAsset.denom) {
+        if (denom === sendAsset.denom) {
           exchangeRate = '1';
-        } else if (registryAsset.isIbc) {
+        } else if (isIbc) {
           exchangeRate = '-';
         } else {
-          const baseExchangeRate = parseFloat(exchangeRequirement?.exchange_rate || '1');
-          const exponent = sendAsset.exponent || GREATER_EXPONENT_DEFAULT;
           exchangeRate = new BigNumber(baseExchangeRate)
             .dividedBy(adjustmentRate)
             .toFixed(exponent);
         }
+        console.log(`Calculated Exchange Rate for ${denom}: ${exchangeRate}`);
 
         return {
-          ...registryAsset,
-          amount: exchangeRequirement?.base_currency.amount || '0',
+          symbol,
+          denom,
+          amount,
+          logo: logo ?? '',
+          exponent,
+          isIbc,
           exchangeRate,
-        };
+        } as Asset;
       });
 
-      setAvailableAssets(exchangeAssets);
+      const additionalAssets = walletAssets.filter(
+        walletAsset => !exchangeAssets.some(processed => processed.denom === walletAsset.denom),
+      );
+
+      const mergedAssets = [
+        ...exchangeAssets,
+        ...additionalAssets.map(walletAsset => ({
+          ...walletAsset,
+          exchangeRate: walletAsset.denom === sendAsset.denom ? '1' : '-',
+        })),
+      ];
+
+      setAvailableAssets(mergedAssets);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch exchange assets');
       console.error('Error fetching exchange assets:', err);

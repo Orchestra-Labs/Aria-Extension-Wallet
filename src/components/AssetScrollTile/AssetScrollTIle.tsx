@@ -142,7 +142,7 @@ export const AssetScrollTile = ({
             <Button size="medium" className={'w-full'} onClick={handleSendClick}>
               Send
             </Button>
-            <ReceiveDialog buttonSize="medium" />
+            <ReceiveDialog buttonSize="medium" asset={asset} />
             <Button size="medium" className={'w-full'} onClick={() => setActiveIndex(1)}>
               Stake
             </Button>

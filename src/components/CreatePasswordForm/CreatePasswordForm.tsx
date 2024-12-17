@@ -3,6 +3,7 @@ import { EyeClose, EyeOpen } from '@/assets/icons';
 import { Input } from '@/ui-kit';
 import { useAtom, useSetAtom } from 'jotai';
 import { confirmPasswordAtom, passwordAtom, passwordsVerifiedAtom } from '@/atoms';
+import { InputStatus } from '@/constants';
 
 export const CreatePasswordForm = () => {
   const [password, setPassword] = useAtom(passwordAtom);
@@ -11,9 +12,9 @@ export const CreatePasswordForm = () => {
 
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
-  const [passwordStatus, setPasswordStatus] = useState<'error' | 'success' | null>(null);
-  const [confirmPasswordStatus, setConfirmPasswordStatus] = useState<'error' | 'success' | null>(
-    null,
+  const [passwordStatus, setPasswordStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
+  const [confirmPasswordStatus, setConfirmPasswordStatus] = useState<InputStatus>(
+    InputStatus.NEUTRAL,
   );
   const [allowValidatePassword, setAllowValidatePassword] = useState(false);
   const [allowValidateConfirmPassword, setAllowValidateConfirmPassword] = useState(false);
@@ -23,21 +24,21 @@ export const CreatePasswordForm = () => {
   // Validate password
   const validatePassword = () => {
     if (password === '') {
-      setPasswordStatus(null);
+      setPasswordStatus(InputStatus.NEUTRAL);
       return;
     }
     const isPasswordValid = password.length >= 8;
-    setPasswordStatus(isPasswordValid ? 'success' : 'error');
+    setPasswordStatus(isPasswordValid ? InputStatus.SUCCESS : InputStatus.ERROR);
   };
 
   // Validate confirm password
   const validateConfirmPassword = () => {
     if (confirmPassword === '') {
-      setConfirmPasswordStatus(null);
+      setConfirmPasswordStatus(InputStatus.NEUTRAL);
       return;
     }
     const isConfirmPasswordValid = confirmPassword === password;
-    setConfirmPasswordStatus(isConfirmPasswordValid ? 'success' : 'error');
+    setConfirmPasswordStatus(isConfirmPasswordValid ? InputStatus.SUCCESS : InputStatus.ERROR);
   };
 
   const checkPasswordStatus = () => {
@@ -63,8 +64,8 @@ export const CreatePasswordForm = () => {
   }, [confirmPassword]);
 
   useEffect(() => {
-    const passwordVerified = passwordStatus === 'success';
-    const confirmPasswordVerified = confirmPasswordStatus === 'success';
+    const passwordVerified = passwordStatus === InputStatus.SUCCESS;
+    const confirmPasswordVerified = confirmPasswordStatus === InputStatus.SUCCESS;
 
     setPasswordsVerified(passwordVerified && confirmPasswordVerified);
   }, [passwordStatus, confirmPasswordStatus]);
@@ -81,7 +82,7 @@ export const CreatePasswordForm = () => {
     // Reset validation when empty
     if (newPassword === '') {
       setAllowValidatePassword(false);
-      setPasswordStatus(null);
+      setPasswordStatus(InputStatus.NEUTRAL);
     }
 
     if (allowValidatePassword) {
@@ -101,7 +102,7 @@ export const CreatePasswordForm = () => {
     // Reset validation when empty
     if (newConfirmPassword === '') {
       setAllowValidateConfirmPassword(false);
-      setConfirmPasswordStatus(null);
+      setConfirmPasswordStatus(InputStatus.NEUTRAL);
     }
 
     if (allowValidateConfirmPassword) {
@@ -155,7 +156,9 @@ export const CreatePasswordForm = () => {
           variant="primary"
           showMessageText={true}
           status={passwordStatus}
-          messageText={passwordStatus === 'error' ? 'Password must be at least 8 characters' : ''}
+          messageText={
+            passwordStatus === InputStatus.ERROR ? 'Password must be at least 8 characters' : ''
+          }
           label="New password (8 characters min)"
           placeholder="Enter password"
           type={passwordVisible ? 'text' : 'password'}

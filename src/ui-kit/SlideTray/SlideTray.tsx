@@ -187,7 +187,9 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
             <div className="relative flex flex-col h-full">
               {title && (
                 <>
-                  <h2 className={`text-h5 font-bold ${titleColor} text-center mb-2`}>{title}</h2>
+                  <h2 className={`text-h5 font-bold line-clamp-1 ${titleColor} text-center mb-2`}>
+                    {title}
+                  </h2>
                   <Separator variant={reducedTopMargin ? 'bottom' : 'top'} />
                 </>
               )}

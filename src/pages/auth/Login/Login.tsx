@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { EyeOpen, EyeClose } from '@/assets/icons';
-import { ROUTES } from '@/constants';
+import { InputStatus, ROUTES } from '@/constants';
 import { Button, Input } from '@/ui-kit';
 import { resetNodeErrorCounts, tryAuthorizeAccess } from '@/helpers';
 import { useSetAtom } from 'jotai';
@@ -14,7 +14,7 @@ export const Login: React.FC = () => {
 
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [passwordStatus, setPasswordStatus] = useState<'error' | 'success' | null>(null);
+  const [passwordStatus, setPasswordStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
   const [passwordMessage, setPasswordMessage] = useState<string>('');
 
   // Reset status on typing
@@ -23,8 +23,8 @@ export const Login: React.FC = () => {
     setPassword(newPassword);
 
     // Only reset the error state if the user had an error before
-    if (passwordStatus === 'error') {
-      setPasswordStatus(null);
+    if (passwordStatus === InputStatus.ERROR) {
+      setPasswordStatus(InputStatus.NEUTRAL);
       setPasswordMessage('');
     }
   };
@@ -35,8 +35,8 @@ export const Login: React.FC = () => {
     setPassword(pastedText.trim());
 
     // Only reset the error state if the user had an error before
-    if (passwordStatus === 'error') {
-      setPasswordStatus(null);
+    if (passwordStatus === InputStatus.ERROR) {
+      setPasswordStatus(InputStatus.NEUTRAL);
       setPasswordMessage('');
     }
   };
@@ -49,10 +49,10 @@ export const Login: React.FC = () => {
       setIsLoggedIn(true);
       navigate(ROUTES.APP.ROOT);
     } else if (authStatus === 'no_wallet') {
-      setPasswordStatus('error');
+      setPasswordStatus(InputStatus.ERROR);
       setPasswordMessage('No wallet found.  Make or import a new one.');
     } else {
-      setPasswordStatus('error');
+      setPasswordStatus(InputStatus.ERROR);
       setPasswordMessage('Incorrect password.');
     }
   };

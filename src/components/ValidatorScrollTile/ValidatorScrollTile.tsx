@@ -30,7 +30,6 @@ import { Loader } from '../Loader';
 import { useRefreshData, useToast } from '@/hooks';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 
-// TODO: show all validators for user, including those where the user is unstaking.
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 interface ValidatorScrollTileProps {
   combinedStakingInfo: CombinedStakingInfo;
@@ -83,13 +82,13 @@ export const ValidatorScrollTile = ({
     parseFloat(rewardAmount),
     GREATER_EXPONENT_DEFAULT,
   ).toFixed(GREATER_EXPONENT_DEFAULT)}`;
-  const userIsUnbonding = unbondingBalance && parseFloat(unbondingBalance?.balance || '') > 0;
+  const userHasUnbonding = unbondingBalance && parseFloat(unbondingBalance?.balance || '') > 0;
   const formattedRewardAmount = formatBalanceDisplay(strippedRewardAmount, symbol);
-
   const delegatedAmount = convertToGreaterUnit(
     parseFloat(delegation.shares || '0'),
     GREATER_EXPONENT_DEFAULT,
   );
+  const userIsUnbonding = userHasUnbonding && delegatedAmount === 0;
 
   const title = validator.description.moniker || 'Unknown Validator';
   const commission = `${parseFloat(validator.commission.commission_rates.rate) * 100}%`;
@@ -379,13 +378,19 @@ export const ValidatorScrollTile = ({
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
 
   if (showCurrentValidators) {
-    if (userIsUnbonding) {
+    if (userHasUnbonding) {
       value = formatBalanceDisplay(
-        parseFloat(unbondingBalance?.balance || '0').toFixed(GREATER_EXPONENT_DEFAULT),
+        convertToGreaterUnit(
+          parseFloat(unbondingBalance?.balance || '0'),
+          GREATER_EXPONENT_DEFAULT,
+        ).toFixed(GREATER_EXPONENT_DEFAULT),
         'MLD',
       );
-      statusColor = TextFieldStatus.WARN;
-      secondarySubtitle = 'Unstaking...';
+
+      if (userIsUnbonding) {
+        statusColor = TextFieldStatus.WARN;
+        secondarySubtitle = 'Unstaking...';
+      }
     }
   } else {
     // TODO: uncomment when uptime is fixed
@@ -477,14 +482,14 @@ export const ValidatorScrollTile = ({
                 {' '}
                 <strong>Amount Staked:</strong> <span className="text-blue">{dialogSubTitle}</span>
               </p>
-              {userIsUnbonding && (
+              {userHasUnbonding && (
                 <>
                   <p className="line-clamp-1">
-                    <strong>Amount Unstaking:</strong> <span className="text-blue">{value}</span>
+                    <strong>Amount Unstaking:</strong> <span className="text-warning">{value}</span>
                   </p>
                   <p className="line-clamp-1">
                     <strong>Remaining Time to Unstake:</strong>{' '}
-                    <span className="text-blue">{unstakingTime}</span>
+                    <span className="text-warning">{unstakingTime}</span>
                   </p>
                   <p>
                     <strong>Validator Commission:</strong> <span>{commission}</span>

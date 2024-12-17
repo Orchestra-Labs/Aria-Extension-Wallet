@@ -3,15 +3,16 @@ import { useAtomValue } from 'jotai';
 import { walletStateAtom } from '@/atoms';
 import { Button, CopyTextField, SlideTray } from '@/ui-kit';
 import { truncateWalletAddress } from '@/helpers';
-import { DEFAULT_ASSET, WALLET_PREFIX } from '@/constants';
+import { WALLET_PREFIX } from '@/constants';
 import { QRCodeContainer } from '../QRCodeContainer';
+import { Asset } from '@/types';
 
 interface ReceiveDialogProps {
   buttonSize?: 'default' | 'medium' | 'small' | 'xsmall';
+  asset: Asset;
 }
 
-// TODO: pass unit to receive, default to wallet default
-export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default' }) => {
+export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
   const walletState = useAtomValue(walletStateAtom);
 
   const [includeCoinPreference, setIncludeCoinPreference] = useState(false);
@@ -21,7 +22,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
 
   const qrDataWithAddress = JSON.stringify({
     address: walletAddress,
-    denomPreference: DEFAULT_ASSET.denom,
+    denomPreference: asset.denom,
   });
   const qrData = includeCoinPreference ? qrDataWithAddress : walletAddress;
 
@@ -45,7 +46,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
             onClick={() => setIncludeCoinPreference(!includeCoinPreference)}
             className="ml-1 px-2 rounded-md text-xs"
           >
-            {`${includeCoinPreference ? 'Receiving' : 'Receive'} ${DEFAULT_ASSET.symbol}${includeCoinPreference ? '' : '?'}`}
+            {`${includeCoinPreference ? 'Receiving' : 'Receive'} ${asset.symbol}${includeCoinPreference ? '' : '?'}`}
           </Button>
         </div>
 

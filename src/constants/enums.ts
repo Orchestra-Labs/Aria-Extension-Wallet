@@ -32,3 +32,21 @@ export enum ValidatorSortType {
   APY = 'apy',
   VOTING_POWER = 'votingPower',
 }
+
+export enum IBCConnectionState {
+  OPEN = 'STATE_OPEN',
+  CLOSED = 'STATE_CLOSED',
+}
+
+export enum InputStatus {
+  ERROR = 'error',
+  SUCCESS = 'success',
+  WARNING = 'warning',
+  INFO = 'info',
+  NEUTRAL = '',
+}
+
+export enum NetworkLevel {
+  TESTNET = 'testnet',
+  MAINNET = 'mainnet',
+}

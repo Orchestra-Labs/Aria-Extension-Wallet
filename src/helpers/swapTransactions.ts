@@ -1,14 +1,13 @@
-import { osmosis } from '@orchestra-labs/symphonyjs';
 import { incrementErrorCount, performRpcQuery, selectNodeProviders } from './queryNodes';
 import { SwapObject, TransactionResult, RPCResponse, Asset } from '@/types';
 import { CHAIN_ENDPOINTS, DELAY_BETWEEN_NODE_ATTEMPTS, MAX_NODES_PER_QUERY } from '@/constants';
 import { createOfflineSignerFromMnemonic } from './dataHelpers/wallet';
-import { getSigningOsmosisClient } from '@orchestra-labs/symphonyjs';
 import { delay } from './timer';
 import { getValidFeeDenom } from './feeDenom';
 import { getSessionToken } from './dataHelpers';
+import { getSigningSymphonyClient, symphony } from '@orchestra-labs/symphonyjs';
 
-const { swapSend } = osmosis.market.v1beta1.MessageComposer.withTypeUrl;
+const { swapSend } = symphony.market.v1beta1.MessageComposer.withTypeUrl;
 
 export const isValidSwap = ({
   sendAsset,
@@ -53,7 +52,7 @@ const queryWithRetry = async ({
         }
         const offlineSigner = await createOfflineSignerFromMnemonic(sessionToken.mnemonic || '');
 
-        const client = await getSigningOsmosisClient({
+        const client = await getSigningSymphonyClient({
           rpcEndpoint: queryMethod,
           signer: offlineSigner,
         });

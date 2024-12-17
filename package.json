@@ -1,7 +1,7 @@
 {
   "name": "aria-wallet",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,20 +9,20 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc",
-    "prepare-zip": "yarn build && mv dist/manifest.json ./ && zip -r aria-wallet.zip manifest.json dist/ && mv manifest.json dist/"
+    "prepare-zip": "yarn build && zip -r aria-wallet.zip dist/",
+    "reset": "rm -rf node_modules yarn.lock && yarn install"
   },
   "dependencies": {
     "@cosmjs/amino": "^0.32.4",
     "@cosmjs/encoding": "^0.32.4",
     "@cosmjs/stargate": "^0.32.4",
-    "@orchestra-labs/symphonyjs": "^1.0.28",
+    "@orchestra-labs/symphonyjs": "^1.0.29",
     "@radix-ui/react-dialog": "~1.0.5",
     "@radix-ui/react-scroll-area": "~1.0.5",
     "@radix-ui/react-select": "~2.0.0",
     "@radix-ui/react-slot": "~1.0.2",
     "@radix-ui/react-toast": "^1.2.2",
     "@tanstack/react-query": "^5.52.1",
-    "@types/chrome": "^0.0.266",
     "@types/node": "~20.12.3",
     "@types/react": "~18.2.66",
     "@types/react-dom": "~18.2.22",
@@ -30,6 +30,7 @@
     "@vitejs/plugin-react": "~4.2.1",
     "@zxing/browser": "^0.1.5",
     "autoprefixer": "~10.4.19",
+    "bech32": "^2.0.0",
     "bignumber.js": "^9.1.2",
     "bip39": "^3.1.0",
     "class-variance-authority": "~0.7.0",

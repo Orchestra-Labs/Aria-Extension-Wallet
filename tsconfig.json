@@ -3,11 +3,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "useDefineForClassFields": true,
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ESNext"
-    ],
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": false,
     "esModuleInterop": false,
     "forceConsistentCasingInFileNames": false,
@@ -25,25 +21,12 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true,
 
-    "types": [
-      "node",
-      "vite/client",
-      "chrome"
-    ],
-    "typeRoots": [
-      "src/types/**/*",
-      "node_modules/@types"
-    ],
+    "types": ["node", "vite/client"],
+    "typeRoots": ["src/types/**/*", "node_modules/@types"],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
+      "@/*": ["./src/*"]
+    }
   },
-  "include": [
-    "vite.config.ts",
-    ".eslintrc.cjs",
-    "src/**/*",
-  ],
+  "include": ["vite.config.ts", ".eslintrc.cjs", "src/**/*"]
 }

@@ -81,7 +81,7 @@ export const BalanceCard = ({ currentStep, totalSteps }: BalanceCardProps) => {
             <Button className="w-full" asChild>
               <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
             </Button>
-            <ReceiveDialog />
+            <ReceiveDialog asset={DEFAULT_ASSET} />
           </>
         ) : (
           <>

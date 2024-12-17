@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ArrowLeft, Spinner, Swap } from '@/assets/icons';
-import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, ROUTES } from '@/constants';
+import {
+  DEFAULT_ASSET,
+  defaultReceiveState,
+  defaultSendState,
+  GREATER_EXPONENT_DEFAULT,
+  NetworkLevel,
+  ROUTES,
+} from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { useAtom, useAtomValue } from 'jotai';
 import {
@@ -19,10 +26,12 @@ import { AssetInput, WalletSuccessScreen, TransactionResultsTile } from '@/compo
 import {
   formatBalanceDisplay,
   getSessionStorageItem,
+  isIBC,
   isValidSwap,
   isValidTransaction,
   removeSessionStorageItem,
   removeTrailingZeroes,
+  sendIBC,
   sendTransaction,
   setSessionStorageItem,
   swapTransaction,
@@ -64,9 +73,10 @@ export const Send = () => {
   const walletState = useAtomValue(walletStateAtom);
   const walletAssets = walletState?.assets || [];
 
-  // TODO: handle bridge types such as IBC
+  // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
   const [transactionType, setTransactionType] = useState({
     isSwap: false,
+    isIBC: false,
     isValid: true,
   });
   const [simulatedFee, setSimulatedFee] = useState<{
@@ -121,6 +131,8 @@ export const Send = () => {
   };
 
   const handleTransaction = async ({ simulateTransaction = false } = {}) => {
+    console.log('Entering handleTransaction...');
+    console.log('Current transaction type:', transactionType);
     if (!transactionType.isValid) return;
 
     let currentRecipientAddress = '';
@@ -156,12 +168,28 @@ export const Send = () => {
     try {
       let result: TransactionResult;
       // Routing logic based on transactionType
-      console.log('transaction type', transactionType.isSwap);
+      console.log('transaction type', transactionType);
 
-      if (!transactionType.isSwap) {
+      // TODO: handle swap then IBC if both are enabled
+      if (!transactionType.isSwap && !transactionType.isIBC) {
         console.log('Executing sendTransaction');
         result = await sendTransaction(walletState.address, sendObject, simulateTransaction);
         console.log('sendTransaction result:', result);
+      } else if (transactionType.isIBC) {
+        const fromAddress = walletState.address;
+        // TODO: move chain and network level into sendState and receiveState
+        const sendChain = sendState.chainName;
+        const receiveChain = receiveState.chainName;
+        const networkLevel = NetworkLevel.TESTNET;
+        const ibcObject = { fromAddress, sendObject, sendChain, receiveChain, networkLevel };
+        console.log('Executing IBC Transaction with the following details:');
+        console.log('From Address:', fromAddress);
+        console.log('Send Chain:', sendChain);
+        console.log('Receive Chain:', receiveChain);
+        console.log('Network Level:', networkLevel);
+
+        result = await sendIBC({ ibcObject, simulateTransaction });
+        console.log('IBC Transaction Result:', result);
       } else if (transactionType.isSwap) {
         const swapObject = { sendObject, resultDenom: receiveAsset.denom };
         console.log('Executing swapTransaction with swapObject:', swapObject);
@@ -177,7 +205,6 @@ export const Send = () => {
 
       // Process result for simulation or actual transaction
       if (simulateTransaction && result?.data?.code === 0) {
-        console.log('Simulation successful');
         return result;
       } else if (result.success && result.data?.code === 0) {
         const txHash = result.data.txHash || 'Hash not provided';
@@ -191,12 +218,10 @@ export const Send = () => {
       handleTransactionError(errorMessage);
     } finally {
       if (!simulateTransaction) {
-        console.log('Resetting loading state');
         setLoading(false);
       }
     }
 
-    console.log('Ending handleTransaction function');
     return null;
   };
 
@@ -205,11 +230,6 @@ export const Send = () => {
     if (!walletAsset) return 0;
 
     const maxAmount = parseFloat(walletAsset.amount || '0');
-    console.log('simulated fee', simulatedFee ? parseFloat(simulatedFee.fee) : 0);
-    console.log(
-      'alternative representation',
-      simulatedFee ? parseFloat(simulatedFee.fee.split(' ')[0]) : 0,
-    );
     const feeAmount = simulatedFee ? parseFloat(simulatedFee.fee) : 0;
 
     const maxAvailable = Math.max(0, maxAmount - feeAmount);
@@ -314,19 +334,11 @@ export const Send = () => {
   };
 
   const updateFee = async () => {
-    console.log(
-      'Updating fee with current sendState and transactionType:',
-      sendState,
-      transactionType,
-    );
-
     if (sendState.amount > 0 && transactionType.isValid) {
       const simulationResponse = await handleTransaction({ simulateTransaction: true });
-      console.log('Simulation response:', simulationResponse, simulationResponse?.data);
 
       if (simulationResponse && simulationResponse.data) {
         const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
-        console.log('Gas wanted:', simulationResponse.data.gasWanted, gasWanted);
 
         // TODO: get default gas price from chain registry
         const defaultGasPrice = 0.025;
@@ -337,18 +349,15 @@ export const Send = () => {
 
         const feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / sendState.amount) * 100 : 0;
 
-        console.log('Calculated fee:', feeInGreaterUnit, 'Fee percentage:', feePercentage);
-
         setSimulatedFee({
           fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
           textClass:
             feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
         });
       } else {
-        console.log('Simulation did not return gas details');
+        console.error('Simulation did not return gas details');
       }
     } else {
-      console.log('No valid send amount or invalid transaction type');
       setSimulatedFee({
         fee: '0 MLD',
         textClass: 'text-blue',
@@ -356,41 +365,67 @@ export const Send = () => {
     }
   };
 
-  const updateTransactionType = () => {
+  const updateTransactionType = async () => {
     const sendAsset = sendState.asset;
     const receiveAsset = receiveState.asset;
+    const network = sendState.networkLevel;
 
     if (!sendAsset || !receiveAsset) {
       console.log('Missing assets for transaction type update');
       return;
     }
 
-    const newTransactionType = {
-      isSwap: isValidSwap({ sendAsset, receiveAsset }),
-      isValid: isValidTransaction({ sendAsset, receiveAsset }),
-    };
+    console.log('Updating transaction type with the following details:');
+    console.log('Send Asset:', sendAsset);
+    console.log('Receive Asset:', receiveAsset);
+    console.log('Send address:', walletState.address);
+    console.log('Receive addss:', recipientAddress);
 
-    console.log('Updated transaction type:', newTransactionType);
+    try {
+      const isIBCEnabled = await isIBC({
+        sendAddress: walletState.address,
+        recipientAddress,
+        network,
+      });
+      const isSwapEnabled = isValidSwap({ sendAsset, receiveAsset });
+      const isValidTransactionEnabled = await isValidTransaction({
+        sendAddress: walletState.address,
+        recipientAddress,
+        sendState,
+        receiveState,
+        network,
+      });
 
-    setTransactionType(newTransactionType);
+      const newTransactionType = {
+        isIBC: isIBCEnabled,
+        isSwap: isSwapEnabled,
+        isValid: isValidTransactionEnabled,
+      };
 
-    // Update send and receive placeholders based on max values and exchange rate
-    const maxSendable = calculateMaxAvailable(sendAsset);
-    const applicableExchangeRate = sendAsset.denom === receiveAsset.denom ? 1 : exchangeRate || 1;
-    const maxReceivable = maxSendable * applicableExchangeRate;
+      console.log('Computed transaction type:', newTransactionType);
+      setTransactionType(newTransactionType);
 
-    console.log('Transaction type update details:', {
-      maxSendable,
-      applicableExchangeRate,
-      maxReceivable,
-    });
+      const maxSendable = calculateMaxAvailable(sendAsset);
+      const applicableExchangeRate = sendAsset.denom === receiveAsset.denom ? 1 : exchangeRate || 1;
+      const maxReceivable = maxSendable * applicableExchangeRate;
 
-    setSendPlaceholder(`Max: ${formatBalanceDisplay(`${maxSendable}`, sendAsset.symbol || 'MLD')}`);
-    setReceivePlaceholder(
-      !newTransactionType.isSwap
-        ? 'No exchange on current pair'
-        : `Max: ${removeTrailingZeroes(maxReceivable)}${receiveAsset.symbol}`,
-    );
+      console.log('Transaction placeholders:', {
+        maxSendable,
+        applicableExchangeRate,
+        maxReceivable,
+      });
+
+      setSendPlaceholder(
+        `Max: ${formatBalanceDisplay(`${maxSendable}`, sendAsset.symbol || 'MLD')}`,
+      );
+      setReceivePlaceholder(
+        !newTransactionType.isSwap
+          ? 'No exchange on current pair'
+          : `Max: ${removeTrailingZeroes(maxReceivable)}${receiveAsset.symbol}`,
+      );
+    } catch (error) {
+      console.error('Error updating transaction type:', error);
+    }
   };
 
   const switchFields = () => {
@@ -410,6 +445,10 @@ export const Send = () => {
     setMap = setChangeMap,
     isExchangeRateUpdate = false,
   ) => {
+    if (map.sendAsset || map.receiveAsset) {
+      updateTransactionType();
+    }
+
     if (map.sendAsset) {
       const sendAsset = sendState.asset;
       const sendAmount = sendState.amount;
@@ -494,18 +533,11 @@ export const Send = () => {
 
     // TODO: add fee update to changemap?
     updateFee();
-    updateTransactionType();
   };
 
   const resetStates = () => {
-    setSendState({
-      asset: DEFAULT_ASSET,
-      amount: 0,
-    });
-    setReceiveState({
-      asset: DEFAULT_ASSET,
-      amount: 0,
-    });
+    setSendState(defaultSendState);
+    setReceiveState(defaultReceiveState);
     setRecipientAddress('');
     setSelectedAsset(DEFAULT_ASSET);
   };
@@ -518,6 +550,11 @@ export const Send = () => {
   useEffect(() => {
     propagateChanges(callbackChangeMap, setCallbackChangeMap, true);
   }, [exchangeRate]);
+
+  useEffect(() => {
+    console.log('recipient address updated to', recipientAddress);
+    updateTransactionType();
+  }, [recipientAddress]);
 
   useEffect(() => {
     setUserIsOnPage(true);
@@ -621,7 +658,7 @@ export const Send = () => {
 
           {/* Send Button */}
           <Button
-            className="w-full"
+            className="w-[85%]"
             onClick={() => handleTransaction()}
             disabled={isLoading || sendState.amount === 0}
           >

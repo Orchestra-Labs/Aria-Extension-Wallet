@@ -110,6 +110,12 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: for when viewing all validators, enable selectable option for viewing unbonded validators
+  // TODO: Add remember me
+  // TODO: make toast animate in, animate out, and swipe-away
+  // TODO: Add first level of routing (swap to IBC send or IBC to swap)
+  // TODO: Add additional chain views to verify above
+  // TODO: abstract wallet prefix and mnemonic decryption
   // TODO: add auth support for dApps
   /* ******************************************************************************************* */
 
@@ -119,28 +125,15 @@ export const CreateWallet = () => {
   // TODO: abstract IBC needs
   // TODO: add button to "add chain" at bottom of Holdings list
   // TODO: add link to github repo for registry
-  // TODO: enable Wallet Name display
-
-  /* Revenue TODOs (ensure no added fees from us adds total fees over 1% on transaction */
-  // TODO: list these in user info:
-  // revenue sources will be gas markups (transaction fees), cross-chain exchange fees, on-ramp/off-ramp fees, staking commission, affiliate revenue
-  // TODO: minor revenue for wallets - gas markups
-  // TODO: in-app exchange fee (find lowest rates for user, but add small commission)
-  // TODO: on-ramp fees (add small commission)
-  // TODO: staking fees add small percent commission
-  // TODO: affiliate revenue from integrated services
-  // NOTE: metamask - primary from swap and on-ramp
-  // NOTE: trust - primary from on-ramps, swaps, and staking
-  // NOTE: coinbase - primary from on-ramps, coinbase, and affiliate
-  // NOTE: exodus - primary from staking, affiliate, and on-ramp
-
-  /* Interchain-compatibility TODOs (mobile version before this) */
-  // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
-  // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
+  // TODO: Add routing
   // TODO: modify claim, restake, and unstake functions to withdraw from all unique delegator addresses
   // TODO: enable search function for wallet asset list by chain (on top of current functionality)
   // TODO: enable search function to validator list by chain (on top of current functionality)
   // TODO: add show/hide function to validator list (by chain)
+
+  /* Interchain-compatibility TODOs (mobile version before this) */
+  // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
+  // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
 
   /* dApp TODOs */
   // TODO: add page
@@ -151,7 +144,7 @@ export const CreateWallet = () => {
 
   /* Nice to have TODOs */
   // TODO: get google analytics going
-  // TODO: creation of wallet with old password should add additional wallet on same account
+  // TODO: creation of wallet with old password should overwrite old wallet
   // TODO: fix issue with gas on 'all' button for validator selections (bundle transactions)
   // TODO: make toasts copy-on-click
   // TODO: fix copytextfield issue of enlarged border on click

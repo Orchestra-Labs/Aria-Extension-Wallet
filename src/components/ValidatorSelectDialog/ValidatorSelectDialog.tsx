@@ -35,7 +35,6 @@ interface ValidatorSelectDialogProps {
   isClaimDialog?: boolean;
 }
 
-// TODO: show error printout in same place as loader
 export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   buttonText,
   buttonVariant,

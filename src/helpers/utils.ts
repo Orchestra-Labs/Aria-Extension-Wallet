@@ -1,9 +1,10 @@
-import { Asset } from '@/types';
+import { TransactionState } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
 import { isValidSend } from './sendTransactions';
-import { TextFieldStatus } from '@/constants';
+import { NetworkLevel, TextFieldStatus } from '@/constants';
+import { isIBC } from './ibcTransactions';
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs, { strict: false }));
@@ -44,13 +45,33 @@ export const getRegexForDecimals = (exponent: number) => {
   return new RegExp(`^\\d*\\.?\\d{0,${exponent}}$`);
 };
 
-export const isValidTransaction = ({
-  sendAsset,
-  receiveAsset,
+export const isValidTransaction = async ({
+  sendAddress,
+  recipientAddress,
+  sendState,
+  receiveState,
+  network,
 }: {
-  sendAsset: Asset;
-  receiveAsset: Asset;
+  sendAddress: string;
+  recipientAddress: string;
+  sendState: TransactionState;
+  receiveState: TransactionState;
+  network: NetworkLevel;
 }) => {
+  if (sendState.networkLevel !== receiveState.networkLevel) {
+    return false;
+  }
+
+  if (sendAddress && recipientAddress) {
+    const isValidIBC = await isIBC({ sendAddress, recipientAddress, network });
+    if (!isValidIBC) {
+      return false;
+    }
+  }
+
+  const sendAsset = sendState.asset;
+  const receiveAsset = receiveState.asset;
+
   const isSwap = isValidSwap({ sendAsset, receiveAsset });
   const isSend = isValidSend({ sendAsset, receiveAsset });
   const result = isSend || isSwap;

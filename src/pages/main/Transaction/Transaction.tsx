@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 
-import { ArrowLeft, Copy, FullArrowRight } from '@/assets/icons';
+import { ArrowLeft, Copy, FullArrowRight, Logo } from '@/assets/icons';
 import { ROUTES } from '@/constants';
 import { cn } from '@/helpers/utils';
 import { Button } from '@/ui-kit';
@@ -14,8 +14,6 @@ const TRANSACTION_INFO = [
   { id: 5, label: 'Sum gas', value: '0.005 MLD' },
   { id: 6, label: 'Total sum', value: '0.00554 MLD' },
 ];
-
-const avatarUrl = chrome?.runtime?.getURL('avatar.png');
 
 export const Transaction: React.FC = () => (
   <div className="h-full pt-5 px-4">
@@ -50,7 +48,7 @@ export const Transaction: React.FC = () => (
       <div className="bg-neutral-2 rounded-2xl py-2 px-3 w-full h-14">
         <h6 className="text-sm text-neutral-1">From</h6>
         <div className="flex items-center mt-1">
-          <img className="w-5 h-5 rounded-full mr-1" src={avatarUrl} alt="avatar" />
+          <Logo className="w-5 h-5 rounded-full mr-1" />
           <p className="text-white text-base">Au4...Z45U56x</p>
         </div>
       </div>
@@ -60,7 +58,7 @@ export const Transaction: React.FC = () => (
       <div className="bg-neutral-2 rounded-2xl py-3 px-3 w-full h-16">
         <h6 className="text-sm text-neutral-1">To</h6>
         <div className="flex items-center mt-1">
-          <img className="w-5 h-5 rounded-full mr-1" src={avatarUrl} alt="avatar" />
+          <Logo className="w-5 h-5 rounded-full mr-1" />
           <p className="text-white text-base">Au4...Z45U56x</p>
         </div>
       </div>

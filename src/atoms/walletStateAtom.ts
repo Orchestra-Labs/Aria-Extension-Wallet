@@ -114,11 +114,10 @@ export const filteredDialogAssetsAtom = atom(get => {
         );
         Object.values(networkAssets).forEach(asset => {
           const walletAsset = walletState.assets.find(wAsset => wAsset.denom === asset.denom);
-          visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
-          console.log(
-            'Dialog - Added asset:',
-            walletAsset ? walletAsset : { ...asset, amount: '0' },
-          );
+          if (walletAsset && parseFloat(walletAsset.amount) > 0) {
+            visibleAssets.push(walletAsset);
+            console.log('Dialog - Added asset:', walletAsset);
+          }
         });
       } else {
         console.log(`Dialog - Subscribed denoms for ${networkID}:`, subscription.coinDenoms);
@@ -126,11 +125,10 @@ export const filteredDialogAssetsAtom = atom(get => {
           const asset = networkAssets[denom];
           if (asset) {
             const walletAsset = walletState.assets.find(wAsset => wAsset.denom === denom);
-            visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
-            console.log(
-              'Dialog - Added specific asset:',
-              walletAsset ? walletAsset : { ...asset, amount: '0' },
-            );
+            if (walletAsset && parseFloat(walletAsset.amount) > 0) {
+              visibleAssets.push(walletAsset);
+              console.log('Dialog - Added specific asset:', walletAsset);
+            }
           } else {
             console.warn(
               `Dialog - Asset with denom ${denom} not found in network assets for ${networkID}`,

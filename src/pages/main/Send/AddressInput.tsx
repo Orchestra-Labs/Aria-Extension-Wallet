@@ -1,11 +1,17 @@
 import { Input } from '@/ui-kit';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { addressVerifiedAtom, recipientAddressAtom, walletStateAtom } from '@/atoms';
+import {
+  addressVerifiedAtom,
+  receiveStateAtom,
+  recipientAddressAtom,
+  walletStateAtom,
+} from '@/atoms';
 import { useEffect, useState } from 'react';
-import { WALLET_PREFIX } from '@/constants';
-import { cn } from '@/helpers';
+import { InputStatus } from '@/constants';
+import { cn, fetchBech32Prefixes } from '@/helpers';
 import { QRCodeScannerDialog } from '@/components';
-import { Asset } from '@/types';
+import { Asset, ChainData } from '@/types';
+import { bech32 } from 'bech32';
 
 interface AddressInputProps {
   addBottomMargin?: boolean;
@@ -13,7 +19,6 @@ interface AddressInputProps {
   updateSendAsset: (asset: Asset, propagateChanges: boolean) => void;
 }
 
-// TODO: return validity
 export const AddressInput: React.FC<AddressInputProps> = ({
   addBottomMargin = true,
   labelWidth,
@@ -21,41 +26,80 @@ export const AddressInput: React.FC<AddressInputProps> = ({
 }) => {
   const [address, setAddress] = useAtom(recipientAddressAtom);
   const setAddressVerified = useSetAtom(addressVerifiedAtom);
+  const setReceiveState = useSetAtom(receiveStateAtom);
   const walletState = useAtomValue(walletStateAtom);
 
-  const [addressStatus, setAddressStatus] = useState<'error' | 'success' | null>(null);
+  const [addressStatus, setAddressStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
+  const [messageText, setMessageText] = useState<string>('');
   const [allowValidateAddress, setAllowValidatePassword] = useState(false);
+  const [testnetPrefixes, setTestnetPrefixes] = useState<ChainData[]>([]);
 
   const validAddressLength = 47;
 
-  // TODO: allow validation against more than just Symphony addresses.  any address in registry.  provide warning and return error if not sendable?
   const validateAddress = () => {
     if (address === '') {
-      setAddressStatus(null);
+      setAddressStatus(InputStatus.NEUTRAL);
+      setMessageText('');
       return;
     }
 
-    const hasPrefix = address.startsWith(WALLET_PREFIX);
-    const isValidLength = address.length === validAddressLength;
     const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(address);
+    if (!isAlphanumeric) {
+      setAddressStatus(InputStatus.ERROR);
+      setMessageText('Address contains invalid characters.');
+      setAddressVerified(false);
+      return;
+    }
 
-    const isAddressValid = hasPrefix && isValidLength && isAlphanumeric;
-    setAddressStatus(isAddressValid ? 'success' : 'error');
-    setAddressVerified(isAddressValid);
+    try {
+      const decoded = bech32.decode(address);
+
+      // TODO: check this verifies prefix presence properly
+      console.log('found prefix', decoded.prefix);
+      if (!decoded.prefix) {
+        setAddressStatus(InputStatus.ERROR);
+        setMessageText(`Missing prefix`);
+        setAddressVerified(false);
+        return;
+      }
+
+      // TODO: use net of sending coin
+      const matchedChain = testnetPrefixes.find(chain => chain.testnet === decoded.prefix);
+
+      if (!matchedChain) {
+        setAddressStatus(InputStatus.WARNING);
+        setMessageText('Prefix not known');
+        setAddressVerified(false);
+        return;
+      }
+
+      setAddressStatus(InputStatus.SUCCESS);
+      setMessageText('');
+      setAddressVerified(true);
+      setReceiveState(prevState => ({
+        ...prevState,
+        chainName: matchedChain.coin.toLowerCase(),
+      }));
+    } catch (error) {
+      setAddressStatus(InputStatus.ERROR);
+      setMessageText('Invalid Bech32 encoding.');
+      setAddressVerified(false);
+    }
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newAddress = e.target.value;
-    setAddress(newAddress);
+    const trimmedAddress = newAddress.trim();
+    setAddress(trimmedAddress);
 
-    if (newAddress.length >= validAddressLength && !allowValidateAddress) {
+    if (trimmedAddress.length >= validAddressLength && !allowValidateAddress) {
       setAllowValidatePassword(true);
     }
 
     // Reset validation when empty
-    if (newAddress === '') {
+    if (trimmedAddress === '') {
       setAllowValidatePassword(false);
-      setAddressStatus(null);
+      setAddressStatus(InputStatus.NEUTRAL);
     }
 
     if (allowValidateAddress) {
@@ -73,10 +117,11 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const handleAddressPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData('text');
-    setAddress(pastedText);
+    const trimmedAddress = pastedText.trim();
+    setAddress(trimmedAddress);
 
     // Start validating immediately after paste
-    if (pastedText.length > 0) {
+    if (trimmedAddress.length > 0) {
       setAllowValidatePassword(true);
     }
     validateAddress();
@@ -90,6 +135,16 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     setAddressVerified(addressStatus === 'success');
   }, [addressStatus]);
 
+  useEffect(() => {
+    const fetchPrefixes = async () => {
+      const prefixes = await fetchBech32Prefixes();
+      const testnets = prefixes.filter(chain => chain.testnet !== null);
+      setTestnetPrefixes(testnets);
+    };
+
+    fetchPrefixes();
+  }, []);
+
   return (
     <div className={cn(`flex items-baseline ${addBottomMargin ? 'mb-4' : ''} space-x-2`)}>
       <label className={cn(`text-sm text-neutral-1 whitespace-nowrap ${labelWidth}`)}>
@@ -101,7 +156,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
           type="text"
           status={addressStatus}
           showMessageText={true}
-          messageText={addressStatus === 'error' ? 'Address not in supported format' : ''}
+          messageText={messageText}
           placeholder={walletState.address || 'Wallet Address or ICNS'}
           icon={<QRCodeScannerDialog updateSendAsset={updateSendAsset} />}
           value={address}
