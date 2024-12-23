@@ -18,4 +18,5 @@ export * from './Toast';
 export * from './TransactionResultsTile';
 export * from './ValidatorScrollTile';
 export * from './ValidatorSelectDialog';
+export * from './WalletConnect';
 export * from './WalletSuccessScreen';

@@ -7,7 +7,7 @@ export const WALLET_PREFIX = 'symphony';
 
 // RPC and REST URLs for the Symphony network
 export const DEFAULT_CHAIN_NAME = 'symphonytestnet';
-const DEFAULT_CHAIN_ID = 'symphony-testnet-4';
+export const DEFAULT_CHAIN_ID = 'symphony-testnet-4';
 
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
