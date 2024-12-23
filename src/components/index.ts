@@ -15,6 +15,7 @@ export * from './SearchBar';
 export * from './SortDialog';
 export * from './TileScroller';
 export * from './Toast';
+export * from './Tooltip';
 export * from './TransactionResultsTile';
 export * from './ValidatorScrollTile';
 export * from './ValidatorSelectDialog';
