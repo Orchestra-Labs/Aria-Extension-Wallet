@@ -7,6 +7,7 @@ import {
   defaultSendState,
   GREATER_EXPONENT_DEFAULT,
   NetworkLevel,
+  Position,
   ROUTES,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
@@ -39,6 +40,7 @@ import {
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
 import { AddressInput } from './AddressInput';
+import Tooltip from '@/components/Tooltip/Tooltip';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -588,9 +590,11 @@ export const Send = () => {
         >
           <ArrowLeft className="w-full h-full text-white" />
         </NavLink>
-        <div>
+
+        <Tooltip tooltipText={'To swap, click the receive field icon'} position={Position.RIGHT}>
           <h1 className="text-h5 text-white font-bold">Send</h1>
-        </div>
+        </Tooltip>
+
         <div className="max-w-5 w-full max-h-5" />
       </div>
 
@@ -660,7 +664,7 @@ export const Send = () => {
           <Button
             className="w-[85%]"
             onClick={() => handleTransaction()}
-            disabled={isLoading || sendState.amount === 0}
+            disabled={isLoading || sendState.amount === 0 || !transactionType.isValid}
           >
             Send
           </Button>

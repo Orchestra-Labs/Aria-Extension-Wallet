@@ -50,3 +50,10 @@ export enum NetworkLevel {
   TESTNET = 'testnet',
   MAINNET = 'mainnet',
 }
+
+export enum Position {
+  TOP = 'top',
+  BOTTOM = 'bottom',
+  LEFT = 'left',
+  RIGHT = 'right',
+}

@@ -105,11 +105,14 @@ export const CreateWallet = () => {
   }, [use24Words]);
 
   /* ******************************************************************************************* */
-  /* Chris current TODO */
-  /* ******************************************************************************************* */
-
-  /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: only show those in receive that can be accessed from the send
+  // TODO: ensure swap updates when swappable asset is selected
+  // TODO: change unit on fee when send denom is changed
+  // TODO: ensure fees are taken on send in send denom
+  // TODO: on press of switch button, ensure placeholder values update
+  // TODO: on press of switch button, ensure input values update
+
   // TODO: for when viewing all validators, enable selectable option for viewing unbonded validators
   // TODO: Add remember me
   // TODO: make toast animate in, animate out, and swipe-away
@@ -122,7 +125,6 @@ export const CreateWallet = () => {
   /* Current TODOs */
   // TODO: add ledger support
   // TODO: abstract wallet prefix and mnemonic decryption
-  // TODO: abstract IBC needs
   // TODO: add button to "add chain" at bottom of Holdings list
   // TODO: add link to github repo for registry
   // TODO: Add routing
