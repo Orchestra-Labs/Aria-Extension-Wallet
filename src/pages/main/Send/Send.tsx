@@ -58,7 +58,7 @@ const userIsOnPage = () => {
   return result;
 };
 
-// TODO: navigating away and back results in not showing success or error messages
+// TODO: fix issue where navigation away is not clearing asset selection
 export const Send = () => {
   const { refreshData } = useRefreshData();
   const { exchangeRate } = useExchangeRate();
@@ -135,6 +135,7 @@ export const Send = () => {
   const handleTransaction = async ({ simulateTransaction = false } = {}) => {
     console.log('Entering handleTransaction...');
     console.log('Current transaction type:', transactionType);
+
     if (!transactionType.isValid) return;
 
     let currentRecipientAddress = '';
@@ -169,17 +170,19 @@ export const Send = () => {
 
     try {
       let result: TransactionResult;
-      // Routing logic based on transactionType
-      console.log('transaction type', transactionType);
+      console.log('Transaction details:', {
+        sendObject,
+        simulateTransaction,
+        transactionType,
+      });
 
-      // TODO: handle swap then IBC if both are enabled
+      // Routing logic based on transactionType
       if (!transactionType.isSwap && !transactionType.isIBC) {
         console.log('Executing sendTransaction');
         result = await sendTransaction(walletState.address, sendObject, simulateTransaction);
         console.log('sendTransaction result:', result);
       } else if (transactionType.isIBC) {
         const fromAddress = walletState.address;
-        // TODO: move chain and network level into sendState and receiveState
         const sendChain = sendState.chainName;
         const receiveChain = receiveState.chainName;
         const networkLevel = NetworkLevel.TESTNET;
@@ -205,7 +208,6 @@ export const Send = () => {
 
       console.log('Result data:', simulateTransaction, result?.data?.code);
 
-      // Process result for simulation or actual transaction
       if (simulateTransaction && result?.data?.code === 0) {
         return result;
       } else if (result.success && result.data?.code === 0) {
@@ -239,15 +241,16 @@ export const Send = () => {
   };
 
   const updateSendAsset = (newAsset: Asset, propagateChanges: boolean = false) => {
+    console.log('updating send asset');
     setSendState(prevState => ({
       ...prevState,
       asset: {
         ...newAsset,
       },
     }));
+    setChangeMap(prevMap => ({ ...prevMap, sendAsset: true }));
 
     if (propagateChanges) {
-      setChangeMap(prevMap => ({ ...prevMap, sendAsset: true }));
       setCallbackChangeMap({
         sendAsset: true,
         receiveAsset: false,
@@ -258,18 +261,19 @@ export const Send = () => {
   };
 
   const updateReceiveAsset = (newAsset: Asset, propagate: boolean = false) => {
+    console.log('updating receive asset');
     setReceiveState(prevState => ({
       ...prevState,
       asset: {
         ...newAsset,
       },
     }));
+    setChangeMap(prevMap => ({
+      ...prevMap,
+      receiveAsset: true,
+    }));
 
     if (propagate) {
-      setChangeMap(prevMap => ({
-        ...prevMap,
-        receiveAsset: true,
-      }));
       setCallbackChangeMap({
         sendAsset: false,
         receiveAsset: true,
@@ -350,6 +354,12 @@ export const Send = () => {
         const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 
         const feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / sendState.amount) * 100 : 0;
+
+        console.log('Fee details:', {
+          feeAmount,
+          feeInGreaterUnit,
+          feePercentage,
+        });
 
         setSimulatedFee({
           fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
@@ -447,7 +457,9 @@ export const Send = () => {
     setMap = setChangeMap,
     isExchangeRateUpdate = false,
   ) => {
+    console.log('current map state', map);
     if (map.sendAsset || map.receiveAsset) {
+      console.log('asset changed.  updating transaction type');
       updateTransactionType();
     }
 
@@ -557,6 +569,10 @@ export const Send = () => {
     console.log('recipient address updated to', recipientAddress);
     updateTransactionType();
   }, [recipientAddress]);
+
+  useEffect(() => {
+    console.log('transaction type updated to', transactionType);
+  }, [transactionType]);
 
   useEffect(() => {
     setUserIsOnPage(true);
