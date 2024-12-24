@@ -67,7 +67,7 @@ export const AssetScrollTile = ({
   const handleSendClick = () => {
     // Set the selected asset in the send state
     setSelectedAsset(asset);
-    navigate(ROUTES.APP.SEND); // Navigate to the Send page
+    navigate(ROUTES.APP.SEND);
   };
 
   const handleClick = () => {
@@ -86,15 +86,6 @@ export const AssetScrollTile = ({
     : isOnSendPage
       ? asset.denom === currentState.asset.denom
       : asset.denom === dialogSelectedAsset.denom;
-
-  // Log the selected asset and the comparison for debugging
-  console.log('Asset:', asset.symbol, 'Denom:', asset.denom);
-  console.log('Is on SEND page:', isOnSendPage);
-  console.log('Current state asset denom:', currentState.asset.denom);
-  console.log('Dialog selected asset denom:', dialogSelectedAsset.denom);
-  console.log('Multi-select enabled:', multiSelectEnabled);
-  console.log('Selected coins:', selectedCoins);
-  console.log('Is selected:', isSelected);
 
   return (
     <>
