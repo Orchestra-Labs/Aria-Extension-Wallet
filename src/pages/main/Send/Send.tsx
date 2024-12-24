@@ -58,7 +58,7 @@ const userIsOnPage = () => {
   return result;
 };
 
-// TODO: navigating away and back results in not showing success or error messages
+// TODO: fix issue where navigation away is not clearing asset selection
 export const Send = () => {
   const { refreshData } = useRefreshData();
   const { exchangeRate } = useExchangeRate();
@@ -135,6 +135,7 @@ export const Send = () => {
   const handleTransaction = async ({ simulateTransaction = false } = {}) => {
     console.log('Entering handleTransaction...');
     console.log('Current transaction type:', transactionType);
+
     if (!transactionType.isValid) return;
 
     let currentRecipientAddress = '';
@@ -169,17 +170,19 @@ export const Send = () => {
 
     try {
       let result: TransactionResult;
-      // Routing logic based on transactionType
-      console.log('transaction type', transactionType);
+      console.log('Transaction details:', {
+        sendObject,
+        simulateTransaction,
+        transactionType,
+      });
 
-      // TODO: handle swap then IBC if both are enabled
+      // Routing logic based on transactionType
       if (!transactionType.isSwap && !transactionType.isIBC) {
         console.log('Executing sendTransaction');
         result = await sendTransaction(walletState.address, sendObject, simulateTransaction);
         console.log('sendTransaction result:', result);
       } else if (transactionType.isIBC) {
         const fromAddress = walletState.address;
-        // TODO: move chain and network level into sendState and receiveState
         const sendChain = sendState.chainName;
         const receiveChain = receiveState.chainName;
         const networkLevel = NetworkLevel.TESTNET;
@@ -205,7 +208,6 @@ export const Send = () => {
 
       console.log('Result data:', simulateTransaction, result?.data?.code);
 
-      // Process result for simulation or actual transaction
       if (simulateTransaction && result?.data?.code === 0) {
         return result;
       } else if (result.success && result.data?.code === 0) {
@@ -245,9 +247,9 @@ export const Send = () => {
         ...newAsset,
       },
     }));
+    setChangeMap(prevMap => ({ ...prevMap, sendAsset: true }));
 
     if (propagateChanges) {
-      setChangeMap(prevMap => ({ ...prevMap, sendAsset: true }));
       setCallbackChangeMap({
         sendAsset: true,
         receiveAsset: false,
@@ -264,12 +266,12 @@ export const Send = () => {
         ...newAsset,
       },
     }));
+    setChangeMap(prevMap => ({
+      ...prevMap,
+      receiveAsset: true,
+    }));
 
     if (propagate) {
-      setChangeMap(prevMap => ({
-        ...prevMap,
-        receiveAsset: true,
-      }));
       setCallbackChangeMap({
         sendAsset: false,
         receiveAsset: true,
@@ -351,6 +353,12 @@ export const Send = () => {
 
         const feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / sendState.amount) * 100 : 0;
 
+        console.log('Fee details:', {
+          feeAmount,
+          feeInGreaterUnit,
+          feePercentage,
+        });
+
         setSimulatedFee({
           fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
           textClass:
@@ -376,12 +384,6 @@ export const Send = () => {
       console.log('Missing assets for transaction type update');
       return;
     }
-
-    console.log('Updating transaction type with the following details:');
-    console.log('Send Asset:', sendAsset);
-    console.log('Receive Asset:', receiveAsset);
-    console.log('Send address:', walletState.address);
-    console.log('Receive addss:', recipientAddress);
 
     try {
       const isIBCEnabled = await isIBC({
@@ -538,6 +540,7 @@ export const Send = () => {
   };
 
   const resetStates = () => {
+    console.log('resetting states');
     setSendState(defaultSendState);
     setReceiveState(defaultReceiveState);
     setRecipientAddress('');
@@ -572,6 +575,7 @@ export const Send = () => {
   }, []);
 
   const handleBackClick = () => {
+    resetStates();
     setUserIsOnPage(false);
   };
 

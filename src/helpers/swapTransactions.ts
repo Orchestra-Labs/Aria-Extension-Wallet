@@ -16,7 +16,13 @@ export const isValidSwap = ({
   sendAsset: Asset;
   receiveAsset: Asset;
 }) => {
+  console.log('Checking swap validity:');
+  console.log('Send Asset:', sendAsset);
+  console.log('Receive Asset:', receiveAsset);
+
   const result = !sendAsset.isIbc && !receiveAsset.isIbc && sendAsset.denom !== receiveAsset.denom;
+  console.log('Is valid swap:', result);
+
   return result;
 };
 
@@ -87,6 +93,7 @@ export const swapTransaction = async (
   swapObject: SwapObject,
   simulateOnly: boolean = false,
 ): Promise<TransactionResult> => {
+  console.log('Attempting swap with object:', swapObject);
   const endpoint = CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
@@ -103,6 +110,7 @@ export const swapTransaction = async (
 
   try {
     const feeDenom = getValidFeeDenom(swapObject.sendObject.denom);
+    console.log('Swap fee denom:', feeDenom);
     const response = await queryWithRetry({
       endpoint,
       walletAddress: fromAddress,

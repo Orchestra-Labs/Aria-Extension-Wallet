@@ -6,10 +6,16 @@ import { Position } from '@/constants';
 interface TooltipProps {
   children: ReactNode;
   tooltipText: string;
+  maxWidth?: number;
   position?: Position;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ children, tooltipText, position = Position.TOP }) => {
+const Tooltip: React.FC<TooltipProps> = ({
+  children,
+  tooltipText,
+  maxWidth = 150,
+  position = Position.TOP,
+}) => {
   return (
     <div className="flex justify-center items-center w-full">
       <div className="flex-1 flex justify-center items-center" />
@@ -20,7 +26,7 @@ const Tooltip: React.FC<TooltipProps> = ({ children, tooltipText, position = Pos
         <Tippy
           content={tooltipText}
           placement={position}
-          maxWidth="100px"
+          maxWidth={`${maxWidth}px`}
           arrow={true}
           theme="dark"
         >
