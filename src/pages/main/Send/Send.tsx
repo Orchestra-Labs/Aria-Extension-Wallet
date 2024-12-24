@@ -241,7 +241,6 @@ export const Send = () => {
   };
 
   const updateSendAsset = (newAsset: Asset, propagateChanges: boolean = false) => {
-    console.log('updating send asset');
     setSendState(prevState => ({
       ...prevState,
       asset: {
@@ -261,7 +260,6 @@ export const Send = () => {
   };
 
   const updateReceiveAsset = (newAsset: Asset, propagate: boolean = false) => {
-    console.log('updating receive asset');
     setReceiveState(prevState => ({
       ...prevState,
       asset: {
@@ -387,12 +385,6 @@ export const Send = () => {
       return;
     }
 
-    console.log('Updating transaction type with the following details:');
-    console.log('Send Asset:', sendAsset);
-    console.log('Receive Asset:', receiveAsset);
-    console.log('Send address:', walletState.address);
-    console.log('Receive addss:', recipientAddress);
-
     try {
       const isIBCEnabled = await isIBC({
         sendAddress: walletState.address,
@@ -457,9 +449,7 @@ export const Send = () => {
     setMap = setChangeMap,
     isExchangeRateUpdate = false,
   ) => {
-    console.log('current map state', map);
     if (map.sendAsset || map.receiveAsset) {
-      console.log('asset changed.  updating transaction type');
       updateTransactionType();
     }
 
@@ -550,6 +540,7 @@ export const Send = () => {
   };
 
   const resetStates = () => {
+    console.log('resetting states');
     setSendState(defaultSendState);
     setReceiveState(defaultReceiveState);
     setRecipientAddress('');
@@ -571,10 +562,6 @@ export const Send = () => {
   }, [recipientAddress]);
 
   useEffect(() => {
-    console.log('transaction type updated to', transactionType);
-  }, [transactionType]);
-
-  useEffect(() => {
     setUserIsOnPage(true);
     updateSendAsset(selectedAsset);
     updateReceiveAsset(selectedAsset);
@@ -588,6 +575,7 @@ export const Send = () => {
   }, []);
 
   const handleBackClick = () => {
+    resetStates();
     setUserIsOnPage(false);
   };
 

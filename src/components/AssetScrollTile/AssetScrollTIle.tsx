@@ -3,7 +3,7 @@ import { SlideTray, Button } from '@/ui-kit';
 import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { DEFAULT_ASSET, ROUTES } from '@/constants';
 import {
   swiperIndexState,
@@ -11,6 +11,7 @@ import {
   dialogSelectedAssetAtom,
   sendStateAtom,
   selectedCoinListAtom,
+  receiveStateAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
 
@@ -31,10 +32,12 @@ export const AssetScrollTile = ({
 }: AssetScrollTileProps) => {
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
+  const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
 
   const navigate = useNavigate();
+  const location = useLocation(); // Get the current route to check if it's the SEND page
 
   const symbol = asset.symbol || DEFAULT_ASSET.symbol || 'MLD';
   const title = asset.symbol || 'Unknown Asset';
@@ -62,8 +65,9 @@ export const AssetScrollTile = ({
   }
 
   const handleSendClick = () => {
+    // Set the selected asset in the send state
     setSelectedAsset(asset);
-    navigate(ROUTES.APP.SEND);
+    navigate(ROUTES.APP.SEND); // Navigate to the Send page
   };
 
   const handleClick = () => {
@@ -73,9 +77,25 @@ export const AssetScrollTile = ({
     }
   };
 
+  // Check if the current page is the SEND page
+  const isOnSendPage = location.pathname === ROUTES.APP.SEND;
+
+  // Determine if the asset is selected, based on current state or multi-select mode
   const isSelected = multiSelectEnabled
     ? selectedCoins.some(selectedCoin => selectedCoin.denom === asset.denom)
-    : asset.denom === dialogSelectedAsset.denom;
+    : isOnSendPage
+      ? asset.denom === currentState.asset.denom
+      : asset.denom === dialogSelectedAsset.denom;
+
+  // Log the selected asset and the comparison for debugging
+  console.log('Asset:', asset.symbol, 'Denom:', asset.denom);
+  console.log('Is on SEND page:', isOnSendPage);
+  console.log('Current state asset denom:', currentState.asset.denom);
+  console.log('Dialog selected asset denom:', dialogSelectedAsset.denom);
+  console.log('Multi-select enabled:', multiSelectEnabled);
+  console.log('Selected coins:', selectedCoins);
+  console.log('Is selected:', isSelected);
+
   return (
     <>
       {isSelectable ? (
