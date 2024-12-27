@@ -1,5 +1,5 @@
 import {
-  exchangeAssetsAtom,
+  symphonyAssetsAtom,
   isFetchingWalletDataAtom,
   isInitialDataLoadAtom,
   sendStateAtom,
@@ -23,7 +23,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   const setUserWallet = useSetAtom(userWalletAtom);
 
   const { availableAssets, refetch } = useExchangeAssets();
-  const setExchangeAssets = useSetAtom(exchangeAssetsAtom);
+  const setExchangeAssets = useSetAtom(symphonyAssetsAtom);
 
   const sendState = useAtomValue(sendStateAtom);
 
@@ -60,7 +60,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   useEffect(() => {
     const fetchExchangeAssets = async () => {
       try {
-        await refetch(); // Ensure refetch is awaited
+        await refetch();
       } catch (error) {
         console.error('Error fetching exchange assets:', error);
       }

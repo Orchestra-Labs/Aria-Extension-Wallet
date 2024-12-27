@@ -59,6 +59,7 @@ export interface SendObject {
   recipientAddress: string;
   amount: string;
   denom: string;
+  symphonyAssets: Asset[];
 }
 export interface SwapObject {
   sendObject: SendObject;

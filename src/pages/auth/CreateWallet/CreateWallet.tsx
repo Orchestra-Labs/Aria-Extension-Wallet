@@ -106,25 +106,33 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: only show those in receive that can be accessed from the send
-  // TODO: ensure swap updates when swappable asset is selected
-  // TODO: change unit on fee when send denom is changed
-  // TODO: ensure fees are taken on send in send denom
+  // TODO: add config option to select whether stablecoin fee election is enabled or not
+  // TODO: for when viewing all validators, add config option for viewing unbonded validators
+
   // TODO: on press of switch button, ensure placeholder values update
   // TODO: on press of switch button, ensure input values update
 
-  // TODO: for when viewing all validators, enable selectable option for viewing unbonded validators
-  // TODO: Add remember me
-  // TODO: make toast animate in, animate out, and swipe-away
+  // TODO: fix copytextfield issue of enlarged border on click
+  // TODO: make "clear" and "max" button send screen inputs.  make placement and appearance for these uniform (send and unstake sections)
+
   // TODO: Add first level of routing (swap to IBC send or IBC to swap)
-  // TODO: Add additional chain views to verify above
-  // TODO: abstract wallet prefix and mnemonic decryption
+
+  // TODO: Add remember me
+
+  // TODO: make toasts copy-on-click
+  // TODO: make toast animate in, animate out, and swipe-away
   // TODO: add auth support for dApps
+
+  // TODO: add feeLoading state so user knows fees are updating
+  // TODO: add search icon to search field, add onclick
+  // TODO: add change password functionality
   /* ******************************************************************************************* */
 
-  /* Current TODOs */
-  // TODO: add ledger support
+  /* Interchain-compatibility TODOs (mobile version before this) */
   // TODO: abstract wallet prefix and mnemonic decryption
+  // TODO: Add view of additional cosmos chains
+  // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
+  // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
   // TODO: add button to "add chain" at bottom of Holdings list
   // TODO: add link to github repo for registry
   // TODO: Add routing
@@ -133,11 +141,8 @@ export const CreateWallet = () => {
   // TODO: enable search function to validator list by chain (on top of current functionality)
   // TODO: add show/hide function to validator list (by chain)
 
-  /* Interchain-compatibility TODOs (mobile version before this) */
-  // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
-  // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
-
   /* dApp TODOs */
+  // TODO: add ledger support
   // TODO: add page
   // TODO: add search
   // TODO: add categorization for filtering and sorting
@@ -148,18 +153,11 @@ export const CreateWallet = () => {
   // TODO: get google analytics going
   // TODO: creation of wallet with old password should overwrite old wallet
   // TODO: fix issue with gas on 'all' button for validator selections (bundle transactions)
-  // TODO: make toasts copy-on-click
-  // TODO: fix copytextfield issue of enlarged border on click
   // TODO: clean up helper functions and hooks
-  // TODO: make "clear" and "max" button send screen inputs.  make placement and appearance for these uniform (send and unstake sections)
-  // TODO: add search icon to search field, add onclick
   // TODO: keep track of current page for case of re-open before timeout
-  // TODO: prevent re-building auth every time wallet updates
   // TODO: make data text in asset and validator tiles scrollable
-  // TODO: add feeLoading state so user knows fees are updating
   // TODO: ensure logout after blur + timeout (blur is click outside application to close).  to remove sensitive data after time period
   // TODO: speed up resolution on rpc queries (send, stake, unstake, claim)
-  // TODO: add change password functionality
 
   /* Wallet UI TODOs */
   // TODO: create add/edit/remove wallet screen to allow management of multiple accounts
@@ -177,7 +175,6 @@ export const CreateWallet = () => {
 
   /* Less Critical Wallet TODOs */
   // TODO: add data transfer method for extension to wallet or back (including account data)
-  // TODO: ensure refresh only queries once (currently 4 times per pull)
 
   /* Internationalization TODOs */
   // TODO: add translations for all strings (pull from string file/translation file)
@@ -193,8 +190,7 @@ export const CreateWallet = () => {
   /* Nice to have Interchain-compatibility TODOs */
   // TODO: add manual IBC (for rare cases.  hide behind dev tool enabling?)
 
-  /* Dev Mode TODOs */
-  // TODO: add dev mode options (additional views and manual use screens).  these persist after close of dev mode (just hide options toggles)
+  /* Config (Dev Mode) TODOs */
   // TODO: include "add network" screen (dev mode)
   // TODO: Add Manual RPC changes in-app (both selection in list and form entry.  one or both of these should be kept behind dev-mode toggle)
 

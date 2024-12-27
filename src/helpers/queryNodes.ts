@@ -22,22 +22,27 @@ const isIndexerError = (error: any): boolean => {
 // Select and prioritize node providers based on their error counts
 export const selectNodeProviders = () => {
   const errorCounts = getNodeErrorCounts();
+  console.log('Fetching node error counts:', errorCounts);
 
-  // Get node providers and their respective error counts
   const providers = CHAIN_NODES.symphonytestnet.map(provider => ({
     ...provider,
     failCount: errorCounts[provider.rpc] || 0,
   }));
 
-  // Sort providers based on failCount, with lower fail counts first
+  console.log('Providers with fail counts:', providers);
+
   return providers.sort((a, b) => a.failCount - b.failCount);
 };
 
 // Increment the error count for a specific provider
 export const incrementErrorCount = (nodeProvider: string): void => {
   const errorCounts = getNodeErrorCounts();
+  console.log(`Incrementing error count for provider: ${nodeProvider}`);
+
   errorCounts[nodeProvider] = (errorCounts[nodeProvider] || 0) + 1;
   storeNodeErrorCounts(errorCounts);
+
+  console.log(`Updated error counts for ${nodeProvider}:`, errorCounts[nodeProvider]);
 };
 
 // Helper: Perform a REST API query to a selected node
@@ -46,6 +51,10 @@ const performRestQuery = async (
   queryMethod: string,
   queryType: 'POST' | 'GET',
 ) => {
+  console.log(
+    `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
+  );
+
   const response = await fetch(`${queryMethod}${endpoint}`, {
     method: queryType,
     body: null,
@@ -53,10 +62,14 @@ const performRestQuery = async (
   });
 
   if (!response.ok) {
+    console.error('Node query failed:', response);
     throw new Error('Node query failed');
   }
 
-  return await response.json();
+  const responseBody = await response.json();
+  console.log('REST query successful, response:', responseBody);
+
+  return responseBody;
 };
 
 // TODO: modify to support multi-send
@@ -73,14 +86,25 @@ export const performRpcQuery = async (
   },
   memo: string = 'wallet',
 ): Promise<RPCResponse> => {
+  console.log('Performing RPC query...');
+  console.log('Client:', client);
+  console.log('Wallet Address:', walletAddress);
+  console.log('Messages:', messages);
+  console.log('Fee Denom:', feeDenom);
+  console.log('Simulate Only:', simulateOnly);
+  console.log('Fee:', fee);
+
   try {
-    // TODO: modify to support multi-send
     let calculatedFee = fee;
 
     if (!fee || !calculatedFee) {
+      console.log('Calculating fee...');
       const defaultGasPrice = GasPrice.fromString(`0.025${feeDenom}`);
       let gasEstimation = await client.simulate(walletAddress, messages, '');
+      console.log('Gas Estimation:', gasEstimation);
+
       gasEstimation = Math.ceil(gasEstimation * 1.1);
+      console.log('Adjusted Gas Estimation:', gasEstimation);
 
       calculatedFee = {
         amount: [
@@ -94,6 +118,7 @@ export const performRpcQuery = async (
     }
 
     if (simulateOnly) {
+      console.log('Simulation success, returning fee info.');
       return {
         code: 0,
         message: 'Simulation success',
@@ -103,6 +128,7 @@ export const performRpcQuery = async (
     }
 
     const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
+    console.log('Transaction result:', result);
 
     if (result.code === 0) {
       return {
@@ -114,17 +140,20 @@ export const performRpcQuery = async (
       };
     }
 
+    console.error('Transaction failed with code:', result.code);
     throw new Error(`Transaction failed with ${result.code}`);
   } catch (error: any) {
-    // TODO: find another way to verify transaction success.
-    // TODO: log indexer errors, changeover to backups (can be original endpoints).  no single points of failure
+    console.error('Error during RPC query:', error);
+
     if (isIndexerError(error)) {
+      console.log('Indexer error detected.');
       return {
         code: 1,
         message: 'Node indexer disabled',
         txHash: error.txHash || 'unknown',
       };
     }
+
     throw error;
   }
 };
@@ -149,7 +178,17 @@ const queryWithRetry = async ({
     gas: string;
   };
 }): Promise<RPCResponse> => {
+  console.log('Querying with retry...');
+  console.log('Endpoint:', endpoint);
+  console.log('Use RPC:', useRPC);
+  console.log('Query Type:', queryType);
+  console.log('Messages:', messages);
+  console.log('Fee Denom:', feeDenom);
+  console.log('Simulate Only:', simulateOnly);
+
   const providers = selectNodeProviders();
+  console.log('Providers selected for retry:', providers);
+
   let numberAttempts = 0;
   let lastError: any = null;
 
@@ -157,6 +196,7 @@ const queryWithRetry = async ({
     for (const provider of providers) {
       try {
         const queryMethod = useRPC ? provider.rpc : provider.rest;
+        console.log('Using query method:', queryMethod);
 
         if (useRPC) {
           const sessionToken = getSessionToken();
@@ -197,6 +237,7 @@ const queryWithRetry = async ({
   }
 
   if (isIndexerError(lastError)) {
+    console.log('Indexer error detected during retries.');
     return {
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
@@ -204,6 +245,7 @@ const queryWithRetry = async ({
     };
   }
 
+  console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);
   throw new Error(
     `All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts. ${lastError?.message || ''}`,
   );

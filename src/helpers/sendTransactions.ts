@@ -32,8 +32,16 @@ export const sendTransaction = async (
     },
   ];
 
+  console.log('Sending transaction...');
+  console.log('From Address:', fromAddress);
+  console.log('To Address:', sendObject.recipientAddress);
+  console.log('Amount:', sendObject.amount);
+  console.log('Denom:', sendObject.denom);
+
   try {
-    const feeDenom = getValidFeeDenom(sendObject.denom);
+    const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.symphonyAssets);
+    console.log('Fee Denom:', feeDenom);
+
     const response = await queryRpcNode({
       endpoint,
       messages,
@@ -42,6 +50,7 @@ export const sendTransaction = async (
     });
 
     if (simulateOnly) {
+      console.log('Simulation completed successfully!');
       return {
         success: true,
         message: 'Simulation completed successfully!',
@@ -49,6 +58,7 @@ export const sendTransaction = async (
       };
     }
 
+    console.log('Transaction sent successfully!');
     return {
       success: true,
       message: 'Transaction sent successfully!',
@@ -89,7 +99,7 @@ export const multiSendTransaction = async (
     },
   }));
 
-  const feeDenom = getValidFeeDenom(sendObjects[0].denom);
+  const feeDenom = getValidFeeDenom(sendObjects[0].denom, sendObjects[0].symphonyAssets);
 
   try {
     const response = await queryRpcNode({

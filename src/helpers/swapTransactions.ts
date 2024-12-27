@@ -109,7 +109,10 @@ export const swapTransaction = async (
   ];
 
   try {
-    const feeDenom = getValidFeeDenom(swapObject.sendObject.denom);
+    const feeDenom = getValidFeeDenom(
+      swapObject.sendObject.denom,
+      swapObject.sendObject.symphonyAssets,
+    );
     console.log('Swap fee denom:', feeDenom);
     const response = await queryWithRetry({
       endpoint,
@@ -171,7 +174,10 @@ export const multiSwapTransaction = async (
   );
 
   try {
-    const feeDenom = getValidFeeDenom(swapObjects[0].sendObject.denom);
+    const feeDenom = getValidFeeDenom(
+      swapObjects[0].sendObject.denom,
+      swapObjects[0].sendObject.symphonyAssets,
+    );
     const response = await queryWithRetry({
       endpoint,
       walletAddress: fromAddress,

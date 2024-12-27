@@ -377,6 +377,7 @@ export const ValidatorScrollTile = ({
   let subtitleStatus = TextFieldStatus.GOOD;
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
 
+  // TODO: fix tile showing amount unstaking as expected percent rewards on all tile when tray is open
   if (showCurrentValidators) {
     if (userHasUnbonding) {
       value = formatBalanceDisplay(

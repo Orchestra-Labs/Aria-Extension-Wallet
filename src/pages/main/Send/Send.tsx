@@ -21,6 +21,7 @@ import {
   walletStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
+  symphonyAssetsAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile } from '@/components';
@@ -58,13 +59,14 @@ const userIsOnPage = () => {
   return result;
 };
 
-// TODO: fix issue where navigation away is not clearing asset selection
+// TODO: fix issue where if send asset is changed,receive is changed (should not change unless previously changed itself)
 export const Send = () => {
   const { refreshData } = useRefreshData();
   const { exchangeRate } = useExchangeRate();
   const { toast } = useToast();
   const location = useLocation();
 
+  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const [changeMap, setChangeMap] = useAtom(changeMapAtom);
@@ -164,6 +166,7 @@ export const Send = () => {
       recipientAddress: currentRecipientAddress,
       amount: adjustedAmount,
       denom: sendAsset.denom,
+      symphonyAssets,
     };
 
     if (!simulateTransaction) setLoading(true);
