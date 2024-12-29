@@ -155,7 +155,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white">
+    <div className="h-screen flex flex-col overflow-hidden bg-black text-white">
       {/* Top bar with back button and title */}
       <div className="flex justify-between items-center w-full p-5">
         <NavLink
@@ -202,20 +202,23 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
         </div>
       </div>
 
-      <div className="flex-grow px-4 flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden px-4">
         {isInitialDataLoad ? (
           <Loader />
         ) : (
           // TODO: create CategoryTiles option or new component that allows for animated tile inclusion
-          <TileScroller
-            activeIndex={0}
-            onSelectAsset={handleSelectCoin}
-            isSelectable
-            isDialog
-            isReceiveDialog
-            multiSelectEnabled
-          />
+          <div className="flex-grow flex flex-col overflow-hidden">
+            <TileScroller
+              activeIndex={0}
+              onSelectAsset={handleSelectCoin}
+              isSelectable
+              isDialog
+              isReceiveDialog
+              multiSelectEnabled
+            />
+          </div>
         )}
+
         <SearchBar />
       </div>
 

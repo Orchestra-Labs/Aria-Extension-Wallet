@@ -106,9 +106,9 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: fix holdings list to only show those selected as viewable
   // TODO: add config option to select whether stablecoin fee election is enabled or not
   // TODO: for when viewing all validators, add config option for viewing unbonded validators
-
   // TODO: on press of switch button, ensure placeholder values update
   // TODO: on press of switch button, ensure input values update
 
