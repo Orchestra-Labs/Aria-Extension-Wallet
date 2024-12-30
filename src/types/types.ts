@@ -44,6 +44,7 @@ export interface Asset {
   isIbc: boolean;
   logo?: string;
   symbol?: string;
+  name?: string;
   exponent?: number;
   isFeeToken?: boolean;
   networkName?: string;

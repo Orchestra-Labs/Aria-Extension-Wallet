@@ -54,6 +54,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   }, [userAccount]);
 
   useEffect(() => {
+    console.log('available assets / symphony assets set to:', availableAssets);
     setExchangeAssets(availableAssets);
   }, [availableAssets]);
 

@@ -106,7 +106,6 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: fix holdings list to only show those selected as viewable
   // TODO: add config option to select whether stablecoin fee election is enabled or not
   // TODO: for when viewing all validators, add config option for viewing unbonded validators
   // TODO: on press of switch button, ensure placeholder values update
@@ -126,6 +125,9 @@ export const CreateWallet = () => {
   // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
   // TODO: add change password functionality
+
+  // TODO: fix edit coin list to show symbol, chain, and name
+  // TODO: modify default asset selection so when MLD isn't selected, default send and receive are changed
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */

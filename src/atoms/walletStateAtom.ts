@@ -23,29 +23,24 @@ export const walletStateAtom = atom(get => ({
   assets: get(walletAssetsAtom),
 }));
 
-export const filteredAssetsAtom = atom(get => {
+export const subscribedAssetsAtom = atom(get => {
   const walletState = get(walletStateAtom);
-  const searchTerm = get(searchTermAtom);
-  const sortOrder = get(assetSortOrderAtom);
-  const sortType = get(assetSortTypeAtom);
-  const showAllAssets = get(showAllAssetsAtom);
   const userAccount = get(userAccountAtom);
-  const exchangeAssets = get(symphonyAssetsAtom);
+  const symphonyAssets = get(symphonyAssetsAtom);
+
+  console.log('symphony assets:', symphonyAssets);
 
   const visibleAssets: Asset[] = [];
   if (userAccount && userAccount.settings.subscribedTo) {
     Object.entries(userAccount.settings.subscribedTo).forEach(([networkID, subscription]) => {
-      const networkAssets = exchangeAssets.reduce((map: { [key: string]: Asset }, asset) => {
+      const networkAssets = symphonyAssets.reduce((map: { [key: string]: Asset }, asset) => {
         map[asset.denom] = asset;
         return map;
       }, {});
-      const hasCoinSubscriptions = subscription.coinDenoms.length === 0;
+
+      const hasCoinSubscriptions = subscription.coinDenoms.length > 0;
+
       if (hasCoinSubscriptions) {
-        Object.values(exchangeAssets).forEach(asset => {
-          const walletAsset = walletState.assets.find(wAsset => wAsset.denom === asset.denom);
-          visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
-        });
-      } else {
         subscription.coinDenoms.forEach(denom => {
           const asset = networkAssets[denom];
           if (asset) {
@@ -55,14 +50,29 @@ export const filteredAssetsAtom = atom(get => {
             console.warn(`Asset with denom ${denom} not found in network assets for ${networkID}`);
           }
         });
+      } else {
+        Object.values(symphonyAssets).forEach(asset => {
+          const walletAsset = walletState.assets.find(wAsset => wAsset.denom === asset.denom);
+          visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
+        });
       }
     });
   } else {
     console.warn('No user account found.');
   }
 
+  return visibleAssets;
+});
+
+export const filteredAssetsAtom = atom(get => {
+  const searchTerm = get(searchTermAtom);
+  const sortOrder = get(assetSortOrderAtom);
+  const sortType = get(assetSortTypeAtom);
+  const showAllAssets = get(showAllAssetsAtom);
+  const subscribedAssets = get(subscribedAssetsAtom);
+
   const filteredAndSortedAssets = filterAndSortAssets(
-    visibleAssets,
+    subscribedAssets,
     searchTerm,
     sortType,
     sortOrder,
@@ -72,53 +82,38 @@ export const filteredAssetsAtom = atom(get => {
 });
 
 export const filteredDialogAssetsAtom = atom(get => {
-  const walletState = get(walletStateAtom);
   const searchTerm = get(dialogSearchTermAtom);
   const sortOrder = get(assetDialogSortOrderAtom);
   const sortType = get(assetDialogSortTypeAtom);
-  const userAccount = get(userAccountAtom);
-  const exchangeAssets = get(symphonyAssetsAtom);
-
-  const visibleAssets: Asset[] = [];
-  if (userAccount) {
-    Object.entries(userAccount.settings.subscribedTo || {}).forEach(([networkID, subscription]) => {
-      const networkAssets = exchangeAssets.reduce((map: { [key: string]: Asset }, asset) => {
-        map[asset.denom] = asset;
-        return map;
-      }, {});
-      const hasCoinSubscriptions = subscription.coinDenoms.length === 0;
-      if (hasCoinSubscriptions) {
-        Object.values(exchangeAssets).forEach(asset => {
-          const walletAsset = walletState.assets.find(wAsset => wAsset.denom === asset.denom);
-          if (walletAsset && parseFloat(walletAsset.amount) > 0) {
-            visibleAssets.push(walletAsset);
-          }
-        });
-      } else {
-        subscription.coinDenoms.forEach(denom => {
-          const asset = networkAssets[denom];
-          if (asset) {
-            const walletAsset = walletState.assets.find(wAsset => wAsset.denom === denom);
-            if (walletAsset && parseFloat(walletAsset.amount) > 0) {
-              visibleAssets.push(walletAsset);
-            }
-          } else {
-            console.warn(
-              `Dialog - Asset with denom ${denom} not found in network assets for ${networkID}`,
-            );
-          }
-        });
-      }
-    });
-  } else {
-    console.warn('Dialog - No user account found.');
-  }
+  const subscribedAssets = get(subscribedAssetsAtom);
+  console.log('subscribed assets, filtered:', subscribedAssets);
 
   const filteredAndSortedDialogAssets = filterAndSortAssets(
-    visibleAssets,
+    subscribedAssets,
     searchTerm,
     sortType,
     sortOrder,
   );
+  console.log('results, filtered:', filteredAndSortedDialogAssets);
+
+  return filteredAndSortedDialogAssets;
+});
+
+// For exchange page, show all possible assets
+export const coinListAssetsAtom = atom(get => {
+  const searchTerm = get(dialogSearchTermAtom);
+  const sortOrder = get(assetDialogSortOrderAtom);
+  const sortType = get(assetDialogSortTypeAtom);
+  const subscribedAssets = get(symphonyAssetsAtom);
+
+  console.log('subscribed assets:', subscribedAssets);
+  console.log('searching for:', searchTerm);
+  const filteredAndSortedDialogAssets = filterAndSortAssets(
+    subscribedAssets,
+    searchTerm,
+    sortType,
+    sortOrder,
+  );
+  console.log('result of search: ', filteredAndSortedDialogAssets);
   return filteredAndSortedDialogAssets;
 });

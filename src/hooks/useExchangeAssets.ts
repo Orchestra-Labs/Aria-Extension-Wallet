@@ -79,12 +79,10 @@ export const useExchangeAssets = () => {
         // Check if the asset exists in the local registry
         const registryAsset = LOCAL_ASSET_REGISTRY[denom];
 
-        console.log('exchange item', requirement, requirement.base_currency.denom);
         const symbol =
           registryAsset && registryAsset.symbol
             ? registryAsset.symbol
             : `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
-        console.log('symbol', symbol);
 
         const logo = registryAsset ? registryAsset.logo : defaultAsset.logo;
         const exponent = registryAsset ? registryAsset.exponent! : GREATER_EXPONENT_DEFAULT;

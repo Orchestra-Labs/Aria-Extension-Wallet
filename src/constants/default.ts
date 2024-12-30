@@ -7,7 +7,7 @@ export const WALLET_PREFIX = 'symphony';
 
 // RPC and REST URLs for the Symphony network
 export const DEFAULT_CHAIN_NAME = 'symphonytestnet';
-const DEFAULT_CHAIN_ID = 'symphony-testnet-4';
+export const DEFAULT_CHAIN_ID = 'symphony-testnet-4';
 
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
@@ -34,6 +34,7 @@ export const LOCAL_ASSET_REGISTRY: AssetRegistry = {
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/husd.png',
     symbol: 'HUSD',
+    name: 'US Dollar',
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: DEFAULT_CHAIN_ID,
@@ -44,16 +45,18 @@ export const LOCAL_ASSET_REGISTRY: AssetRegistry = {
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/hhkd.png',
     symbol: 'HHKD',
+    name: 'Hong Kong Dollar',
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: DEFAULT_CHAIN_ID,
   },
   uvnd: {
-    denom: 'uvnd',
+    denom: 'uaux',
     amount: '0.000399',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/hvnd.png',
-    symbol: 'HVND',
+    symbol: 'HAUX',
+    name: 'Gold',
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: DEFAULT_CHAIN_ID,
@@ -64,6 +67,7 @@ export const LOCAL_ASSET_REGISTRY: AssetRegistry = {
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/mld.png',
     symbol: 'MLD',
+    name: 'Melody',
     exponent: GREATER_EXPONENT_DEFAULT,
     isFeeToken: true,
     networkName: 'Symphony Testnet',
