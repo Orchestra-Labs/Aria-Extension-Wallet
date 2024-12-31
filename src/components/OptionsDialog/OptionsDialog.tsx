@@ -1,9 +1,9 @@
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
-import { LogOut } from 'lucide-react';
+import { EditIcon, LogOut, Settings } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { ArrowLeft, Discord, DotsVertical, Edit } from '@/assets/icons';
+import { ArrowLeft, Discord, DotsVertical } from '@/assets/icons';
 import { Button, DialogContent } from '@/ui-kit';
 import { useLogout } from '@/hooks';
 import { ROUTES } from '@/constants';
@@ -11,13 +11,20 @@ import { ROUTES } from '@/constants';
 const OPTIONS = [
   {
     id: 1,
+    name: 'Settings',
+    icon: <Settings width={16} height={16} />,
+    target: '',
+    to: ROUTES.APP.SETTINGS,
+  },
+  {
+    id: 2,
     name: 'Edit Coin List',
-    icon: <Edit width={16} height={16} />,
+    icon: <EditIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.EDIT_COIN_LIST,
   },
   {
-    id: 2,
+    id: 3,
     name: 'Contact Us',
     icon: <Discord />,
     target: '_blank',
@@ -32,10 +39,6 @@ export const OptionsDialog: React.FC = () => {
 
   const handleLogOut = () => {
     logout();
-  };
-
-  const handleOptionSelect = () => {
-    setOpen(false);
   };
 
   return (
@@ -53,7 +56,7 @@ export const OptionsDialog: React.FC = () => {
               key={option.id}
               to={option.to}
               target={option.target}
-              onClick={handleOptionSelect}
+              onClick={() => setOpen(false)}
               className="flex items-center text-sm text-white font-normal py-3 not-last:border-b not-last:border-neutral-4 hover:text-white"
             >
               <div className="h-8 w-8 bg-blue rounded-full flex items-center justify-center p-1.5 mr-2.5 text-black">

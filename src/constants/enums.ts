@@ -57,3 +57,8 @@ export enum Position {
   LEFT = 'left',
   RIGHT = 'right',
 }
+
+export enum SettingsOptions {
+  STABLECOIN_FEE = 'stablecoinFeeElection',
+  VALIDATOR_STATUS = 'viewValidatorsByStatus',
+}

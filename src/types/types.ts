@@ -1,4 +1,4 @@
-import { NetworkLevel } from '@/constants';
+import { NetworkLevel, SettingsOptions } from '@/constants';
 
 export interface SessionToken {
   mnemonic: string;
@@ -27,6 +27,8 @@ export interface AccountRecord {
     defaultCoinDenom: string;
     subscribedTo: { [networkID: string]: SubscriptionRecord };
     activeWalletID: string;
+    [SettingsOptions.STABLECOIN_FEE]: boolean;
+    [SettingsOptions.VALIDATOR_STATUS]: boolean;
   };
   wallets: WalletRecord[];
 }

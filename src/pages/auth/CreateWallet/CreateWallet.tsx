@@ -106,28 +106,28 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: add config option to select whether stablecoin fee election is enabled or not
-  // TODO: for when viewing all validators, add config option for viewing unbonded validators
   // TODO: on press of switch button, ensure placeholder values update
   // TODO: on press of switch button, ensure input values update
 
-  // TODO: fix copytextfield issue of enlarged border on click
+  // TODO: add change password functionality
+  // TODO: add view passphrase functionality
+
   // TODO: make "clear" and "max" button send screen inputs.  make placement and appearance for these uniform (send and unstake sections)
 
-  // TODO: Add first level of routing (swap to IBC send or IBC to swap)
+  // TODO: add feeLoading state so user knows fees are updating
+  // TODO: add search icon to search field, add onclick
 
+  // TODO: modify default asset selection so when MLD isn't selected, default send and receive are changed
+  // TODO: add tutorial pages to show how to swap and stake
+
+  // TODO: fix edit coin list to show symbol, chain, and name
+  // TODO: Add first level of routing (swap to IBC send or IBC to swap)
+  // TODO: fix copytextfield issue of enlarged border on click
   // TODO: Add remember me
 
   // TODO: make toasts copy-on-click
   // TODO: make toast animate in, animate out, and swipe-away
   // TODO: add auth support for dApps
-
-  // TODO: add feeLoading state so user knows fees are updating
-  // TODO: add search icon to search field, add onclick
-  // TODO: add change password functionality
-
-  // TODO: fix edit coin list to show symbol, chain, and name
-  // TODO: modify default asset selection so when MLD isn't selected, default send and receive are changed
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */

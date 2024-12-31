@@ -116,6 +116,8 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       // Update state and save to local storage
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
+    } else {
+      console.warn('userAccount is undefined');
     }
 
     closeAndReturn();
@@ -135,6 +137,8 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
     if (userAccount) {
       console.log('subscribed assets', subscribedAssets);
       setSelectedCoins(subscribedAssets);
+    } else {
+      console.warn('userAccount is undefined');
     }
   }, []);
 

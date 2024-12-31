@@ -11,6 +11,7 @@ export const ROUTES = {
     RECEIVE: '/receive',
     ADD_NETWORK: '/add-network',
     EDIT_COIN_LIST: '/edit-coin-list',
+    SETTINGS: '/settings',
   },
   AUTH: {
     ROOT: AUTH_ROOT,

@@ -3,7 +3,6 @@ export * from './Check';
 export * from './Copy';
 export * from './Discord';
 export * from './DotsVertical';
-export * from './Edit';
 export * from './Expand';
 export * from './EyeClose';
 export * from './EyeOpen';

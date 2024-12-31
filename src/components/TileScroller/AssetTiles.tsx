@@ -26,9 +26,6 @@ export const AssetTiles: React.FC<AssetTilesProps> = ({
   isEditPage = false,
   multiSelectEnabled = false,
 }) => {
-  console.log('isEditPage:', isEditPage);
-  console.log('isDialog:', isDialog);
-  console.log('isReceiveDialog:', isReceiveDialog);
   const filteredAssets = useAtomValue(
     isEditPage
       ? coinListAssetsAtom

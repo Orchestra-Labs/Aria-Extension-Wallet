@@ -4,6 +4,7 @@ import { getPasswordRecords, hashPassword, savePasswordHash } from './password';
 import { createWallet } from './wallet';
 import { saveSessionData } from './session';
 import { generateUUID } from '../uuid';
+import { SettingsOptions } from '@/constants';
 
 const ACCOUNTS_KEY = 'accountsToken';
 
@@ -96,6 +97,8 @@ export const createAccount = async (
       defaultCoinDenom,
       subscribedTo: subscriptions,
       activeWalletID: walletRecord.id,
+      [SettingsOptions.STABLECOIN_FEE]: false,
+      [SettingsOptions.VALIDATOR_STATUS]: false,
     },
     wallets: [walletRecord],
   };

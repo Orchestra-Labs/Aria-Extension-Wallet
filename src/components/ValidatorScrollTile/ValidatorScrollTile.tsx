@@ -46,7 +46,6 @@ export const ValidatorScrollTile = ({
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
   const { refreshData } = useRefreshData();
 
-  // TODO: shouldn't this be showing filtered validators?
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
   const walletState = useAtomValue(walletStateAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
