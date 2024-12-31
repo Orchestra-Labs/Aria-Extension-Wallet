@@ -11,7 +11,7 @@ import { userAccountAtom } from '@/atoms/accountAtom';
 interface SettingsScreenProps {}
 
 const DEFAULT_CONFIG = {
-  [SettingsOptions.STABLECOIN_FEE]: false,
+  // [SettingsOptions.STABLECOIN_FEE]: false,
   [SettingsOptions.VALIDATOR_STATUS]: false,
 };
 
@@ -78,10 +78,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
       <Separator />
 
       {/* Configuration options */}
-      <div className="px-4 py-2">
+      <div className="flex flex-grow flex-col px-4 py-2">
         <h2 className="text-lg font-bold text-center">Configuration Options</h2>
         <div className="flex flex-col gap-4 mt-4 mx-[10%]">
-          <label className="flex flex-grow gap-4">
+          {/* <label className="flex flex-grow gap-4">
             <input
               type="checkbox"
               checked={
@@ -92,7 +92,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
               className="form-checkbox h-5 w-5 text-blue-600"
             />
             <span className="text-left flex">Pay Gas With Stablecoins</span>
-          </label>
+          </label> */}
           <label className="flex flex-grow gap-4">
             <input
               type="checkbox"
