@@ -2,7 +2,6 @@ import axios from 'axios';
 import { getPrefixes, prefixesNeedRefresh, savePrefixes } from './dataHelpers';
 import { ChainData } from '@/types';
 
-// TODO: on valid address, check for route
 const SLIP_0173_URL = 'https://raw.githubusercontent.com/satoshilabs/slips/master/slip-0173.md';
 
 export const fetchBech32Prefixes = async (): Promise<ChainData[]> => {

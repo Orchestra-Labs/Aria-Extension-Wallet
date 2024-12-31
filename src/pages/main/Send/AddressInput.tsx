@@ -54,8 +54,6 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     try {
       const decoded = bech32.decode(address);
 
-      // TODO: check this verifies prefix presence properly
-      console.log('found prefix', decoded.prefix);
       if (!decoded.prefix) {
         setAddressStatus(InputStatus.ERROR);
         setMessageText(`Missing prefix`);
@@ -63,7 +61,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         return;
       }
 
-      // TODO: use net of sending coin
+      // TODO: use net level of sending coin
       const matchedChain = testnetPrefixes.find(chain => chain.testnet === decoded.prefix);
 
       if (!matchedChain) {

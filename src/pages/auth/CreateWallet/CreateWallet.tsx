@@ -106,6 +106,8 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
+
   // TODO: on press of switch button, ensure placeholder values update
   // TODO: on press of switch button, ensure input values update
 
@@ -135,7 +137,12 @@ export const CreateWallet = () => {
 
   // TODO: handleCreateWallet should create/add depending on source of origin
   // TODO: creation of wallet with old password should overwrite old wallet
+  // TODO: access alternate wallets through MainLayout.tsx, then remove TODO
   // TODO: add option screen filter for regional display for numbers
+
+  // TODO: support multiple accounts by modifying createAccount on account.ts, then remove TODO
+
+  // TODO: add security options in account to handle saveSessionData TODO, then remove TODO
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */

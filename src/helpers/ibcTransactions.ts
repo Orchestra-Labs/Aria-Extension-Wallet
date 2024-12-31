@@ -161,7 +161,6 @@ export const isIBC = async ({
   return validChannel !== null;
 };
 
-// TODO: use chain input to route to specific chain connection query
 export const fetchActiveIBCChannels = async (): Promise<IBCChannel[]> => {
   console.log('Fetching active IBC channels...');
   try {

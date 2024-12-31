@@ -227,7 +227,6 @@ export interface StakingParams {
   bond_denom: string;
 }
 
-// TODO: ensure IBC channel used is always the one for the sending chain
 export interface IBCChannel {
   channel_id: string;
   port_id: string;
