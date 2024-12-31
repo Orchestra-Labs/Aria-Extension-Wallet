@@ -112,6 +112,8 @@ export const CreateWallet = () => {
   // TODO: add change password functionality
   // TODO: add view passphrase functionality
 
+  // TODO: add tutorial pages for first load so users know how to swap, how to receive specific assets, and how to stake
+
   // TODO: make "clear" and "max" button send screen inputs.  make placement and appearance for these uniform (send and unstake sections)
 
   // TODO: add feeLoading state so user knows fees are updating
@@ -128,6 +130,12 @@ export const CreateWallet = () => {
   // TODO: make toasts copy-on-click
   // TODO: make toast animate in, animate out, and swipe-away
   // TODO: add auth support for dApps
+
+  // TODO: show donut chart with assets rather than singular value (requires connections to exchanges)
+
+  // TODO: handleCreateWallet should create/add depending on source of origin
+  // TODO: creation of wallet with old password should overwrite old wallet
+  // TODO: add option screen filter for regional display for numbers
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */
@@ -153,10 +161,9 @@ export const CreateWallet = () => {
 
   /* Nice to have TODOs */
   // TODO: get google analytics going
-  // TODO: creation of wallet with old password should overwrite old wallet
   // TODO: fix issue with gas on 'all' button for validator selections (bundle transactions)
   // TODO: clean up helper functions and hooks
-  // TODO: keep track of current page for case of re-open before timeout
+  // TODO: keep track of current page for case of re-open before timeout and for close of options pages
   // TODO: make data text in asset and validator tiles scrollable
   // TODO: ensure logout after blur + timeout (blur is click outside application to close).  to remove sensitive data after time period
   // TODO: speed up resolution on rpc queries (send, stake, unstake, claim)
@@ -167,7 +174,6 @@ export const CreateWallet = () => {
   // TODO: add show/hide function to wallet asset list (select which assets to show.  add searchability to this)
   // TODO: security tab enables/disables need to confirm transactions/re-entry of password on transactions (3 levels of security)
   // TODO: update transactions history button (need endpoint for this.  disable until ready)
-  // TODO: show donut chart with assets rather than singular value (requires connections to exchanges)
   // TODO: Add on-ramp / off-ramp page
   // TODO: If at least one on-ramp connection exists, include fiat in send options
   // TODO: If at least one off-ramp connection exists, include fiat in receive options
@@ -180,7 +186,6 @@ export const CreateWallet = () => {
 
   /* Internationalization TODOs */
   // TODO: add translations for all strings (pull from string file/translation file)
-  // TODO: add option screen filter for regional display for numbers
 
   /* Nice to have TODOs */
   // TODO: add password complexity bar on entry
@@ -205,12 +210,11 @@ export const CreateWallet = () => {
   // Check everything is completed properly and pass to confirmation screen
   const handleCreateWallet = async () => {
     try {
-      // TODO: add session token and move user to chain visibility screen
       console.log('trying to create wallet');
       // Generate wallet from the mnemonic and create the token
       const mnemonic = getStringMnemonic();
       const walletName = 'Aria';
-      // TODO: make create/add depending on source of origin
+
       const accountRecord = await createAccount(mnemonic, password, walletName);
       console.log('create wallet function ended');
 
