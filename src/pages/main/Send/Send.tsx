@@ -57,7 +57,6 @@ const userIsOnPage = () => {
   return result;
 };
 
-// TODO: fix issue where if send asset is changed,receive is changed (should not change unless previously changed itself)
 export const Send = () => {
   const { refreshData } = useRefreshData();
   const { exchangeRate } = useExchangeRate();
