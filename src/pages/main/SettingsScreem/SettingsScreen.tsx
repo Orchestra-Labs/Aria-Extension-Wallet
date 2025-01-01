@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { isInitialDataLoadAtom } from '@/atoms';
 import { useAtom, useAtomValue } from 'jotai';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ROUTES, SettingsOptions } from '@/constants';
-import { X } from '@/assets/icons';
 import { Button, Separator } from '@/ui-kit';
 import { saveAccountByID } from '@/helpers/dataHelpers/account';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { Header } from '@/components';
 
 interface SettingsScreenProps {}
 
@@ -61,24 +61,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-black text-white">
       {/* Top bar */}
-      <div className="flex justify-between items-center w-full p-5">
-        <NavLink
-          to={ROUTES.APP.ROOT}
-          className="flex items-center justify-center max-w-5 max-h-5 p-0.5"
-          onClick={closeAndReturn}
-        >
-          <X className="w-full h-full text-white" />
-        </NavLink>
-        <div>
-          <h1 className="text-h5 text-white font-bold">{PAGE_TITLE}</h1>
-        </div>
-        <div className="max-w-5 w-full max-h-5" />
-      </div>
-
-      <Separator />
+      <Header title={PAGE_TITLE} onClose={closeAndReturn} />
 
       {/* Configuration options */}
-      <div className="flex flex-grow flex-col px-4 py-2">
+      <div className="flex flex-grow flex-col px-4 pt-4">
         <h2 className="text-lg font-bold text-center">Configuration Options</h2>
         <div className="flex flex-col gap-4 mt-4 mx-[10%]">
           {/* <label className="flex flex-grow gap-4">

@@ -4,6 +4,7 @@ export * from './AssetSelectDialog';
 export * from './BalanceCard';
 export * from './ConnectedServicesDialog';
 export * from './CreatePasswordForm';
+export * from './Header';
 export * from './Loader';
 export * from './OptionsDialog';
 export * from './QRCodeContainer';
