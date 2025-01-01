@@ -108,9 +108,6 @@ export const CreateWallet = () => {
   /* David Current TODOs */
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
 
-  // TODO: on press of switch button, ensure placeholder values update
-  // TODO: on press of switch button, ensure input values update
-
   // TODO: add change password functionality
   // TODO: add view passphrase functionality
 
