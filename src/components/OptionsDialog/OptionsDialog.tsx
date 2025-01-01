@@ -1,5 +1,5 @@
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
-import { EditIcon, LogOut, Settings } from 'lucide-react';
+import { EditIcon, LogOut, NotebookTextIcon, Settings } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -22,6 +22,13 @@ const OPTIONS = [
     icon: <EditIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.EDIT_COIN_LIST,
+  },
+  {
+    id: 2,
+    name: 'View Passphrase',
+    icon: <NotebookTextIcon width={16} height={16} />,
+    target: '',
+    to: ROUTES.APP.VIEW_PASSPHRASE,
   },
   {
     id: 3,

@@ -109,7 +109,6 @@ export const CreateWallet = () => {
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
 
   // TODO: add change password functionality
-  // TODO: add view passphrase functionality
 
   // TODO: add tutorial pages for first load so users know how to swap, how to receive specific assets, and how to stake
 

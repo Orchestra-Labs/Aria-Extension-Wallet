@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Loader, SearchBar, SortDialog, TileScroller } from '@/components';
+import { Header, Loader, SearchBar, SortDialog, TileScroller } from '@/components';
 import {
   filteredExchangeAssetsAtom,
   isInitialDataLoadAtom,
@@ -11,9 +11,8 @@ import {
   subscribedAssetsAtom,
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DEFAULT_CHAIN_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
-import { X } from '@/assets/icons';
 import { Button, Separator } from '@/ui-kit';
 import { Asset, SubscriptionRecord } from '@/types';
 import { saveAccountByID } from '@/helpers/dataHelpers/account';
@@ -144,22 +143,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-black text-white">
-      {/* Top bar with back button and title */}
-      <div className="flex justify-between items-center w-full p-5">
-        <NavLink
-          to={ROUTES.APP.ROOT}
-          className="flex items-center justify-center max-w-5 max-h-5 p-0.5"
-          onClick={cancel}
-        >
-          <X className="w-full h-full text-white" />
-        </NavLink>
-        <div>
-          <h1 className="text-h5 text-white font-bold">{PAGE_TITLE}</h1>
-        </div>
-        <div className="max-w-5 w-full max-h-5" />
-      </div>
-
-      <Separator />
+      <Header title={PAGE_TITLE} onClose={cancel} />
 
       {/* TODO: extract the below items from here and assetselectdialog to external component */}
       <div className="flex pt-2 px-4 justify-between items-center px-2">

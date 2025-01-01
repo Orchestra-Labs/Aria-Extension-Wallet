@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { ArrowLeft, Spinner, Swap } from '@/assets/icons';
+import { useLocation } from 'react-router-dom';
+import { Spinner, Swap } from '@/assets/icons';
 import {
   DEFAULT_ASSET,
   defaultReceiveState,
@@ -24,7 +24,7 @@ import {
   symphonyAssetsAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionSuccess } from '@/types';
-import { AssetInput, WalletSuccessScreen, TransactionResultsTile } from '@/components';
+import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
 import {
   formatBalanceDisplay,
   getSessionStorageItem,
@@ -41,7 +41,6 @@ import {
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
 import { AddressInput } from './AddressInput';
-import Tooltip from '@/components/Tooltip/Tooltip';
 import { userAccountAtom } from '@/atoms/accountAtom';
 
 const pageMountedKey = 'userIsOnPage';
@@ -589,25 +588,17 @@ export const Send = () => {
 
   return (
     <div className="h-screen flex flex-col bg-black text-white">
-      {/* Top bar with back button and title */}
-      <div className="flex justify-between items-center w-full p-5">
-        <NavLink
-          to={ROUTES.APP.ROOT}
-          className="flex items-center justify-center max-w-5 max-h-5 p-0.5"
-          onClick={handleBackClick}
-        >
-          <ArrowLeft className="w-full h-full text-white" />
-        </NavLink>
-
-        <Tooltip tooltipText={'To swap, click the receive field icon'} position={Position.RIGHT}>
-          <h1 className="text-h5 text-white font-bold">Send</h1>
-        </Tooltip>
-
-        <div className="max-w-5 w-full max-h-5" />
-      </div>
+      <Header
+        title={'Send'}
+        onClose={handleBackClick}
+        useArrow={true}
+        showTooltip={true}
+        tooltipText={'To swap, click the receive field icon'}
+        tooltipPosition={Position.RIGHT}
+      />
 
       {/* Content container */}
-      <div className="flex flex-col justify-between flex-grow p-4 border border-neutral-2 rounded-lg overflow-y-auto">
+      <div className="flex flex-col justify-between flex-grow p-4 rounded-lg overflow-y-auto">
         <>
           {/* TODO: add chain selection if self */}
           {/* Address Input */}
