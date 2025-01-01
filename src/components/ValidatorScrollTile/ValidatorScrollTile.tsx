@@ -46,7 +46,6 @@ export const ValidatorScrollTile = ({
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
   const { refreshData } = useRefreshData();
 
-  // TODO: shouldn't this be showing filtered validators?
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
   const walletState = useAtomValue(walletStateAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
@@ -377,6 +376,7 @@ export const ValidatorScrollTile = ({
   let subtitleStatus = TextFieldStatus.GOOD;
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
 
+  // TODO: fix tile showing amount unstaking as expected percent rewards on all tile when tray is open
   if (showCurrentValidators) {
     if (userHasUnbonding) {
       value = formatBalanceDisplay(

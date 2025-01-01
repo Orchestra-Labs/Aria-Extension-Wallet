@@ -1,16 +1,18 @@
 import React, { useEffect } from 'react';
 import { Loader, SearchBar, SortDialog, TileScroller } from '@/components';
 import {
-  assetDialogSortOrderAtom,
-  assetDialogSortTypeAtom,
-  dialogSearchTermAtom,
   filteredExchangeAssetsAtom,
   isInitialDataLoadAtom,
   selectedCoinListAtom,
+  symphonyAssetsAtom,
+  assetDialogSortTypeAtom,
+  assetDialogSortOrderAtom,
+  dialogSearchTermAtom,
+  subscribedAssetsAtom,
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, ROUTES } from '@/constants';
+import { DEFAULT_CHAIN_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
 import { X } from '@/assets/icons';
 import { Button, Separator } from '@/ui-kit';
 import { Asset, SubscriptionRecord } from '@/types';
@@ -30,12 +32,14 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const [selectedCoins, setSelectedCoins] = useAtom(selectedCoinListAtom);
   const filteredExchangeCoins = useAtomValue(filteredExchangeAssetsAtom);
+  const subscribedAssets = useAtomValue(subscribedAssetsAtom);
+  const unfilteredAssets = useAtomValue(symphonyAssetsAtom);
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(assetDialogSortOrderAtom);
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
   const [userAccount, setUserAccount] = useAtom(userAccountAtom);
 
-  const allCoinsSelected = selectedCoins.length === filteredExchangeCoins.length;
+  const allCoinsSelected = selectedCoins.length === unfilteredAssets.length;
   const noCoinsSelected = selectedCoins.length === 0;
 
   // Store initial settings to revert to them on cancel
@@ -86,22 +90,18 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       const updatedSubscriptions: { [networkID: string]: SubscriptionRecord } = {};
 
       // TODO: change page's save structure to reflect subscription/registry structure to prevent excess looping here
-      Object.keys(LOCAL_CHAIN_REGISTRY).forEach(networkID => {
-        const networkAssets = LOCAL_CHAIN_REGISTRY[networkID]?.assets || {};
-        const networkCoinDenoms = Object.keys(networkAssets);
+      const networkID = DEFAULT_CHAIN_ID;
+      const networkCoinDenoms = unfilteredAssets.map(asset => asset.denom);
+      const selectedNetworkCoins = selectedCoins.map(coin => coin.denom);
 
-        const selectedNetworkCoins = selectedCoins
-          .filter(coin => coin.networkID === networkID)
-          .map(coin => coin.denom);
-
-        if (selectedNetworkCoins.length === networkCoinDenoms.length) {
-          // All coins in the network are selected, so save as an empty array
-          updatedSubscriptions[networkID] = { coinDenoms: [] };
-        } else if (selectedNetworkCoins.length > 0) {
-          // Partial selection, save the selected denoms
-          updatedSubscriptions[networkID] = { coinDenoms: selectedNetworkCoins };
-        }
-      });
+      console.log('saving selected coins', selectedNetworkCoins);
+      if (selectedNetworkCoins.length === networkCoinDenoms.length) {
+        // All coins in the network are selected, so save as an empty array
+        updatedSubscriptions[networkID] = { coinDenoms: [] };
+      } else if (selectedNetworkCoins.length > 0) {
+        // Partial selection, save the selected denoms
+        updatedSubscriptions[networkID] = { coinDenoms: selectedNetworkCoins };
+      }
 
       const updatedUserAccount = {
         ...userAccount,
@@ -111,9 +111,13 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
         },
       };
 
+      console.log('updated user account', updatedUserAccount);
+
       // Update state and save to local storage
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
+    } else {
+      console.warn('userAccount is undefined');
     }
 
     closeAndReturn();
@@ -131,31 +135,15 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
 
   useEffect(() => {
     if (userAccount) {
-      const initialCoins: Asset[] = [];
-
-      Object.entries(userAccount.settings.subscribedTo).forEach(([networkID, subscription]) => {
-        const networkAssets = LOCAL_CHAIN_REGISTRY[networkID]?.assets;
-
-        if (!networkAssets) return;
-
-        if (subscription.coinDenoms.length === 0) {
-          initialCoins.push(...Object.values(networkAssets));
-        } else {
-          subscription.coinDenoms.forEach(denom => {
-            const asset = networkAssets[denom];
-            if (asset) {
-              initialCoins.push(asset);
-            }
-          });
-        }
-      });
-
-      setSelectedCoins(initialCoins);
+      console.log('subscribed assets', subscribedAssets);
+      setSelectedCoins(subscribedAssets);
+    } else {
+      console.warn('userAccount is undefined');
     }
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-black text-white">
+    <div className="h-screen flex flex-col overflow-hidden bg-black text-white">
       {/* Top bar with back button and title */}
       <div className="flex justify-between items-center w-full p-5">
         <NavLink
@@ -198,24 +186,26 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
           </Button>
         </div>
         <div className="justify-end">
-          <SortDialog isValidatorSort isDialog />
+          <SortDialog isDialog />
         </div>
       </div>
 
-      <div className="flex-grow px-4 flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden px-4">
         {isInitialDataLoad ? (
           <Loader />
         ) : (
           // TODO: create CategoryTiles option or new component that allows for animated tile inclusion
-          <TileScroller
-            activeIndex={0}
-            onSelectAsset={handleSelectCoin}
-            isSelectable
-            isDialog
-            isReceiveDialog
-            multiSelectEnabled
-          />
+          <div className="flex-grow flex flex-col overflow-hidden">
+            <TileScroller
+              activeIndex={0}
+              onSelectAsset={handleSelectCoin}
+              isSelectable
+              isEditPage
+              multiSelectEnabled
+            />
+          </div>
         )}
+
         <SearchBar />
       </div>
 

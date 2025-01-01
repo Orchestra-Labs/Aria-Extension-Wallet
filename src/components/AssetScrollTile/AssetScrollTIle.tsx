@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DEFAULT_ASSET, ROUTES } from '@/constants';
+import { DEFAULT_ASSET, LOCAL_ASSET_REGISTRY, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -41,7 +41,7 @@ export const AssetScrollTile = ({
 
   const symbol = asset.symbol || DEFAULT_ASSET.symbol || 'MLD';
   const title = asset.symbol || 'Unknown Asset';
-  const logo = asset.logo;
+  const logo = asset.logo ? asset.logo : LOCAL_ASSET_REGISTRY.note.logo;
 
   const valueAmount = isReceiveDialog
     ? asset.exchangeRate === '0'

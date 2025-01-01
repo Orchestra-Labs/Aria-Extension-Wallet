@@ -1,4 +1,4 @@
-import { NetworkLevel } from '@/constants';
+import { NetworkLevel, SettingsOptions } from '@/constants';
 
 export interface SessionToken {
   mnemonic: string;
@@ -27,6 +27,8 @@ export interface AccountRecord {
     defaultCoinDenom: string;
     subscribedTo: { [networkID: string]: SubscriptionRecord };
     activeWalletID: string;
+    [SettingsOptions.STABLECOIN_FEE]: boolean;
+    [SettingsOptions.VALIDATOR_STATUS]: boolean;
   };
   wallets: WalletRecord[];
 }
@@ -44,6 +46,7 @@ export interface Asset {
   isIbc: boolean;
   logo?: string;
   symbol?: string;
+  name?: string;
   exponent?: number;
   isFeeToken?: boolean;
   networkName?: string;
@@ -59,6 +62,7 @@ export interface SendObject {
   recipientAddress: string;
   amount: string;
   denom: string;
+  symphonyAssets: Asset[];
 }
 export interface SwapObject {
   sendObject: SendObject;
@@ -223,7 +227,6 @@ export interface StakingParams {
   bond_denom: string;
 }
 
-// TODO: ensure IBC channel used is always the one for the sending chain
 export interface IBCChannel {
   channel_id: string;
   port_id: string;

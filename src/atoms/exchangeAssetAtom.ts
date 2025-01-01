@@ -1,18 +1,23 @@
 import { atom } from 'jotai';
-import { dialogSearchTermAtom, assetDialogSortOrderAtom, assetDialogSortTypeAtom } from '@/atoms';
+import {
+  dialogSearchTermAtom,
+  assetDialogSortOrderAtom,
+  assetDialogSortTypeAtom,
+  subscribedAssetsAtom,
+} from '@/atoms';
 import { filterAndSortAssets } from '@/helpers';
 import { Asset } from '@/types';
 
-export const exchangeAssetsAtom = atom<Asset[]>([]);
+export const symphonyAssetsAtom = atom<Asset[]>([]);
 
-// Create a filtered version for the dialog
+// For receive asset list (send page)
 export const filteredExchangeAssetsAtom = atom(get => {
-  const exchangeAssets = get(exchangeAssetsAtom);
+  const symphonyAssets = get(subscribedAssetsAtom);
   const searchTerm = get(dialogSearchTermAtom);
   const sortOrder = get(assetDialogSortOrderAtom);
   const sortType = get(assetDialogSortTypeAtom);
 
-  const nonIbcAssets = exchangeAssets.filter(asset => !asset.isIbc);
+  const nonIbcAssets = symphonyAssets.filter(asset => !asset.isIbc);
 
   return filterAndSortAssets(nonIbcAssets, searchTerm, sortType, sortOrder);
 });

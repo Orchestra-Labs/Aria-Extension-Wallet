@@ -17,6 +17,7 @@ interface TileScrollerProps {
   onSelectValidator?: (validator: CombinedStakingInfo) => void;
   isDialog?: boolean;
   isReceiveDialog?: boolean;
+  isEditPage?: boolean;
   multiSelectEnabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ export const TileScroller: React.FC<TileScrollerProps> = ({
   onSelectValidator,
   isDialog = false,
   isReceiveDialog = false,
+  isEditPage = false,
   multiSelectEnabled = false,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -190,6 +192,7 @@ export const TileScroller: React.FC<TileScrollerProps> = ({
             onClick={allowOnClick ? onSelectAsset : () => {}}
             isDialog={isDialog}
             isReceiveDialog={isReceiveDialog}
+            isEditPage={isEditPage}
             multiSelectEnabled={multiSelectEnabled}
           />
         ) : (

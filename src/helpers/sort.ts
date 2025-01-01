@@ -49,7 +49,6 @@ export function filterAndSortAssets(
 }
 
 const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStatusFilter) => {
-  // TODO: make this a maleable parameter to return non-bonded validators too
   if (statusFilter === ValidatorStatusFilter.STATUS_ACTIVE) {
     return validator.validator.status === BondStatus.BONDED;
   } else if (statusFilter === ValidatorStatusFilter.STATUS_NON_JAILED) {

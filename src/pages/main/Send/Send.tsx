@@ -21,6 +21,7 @@ import {
   walletStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
+  symphonyAssetsAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile } from '@/components';
@@ -41,30 +42,29 @@ import {
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
 import { AddressInput } from './AddressInput';
 import Tooltip from '@/components/Tooltip/Tooltip';
+import { userAccountAtom } from '@/atoms/accountAtom';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
-  console.log(`Setting user on page to: ${isOnPage}`);
   if (isOnPage) {
     removeSessionStorageItem(pageMountedKey);
   } else {
     setSessionStorageItem(pageMountedKey, 'false');
   }
-  console.log(`Session storage after setting: ${getSessionStorageItem(pageMountedKey)}`);
 };
 const userIsOnPage = () => {
   const result = getSessionStorageItem(pageMountedKey) !== 'false';
-  console.log(`Checking if user is on page (should be false if navigated away): ${result}`);
   return result;
 };
 
-// TODO: fix issue where navigation away is not clearing asset selection
 export const Send = () => {
   const { refreshData } = useRefreshData();
   const { exchangeRate } = useExchangeRate();
   const { toast } = useToast();
   const location = useLocation();
 
+  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
+  const userAccount = useAtomValue(userAccountAtom);
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const [changeMap, setChangeMap] = useAtom(changeMapAtom);
@@ -164,6 +164,7 @@ export const Send = () => {
       recipientAddress: currentRecipientAddress,
       amount: adjustedAmount,
       denom: sendAsset.denom,
+      symphonyAssets,
     };
 
     if (!simulateTransaction) setLoading(true);
@@ -347,7 +348,10 @@ export const Send = () => {
         // TODO: get default gas price from chain registry
         const defaultGasPrice = 0.025;
         const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
-        const symbol = sendState.asset.symbol || DEFAULT_ASSET.symbol || 'MLD';
+        const symbol =
+          (userAccount?.settings.stablecoinFeeElection && sendState.asset.symbol) ||
+          DEFAULT_ASSET.symbol ||
+          'MLD';
         const feeAmount = gasWanted * defaultGasPrice;
         const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 

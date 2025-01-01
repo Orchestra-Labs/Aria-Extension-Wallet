@@ -12,6 +12,7 @@ import {
   Main,
   NewWallet,
   Send,
+  SettingsScreen,
   Transaction,
   TransactionsHistory,
 } from '@/pages';
@@ -78,6 +79,10 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.EDIT_COIN_LIST,
           element: <EditCoinListScreen />,
+        },
+        {
+          path: ROUTES.APP.SETTINGS,
+          element: <SettingsScreen />,
         },
       ],
     },
