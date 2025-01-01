@@ -15,6 +15,7 @@ import {
   SettingsScreen,
   Transaction,
   TransactionsHistory,
+  ViewPassphrase,
 } from '@/pages';
 
 const AuthLayout = lazy(() => import('@/layouts/auth/AuthLayout'));
@@ -83,6 +84,10 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.SETTINGS,
           element: <SettingsScreen />,
+        },
+        {
+          path: ROUTES.APP.VIEW_PASSPHRASE,
+          element: <ViewPassphrase />,
         },
       ],
     },

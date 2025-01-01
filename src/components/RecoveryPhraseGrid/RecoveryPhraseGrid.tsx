@@ -11,12 +11,14 @@ type RecoveryPhraseGridProps = {
   isVerifyMode?: boolean;
   hiddenIndices?: number[];
   isEditable?: boolean;
+  singleWordCount?: boolean;
 };
 
 export const RecoveryPhraseGrid: React.FC<RecoveryPhraseGridProps> = ({
   isVerifyMode = false,
   hiddenIndices: hiddenWordIndices = [],
   isEditable = false,
+  singleWordCount = false,
 }) => {
   const [mnemonic12, setMnemonic12] = useAtom(mnemonic12State);
   const [mnemonic24, setMnemonic24] = useAtom(mnemonic24State);
@@ -335,7 +337,7 @@ export const RecoveryPhraseGrid: React.FC<RecoveryPhraseGridProps> = ({
   return (
     <>
       {/* 12 Words vs 24 Words selection */}
-      {!isVerifyMode && (
+      {!isVerifyMode && !singleWordCount && (
         <div className="flex justify-center mt-5">
           <Button
             variant={!use24Words ? 'selected' : 'unselected'}
@@ -350,6 +352,11 @@ export const RecoveryPhraseGrid: React.FC<RecoveryPhraseGridProps> = ({
           >
             24 Words
           </Button>
+        </div>
+      )}
+      {singleWordCount && (
+        <div className="flex justify-center mt-5">
+          <p className="text-blue bg-transparent text-sm">{use24Words ? '24 ' : '12 '} Words</p>
         </div>
       )}
       <div className="mt-3 flex-1">

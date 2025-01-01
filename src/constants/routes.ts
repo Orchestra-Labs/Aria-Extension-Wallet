@@ -12,6 +12,7 @@ export const ROUTES = {
     ADD_NETWORK: '/add-network',
     EDIT_COIN_LIST: '/edit-coin-list',
     SETTINGS: '/settings',
+    VIEW_PASSPHRASE: '/view-passphrase',
   },
   AUTH: {
     ROOT: AUTH_ROOT,
