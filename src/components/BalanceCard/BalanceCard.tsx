@@ -10,9 +10,10 @@ import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@
 interface BalanceCardProps {
   currentStep: number;
   totalSteps: number;
+  swipeTo: (index: number) => void;
 }
 
-export const BalanceCard = ({ currentStep, totalSteps }: BalanceCardProps) => {
+export const BalanceCard = ({ currentStep, totalSteps, swipeTo: swipeTo }: BalanceCardProps) => {
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const walletAssets = useAtomValue(walletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
@@ -91,12 +92,19 @@ export const BalanceCard = ({ currentStep, totalSteps }: BalanceCardProps) => {
         )}
       </div>
       <div className="absolute bottom-2 flex space-x-2">
-        {[...Array(totalSteps)].map((_, index) => (
-          <span
-            key={index}
-            className={`w-2 h-2 rounded-full ${index === currentStep ? 'bg-blue' : 'bg-neutral-4'}`}
-          />
-        ))}
+        {[...Array(totalSteps)].map((_, index) =>
+          index === currentStep ? (
+            <span key={index} className="w-2 h-2 rounded-full bg-blue" />
+          ) : (
+            <Button
+              key={index}
+              variant="unselected"
+              size="blank"
+              onClick={() => swipeTo(index)}
+              className="w-2 h-2 rounded-full bg-neutral-4"
+            />
+          ),
+        )}
       </div>
     </div>
   );
