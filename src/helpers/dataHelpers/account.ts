@@ -1,10 +1,11 @@
 import { AccountRecord, SubscriptionRecord, WalletRecord } from '@/types';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
-import { getPasswordRecords, hashPassword, savePasswordHash } from './password';
+import { getPasswordRecords, hashPassword, savePasswordHash, updatePassword } from './password';
 import { createWallet } from './wallet';
 import { saveSessionData } from './session';
 import { generateUUID } from '../uuid';
 import { SettingsOptions } from '@/constants';
+import { decryptMnemonic, encryptMnemonic } from './crypto';
 
 const ACCOUNTS_KEY = 'accountsToken';
 
@@ -66,7 +67,7 @@ export const removeAccountByID = (id: string): boolean => {
   return true;
 };
 
-// TODO: check password for ifExists. If exists, add wallet.  if not exists, create account
+// TODO: check password for ifExists. If exists, return error.  user can create wallet from within app if desired
 export const createAccount = async (
   mnemonic: string,
   password: string,
@@ -176,5 +177,69 @@ export const removeWalletFromAccount = (accountID: string, walletID: string): bo
 
   saveAccountByID(account);
   console.log('Account updated successfully after wallet removal.');
+  return true;
+};
+
+export const updateWallet = (
+  accountID: string,
+  walletID: string,
+  updatedFields: Partial<WalletRecord>,
+): boolean => {
+  const account = getAccountByID(accountID);
+  if (!account) {
+    console.warn(`Account with ID ${accountID} not found.`);
+    return false;
+  }
+
+  const walletIndex = account.wallets.findIndex(wallet => wallet.id === walletID);
+  if (walletIndex === -1) {
+    console.warn(`Wallet with ID ${walletID} not found in account.`);
+    return false;
+  }
+
+  account.wallets[walletIndex] = {
+    ...account.wallets[walletIndex],
+    ...updatedFields,
+  };
+
+  saveAccountByID(account);
+  return true;
+};
+
+export const updateAccountPassword = ({
+  accountID,
+  newPassword,
+  oldPassword,
+}: {
+  accountID: string;
+  newPassword: string;
+  oldPassword: string;
+}): boolean => {
+  const account = getAccountByID(accountID);
+  if (!account) {
+    console.warn(`Account with ID ${accountID} not found.`);
+    return false;
+  }
+
+  // Validate the old password
+  const newHash = updatePassword(accountID, oldPassword, newPassword);
+  if (!newHash) {
+    console.warn('Old password does not match.');
+    return false;
+  }
+
+  // Re-encrypt mnemonics for all wallets in the account
+  const updatedWallets = account.wallets.map(wallet => {
+    const decryptedMnemonic = decryptMnemonic(wallet.encryptedMnemonic, oldPassword);
+    const reEncryptedMnemonic = encryptMnemonic(decryptedMnemonic, newPassword);
+    return {
+      ...wallet,
+      encryptedMnemonic: reEncryptedMnemonic,
+    };
+  });
+
+  // Save updated wallet records to the account
+  account.wallets = updatedWallets;
+  saveAccountByID(account);
   return true;
 };

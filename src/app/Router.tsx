@@ -5,6 +5,7 @@ import { ROUTES } from '@/constants';
 import { AuthGuard, GuestGuard } from '@/guards';
 import {
   AddNewNetwork,
+  ChangePassword,
   CreateWallet,
   EditCoinListScreen,
   ImportWallet,
@@ -88,6 +89,10 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.VIEW_PASSPHRASE,
           element: <ViewPassphrase />,
+        },
+        {
+          path: ROUTES.APP.CHANGE_PASSWORD,
+          element: <ChangePassword />,
         },
       ],
     },

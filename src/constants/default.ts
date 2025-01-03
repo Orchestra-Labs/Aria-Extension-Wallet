@@ -1,6 +1,8 @@
 import { Asset } from '@/types';
 import { NetworkLevel } from './enums';
 
+export const VALID_PASSWORD_LENGTH = 8;
+
 // Network-related constants
 export const NETWORK = 'symphony';
 export const WALLET_PREFIX = 'symphony';

@@ -13,6 +13,7 @@ export const ROUTES = {
     EDIT_COIN_LIST: '/edit-coin-list',
     SETTINGS: '/settings',
     VIEW_PASSPHRASE: '/view-passphrase',
+    CHANGE_PASSWORD: '/change-password',
   },
   AUTH: {
     ROOT: AUTH_ROOT,
