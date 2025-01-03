@@ -9,10 +9,10 @@ import { cn } from '@/helpers';
 import { Asset } from '@/types';
 
 interface QRCodeScannerDialogProps {
-  updateSendAsset: (asset: Asset, propagateChanges: boolean) => void;
+  updateReceiveAsset: (asset: Asset, propagateChanges: boolean) => void;
 }
 
-export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ updateSendAsset }) => {
+export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ updateReceiveAsset }) => {
   const slideTrayRef = useRef<{ isOpen: () => void; closeWithAnimation: () => void }>(null);
 
   const setAddress = useSetAtom(recipientAddressAtom);
@@ -34,7 +34,7 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
           );
 
           setAddress(parsedResult.address);
-          updateSendAsset(preferredAsset as Asset, true);
+          updateReceiveAsset(preferredAsset as Asset, true);
         } else {
           setAddress(result);
         }

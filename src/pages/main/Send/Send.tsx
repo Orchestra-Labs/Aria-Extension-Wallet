@@ -604,7 +604,7 @@ export const Send = () => {
           {/* Address Input */}
           <AddressInput
             addBottomMargin={false}
-            updateSendAsset={updateSendAsset}
+            updateReceiveAsset={updateReceiveAsset}
             labelWidth="w-14"
           />
 
