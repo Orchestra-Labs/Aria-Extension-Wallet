@@ -3,9 +3,15 @@ import { EyeClose, EyeOpen } from '@/assets/icons';
 import { Input } from '@/ui-kit';
 import { useAtom, useSetAtom } from 'jotai';
 import { confirmPasswordAtom, passwordAtom, passwordsVerifiedAtom } from '@/atoms';
-import { InputStatus } from '@/constants';
+import { InputStatus, VALID_PASSWORD_LENGTH } from '@/constants';
 
-export const CreatePasswordForm = () => {
+interface CreatePasswordFormProps {
+  includeFormClasses?: boolean;
+}
+
+export const CreatePasswordForm: React.FC<CreatePasswordFormProps> = ({
+  includeFormClasses = true,
+}) => {
   const [password, setPassword] = useAtom(passwordAtom);
   const [confirmPassword, setConfirmPassword] = useAtom(confirmPasswordAtom);
   const setPasswordsVerified = useSetAtom(passwordsVerifiedAtom);
@@ -19,15 +25,13 @@ export const CreatePasswordForm = () => {
   const [allowValidatePassword, setAllowValidatePassword] = useState(false);
   const [allowValidateConfirmPassword, setAllowValidateConfirmPassword] = useState(false);
 
-  const validPasswordLength = 8;
-
   // Validate password
   const validatePassword = () => {
     if (password === '') {
       setPasswordStatus(InputStatus.NEUTRAL);
       return;
     }
-    const isPasswordValid = password.length >= 8;
+    const isPasswordValid = password.length >= VALID_PASSWORD_LENGTH;
     setPasswordStatus(isPasswordValid ? InputStatus.SUCCESS : InputStatus.ERROR);
   };
 
@@ -75,7 +79,7 @@ export const CreatePasswordForm = () => {
     setPassword(newPassword);
 
     // Start validating after 8 characters, paste, or blur
-    if (newPassword.length >= validPasswordLength && !allowValidatePassword) {
+    if (newPassword.length >= VALID_PASSWORD_LENGTH && !allowValidatePassword) {
       setAllowValidatePassword(true);
     }
 
@@ -95,7 +99,7 @@ export const CreatePasswordForm = () => {
     setConfirmPassword(newConfirmPassword);
 
     // Start validating after blur, paste, or if password is already valid
-    if (newConfirmPassword.length >= validPasswordLength || allowValidateConfirmPassword) {
+    if (newConfirmPassword.length >= VALID_PASSWORD_LENGTH || allowValidateConfirmPassword) {
       setAllowValidateConfirmPassword(true);
     }
 
@@ -150,7 +154,7 @@ export const CreatePasswordForm = () => {
 
   return (
     <>
-      <form className="mt-9 flex-1">
+      <form className={includeFormClasses ? 'mt-9 flex-1' : ''}>
         {/* New Password Input */}
         <Input
           variant="primary"
