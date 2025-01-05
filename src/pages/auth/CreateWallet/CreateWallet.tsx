@@ -106,7 +106,6 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: add small arrows / arrow tiles to swipe header, allow press on dots to also move swiper
   // TODO: add tutorial pages for first load so users know how to swap, how to receive specific assets, and how to stake
 
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO

@@ -18,6 +18,7 @@ export const Main = () => {
   const totalSlides = 2;
 
   const [activeIndex, setActiveIndex] = useAtom(swiperIndexState);
+  console.log('active index', activeIndex);
   const [showCurrentValidators, setShowCurrentValidators] = useAtom(showCurrentValidatorsAtom);
   const [showAllAssets, setShowAllAssets] = useAtom(showAllAssetsAtom);
   const setSearchTerm = useSetAtom(searchTermAtom);
