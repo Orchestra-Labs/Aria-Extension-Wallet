@@ -18,6 +18,7 @@ export const Main = () => {
   const totalSlides = 2;
 
   const [activeIndex, setActiveIndex] = useAtom(swiperIndexState);
+  console.log('active index', activeIndex);
   const [showCurrentValidators, setShowCurrentValidators] = useAtom(showCurrentValidatorsAtom);
   const [showAllAssets, setShowAllAssets] = useAtom(showAllAssetsAtom);
   const setSearchTerm = useSetAtom(searchTermAtom);
@@ -32,6 +33,13 @@ export const Main = () => {
 
   const validatorViewToggleChange = (shouldShowCurrent: boolean) => {
     setShowCurrentValidators(shouldShowCurrent);
+  };
+
+  const swipeTo = (index: number) => {
+    setActiveIndex(index);
+    if (swiperRef.current) {
+      swiperRef.current.slideTo(index);
+    }
   };
 
   useEffect(() => {
@@ -67,12 +75,20 @@ export const Main = () => {
             >
               <SwiperSlide>
                 <div className="w-full px-4 mt-4 flex-shrink-0">
-                  <BalanceCard currentStep={activeIndex} totalSteps={totalSlides} />
+                  <BalanceCard
+                    currentStep={activeIndex}
+                    totalSteps={totalSlides}
+                    swipeTo={swipeTo}
+                  />
                 </div>
               </SwiperSlide>
               <SwiperSlide>
                 <div className="w-full px-4 mt-4 flex-shrink-0">
-                  <BalanceCard currentStep={activeIndex} totalSteps={totalSlides} />
+                  <BalanceCard
+                    currentStep={activeIndex}
+                    totalSteps={totalSlides}
+                    swipeTo={swipeTo}
+                  />
                 </div>
               </SwiperSlide>
             </Swiper>
