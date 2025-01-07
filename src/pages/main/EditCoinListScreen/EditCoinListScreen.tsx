@@ -190,7 +190,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
           </div>
         )}
 
-        <SearchBar />
+        <SearchBar isDialog />
       </div>
 
       <Separator variant="top" />
