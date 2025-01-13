@@ -43,6 +43,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
 
   // Store initial settings to revert to them on cancel
   const initialSettings = {
+    hasSetCoinList: true,
     subscribedTo:
       userAccount?.settings.subscribedTo &&
       Object.keys(userAccount.settings.subscribedTo).length > 0
@@ -106,6 +107,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
         ...userAccount,
         settings: {
           ...userAccount.settings,
+          hasSetCoinList: true,
           subscribedTo: updatedSubscriptions,
         },
       };
@@ -125,6 +127,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const cancel = () => {
     if (userAccount) {
       // Restore the initial settings
+      userAccount.settings.hasSetCoinList = initialSettings.hasSetCoinList;
       userAccount.settings.subscribedTo = initialSettings.subscribedTo;
       saveAccountByID(userAccount);
     }

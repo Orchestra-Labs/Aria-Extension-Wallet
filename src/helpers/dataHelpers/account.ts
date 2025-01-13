@@ -93,13 +93,15 @@ export const createAccount = async (
   const newAccount: AccountRecord = {
     id: accountID,
     settings: {
-      hasSetCoinList: false,
       defaultNetworkID,
       defaultCoinDenom,
       subscribedTo: subscriptions,
       activeWalletID: walletRecord.id,
       [SettingsOptions.STABLECOIN_FEE]: false,
       [SettingsOptions.VALIDATOR_STATUS]: false,
+      // initialization settings:
+      hasSetCoinList: false,
+      hasViewedTutorial: false,
     },
     wallets: [walletRecord],
   };

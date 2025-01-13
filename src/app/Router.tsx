@@ -14,6 +14,7 @@ import {
   NewWallet,
   Send,
   SettingsScreen,
+  SwapTutorial,
   Transaction,
   TransactionsHistory,
   ViewPassphrase,
@@ -93,6 +94,10 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.CHANGE_PASSWORD,
           element: <ChangePassword />,
+        },
+        {
+          path: ROUTES.APP.VIEW_TUTORIAL,
+          element: <SwapTutorial />,
         },
       ],
     },

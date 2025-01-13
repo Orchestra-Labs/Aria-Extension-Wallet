@@ -22,13 +22,15 @@ export interface AccountRecord {
   id: string; // password and account share ID
   // prioritize lowest level settings for priority (wallet visibility over account visibility)
   settings: {
-    hasSetCoinList: boolean;
     defaultNetworkID: string;
     defaultCoinDenom: string;
     subscribedTo: { [networkID: string]: SubscriptionRecord };
     activeWalletID: string;
     [SettingsOptions.STABLECOIN_FEE]: boolean;
     [SettingsOptions.VALIDATOR_STATUS]: boolean;
+    // initialization settings:
+    hasSetCoinList: boolean;
+    hasViewedTutorial: boolean;
   };
   wallets: WalletRecord[];
 }

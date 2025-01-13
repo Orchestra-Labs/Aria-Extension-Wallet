@@ -14,6 +14,7 @@ export const ROUTES = {
     SETTINGS: '/settings',
     VIEW_PASSPHRASE: '/view-passphrase',
     CHANGE_PASSWORD: '/change-password',
+    VIEW_TUTORIAL: '/view-tutorial',
   },
   AUTH: {
     ROOT: AUTH_ROOT,
