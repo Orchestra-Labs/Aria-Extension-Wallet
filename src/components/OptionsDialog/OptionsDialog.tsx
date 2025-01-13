@@ -1,5 +1,12 @@
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
-import { EditIcon, LogOut, NotebookPenIcon, NotebookTextIcon, Settings } from 'lucide-react';
+import {
+  EditIcon,
+  GraduationCap,
+  LogOut,
+  NotebookPenIcon,
+  NotebookTextIcon,
+  Settings,
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -36,6 +43,13 @@ const OPTIONS = [
     icon: <EditIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.EDIT_COIN_LIST,
+  },
+  {
+    id: 5,
+    name: 'View Tutorial',
+    icon: <GraduationCap width={16} height={16} />,
+    target: '',
+    to: ROUTES.APP.VIEW_TUTORIAL,
   },
   {
     id: 5,
