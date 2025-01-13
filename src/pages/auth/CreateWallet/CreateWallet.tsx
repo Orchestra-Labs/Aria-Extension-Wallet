@@ -109,7 +109,6 @@ export const CreateWallet = () => {
   // TODO: add validation for minimum send amount
   // TODO: ensure maximum sendable amount encorporates fee estimate
   // TODO: add error message to send page to show why button is disabled
-  // TODO: add tutorial pages for first load so users know how to swap, how to receive specific assets, and how to stake
   // TODO: add saved addresses (name and address)
 
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
@@ -146,7 +145,7 @@ export const CreateWallet = () => {
   // TODO: add toggle option for single-click transactions and another for force accepting/declining transactions
   // TODO: add toggle option for ultra-secure mode, using password auth for on every transaction like with hardware wallets.  in that mode, no session storage is used.
 
-  // TODO: check browser compatibility (is edge the coloring issue?)
+  // TODO: check browser compatibility (edge is the coloring issue)
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */
