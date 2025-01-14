@@ -619,7 +619,12 @@ export const Send = () => {
             amountState={sendState.amount}
             updateAsset={updateSendAsset}
             updateAmount={updateSendAmount}
+            showClearAndMax
+            disableButtons={isLoading}
+            onClear={() => {}}
+            onMax={() => {}}
             includeBottomMargin={false}
+            addClearMaxMargin
             labelWidth="w-14"
           />
 
@@ -638,7 +643,12 @@ export const Send = () => {
             amountState={receiveState.amount}
             updateAsset={updateReceiveAsset}
             updateAmount={updateReceiveAmount}
+            showClearAndMax
+            disableButtons={isLoading}
+            onClear={() => {}}
+            onMax={() => {}}
             includeBottomMargin={false}
+            addClearMaxMargin
             labelWidth="w-14"
           />
         </>

@@ -23,6 +23,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   onMax?: () => void;
   onEndButtonClick?: () => void;
   endButtonTitle?: string;
+  addClearMaxMargin?: boolean;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -47,6 +48,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onMax,
       onEndButtonClick,
       endButtonTitle = '',
+      addClearMaxMargin = false,
       ...props
     },
     ref,
@@ -56,6 +58,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const isSuccess = status === InputStatus.SUCCESS;
     const isInfo = status === InputStatus.INFO;
 
+    console.log('input page add margin?', addClearMaxMargin);
     switch (variant) {
       case 'primary': {
         return (
@@ -157,7 +160,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             </div>
 
             {showClearAndMax && (
-              <div className="flex justify-between w-full mt-1">
+              <div className={cn(`flex justify-between mt-1 ${addClearMaxMargin ? 'mr-2' : ''}`)}>
                 <Button
                   size="xs"
                   variant="unselected"

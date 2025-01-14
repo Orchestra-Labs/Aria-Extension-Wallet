@@ -25,6 +25,7 @@ interface AssetInputProps {
   onEndButtonClick?: () => void;
   endButtonTitle?: string;
   className?: string;
+  addClearMaxMargin?: boolean;
 }
 
 export const AssetInput: React.FC<AssetInputProps> = ({
@@ -46,6 +47,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   onEndButtonClick,
   endButtonTitle = '',
   className,
+  addClearMaxMargin = false,
   ...props
 }) => {
   const [localInputValue, setLocalInputValue] = useState<string>('');
@@ -151,6 +153,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
     }
   };
 
+  console.log('asset input page add margin?', addClearMaxMargin);
   return (
     <div
       className={cn(
@@ -188,6 +191,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
           onMax={onMax}
           onEndButtonClick={onEndButtonClick}
           endButtonTitle={endButtonTitle}
+          addClearMaxMargin={addClearMaxMargin}
           className={cn(
             className,
             variant === 'stake'
