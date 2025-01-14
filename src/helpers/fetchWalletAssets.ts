@@ -94,15 +94,13 @@ export async function fetchWalletAssets(
 
         const registryAsset = LOCAL_ASSET_REGISTRY[coin.denom] || null;
 
-        const denom = coin.denom;
         if (!registryAsset) {
+          const denom = coin.denom;
           symbol = `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
           exponent = GREATER_EXPONENT_DEFAULT;
           logo = undefined;
         } else {
-          symbol =
-            registryAsset.symbol ??
-            `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
+          symbol = registryAsset.symbol ?? coin.denom;
           exponent = registryAsset.exponent ?? GREATER_EXPONENT_DEFAULT;
           logo = registryAsset.logo;
         }
