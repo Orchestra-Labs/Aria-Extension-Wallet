@@ -568,52 +568,27 @@ export const ValidatorScrollTile = ({
               )}
 
               {!isLoading && (selectedAction === 'stake' || selectedAction === 'unstake') && (
-                <>
-                  <div className="flex items-center w-full">
-                    <div className="flex-grow mr-2">
-                      <AssetInput
-                        placeholder={`Enter ${selectedAction} amount`}
-                        variant="stake"
-                        assetState={DEFAULT_ASSET}
-                        amountState={amount}
-                        updateAmount={newAmount => setAmount(newAmount)}
-                        reducedHeight
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      className="ml-2 px-2 py-1 rounded-md w-16"
-                      disabled={isLoading}
-                      onClick={() => {
-                        selectedAction === 'stake'
-                          ? handleStake(amount.toString())
-                          : handleUnstake(amount.toString());
-                      }}
-                    >
-                      {selectedAction === 'stake' ? 'Stake' : 'Unstake'}
-                    </Button>
-                  </div>
-                  <div className="flex justify-between w-full mt-1">
-                    <Button
-                      size="xs"
-                      variant="unselected"
-                      className="px-2 rounded-md text-xs"
-                      disabled={isLoading}
-                      onClick={() => setAmount(0)}
-                    >
-                      Clear
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="unselected"
-                      className="px-2 rounded-md text-xs"
-                      disabled={isLoading}
-                      onClick={() => setAmount(delegatedAmount)}
-                    >
-                      Max
-                    </Button>
-                  </div>
-                </>
+                <div className="flex flex-col items-center w-full">
+                  <AssetInput
+                    placeholder={`Enter ${selectedAction} amount`}
+                    variant="stake"
+                    assetState={DEFAULT_ASSET}
+                    amountState={amount}
+                    updateAmount={newAmount => setAmount(newAmount)}
+                    reducedHeight
+                    showClearAndMax
+                    showEndButton
+                    disableButtons={isLoading}
+                    onClear={() => setAmount(0)}
+                    onMax={() => setAmount(delegatedAmount)}
+                    endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+                    onEndButtonClick={() => {
+                      selectedAction === 'stake'
+                        ? handleStake(amount.toString())
+                        : handleUnstake(amount.toString());
+                    }}
+                  />
+                </div>
               )}
 
               {!isLoading && selectedAction === 'claim' && (
