@@ -154,6 +154,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   };
 
   console.log('asset input page add margin?', addClearMaxMargin);
+  const label = variant === 'receive' ? 'Receiving:' : variant === 'send' ? 'Sending:' : undefined;
   return (
     <div
       className={cn(
@@ -162,16 +163,13 @@ export const AssetInput: React.FC<AssetInputProps> = ({
           : `flex items-center ${includeBottomMargin ? 'mb-4' : ''} space-x-2`,
       )}
     >
-      {variant !== 'stake' && (
-        <label className={cn(`text-sm text-neutral-1 whitespace-nowrap ${labelWidth}`)}>
-          {variant === 'receive' ? 'Receiving:' : 'Sending:'}
-        </label>
-      )}
       <div className="flex-grow">
         <Input
           variant="primary"
           type="text"
           ref={inputRef}
+          label={label}
+          labelPosition="left"
           placeholder={placeholder}
           step={currentExponent}
           value={localInputValue || ''}

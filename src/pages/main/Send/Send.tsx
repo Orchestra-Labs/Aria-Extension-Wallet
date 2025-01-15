@@ -602,11 +602,7 @@ export const Send = () => {
         <>
           {/* TODO: add chain selection if self */}
           {/* Address Input */}
-          <AddressInput
-            addBottomMargin={false}
-            updateReceiveAsset={updateReceiveAsset}
-            labelWidth="w-14"
-          />
+          <AddressInput addBottomMargin={false} updateReceiveAsset={updateReceiveAsset} />
 
           {/* Separator */}
           <Separator variant="top" />
@@ -625,11 +621,10 @@ export const Send = () => {
             onMax={() => {}}
             includeBottomMargin={false}
             addClearMaxMargin
-            labelWidth="w-14"
           />
 
           {/* Separator with reverse icon */}
-          <div className="flex justify-center my-2">
+          <div className="flex justify-center mb-2">
             <Button className="rounded-md h-9 w-9 bg-neutral-3" onClick={switchFields}>
               <Swap />
             </Button>
@@ -649,7 +644,6 @@ export const Send = () => {
             onMax={() => {}}
             includeBottomMargin={false}
             addClearMaxMargin
-            labelWidth="w-14"
           />
         </>
 
