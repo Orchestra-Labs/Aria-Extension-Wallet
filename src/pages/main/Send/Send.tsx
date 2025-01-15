@@ -7,7 +7,6 @@ import {
   defaultSendState,
   GREATER_EXPONENT_DEFAULT,
   NetworkLevel,
-  Position,
   ROUTES,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
@@ -588,14 +587,7 @@ export const Send = () => {
 
   return (
     <div className="h-screen flex flex-col bg-black text-white">
-      <Header
-        title={'Send'}
-        onClose={handleBackClick}
-        useArrow={true}
-        showTooltip={true}
-        tooltipText={'To swap, click the receive field icon'}
-        tooltipPosition={Position.RIGHT}
-      />
+      <Header title={'Send'} onClose={handleBackClick} useArrow={true} />
 
       {/* Content container */}
       <div className="flex flex-col justify-between flex-grow p-4 rounded-lg overflow-y-auto">
