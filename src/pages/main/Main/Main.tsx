@@ -57,12 +57,12 @@ export const Main = () => {
   // TODO: modify editcoinlistscreen to different display for tiles.
 
   // TODO: use routing instead
-  if (routeToVisibilitySelection) {
-    return <EditCoinListScreen />;
-  }
-
   if (routeToTutorial) {
     return <SwapTutorial />;
+  }
+
+  if (routeToVisibilitySelection) {
+    return <EditCoinListScreen />;
   }
 
   return (

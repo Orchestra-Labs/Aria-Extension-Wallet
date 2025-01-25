@@ -17,6 +17,15 @@ interface AssetInputProps {
   labelWidth?: string;
   updateAsset?: (newAsset: Asset, propagateChanges?: boolean) => void;
   updateAmount: (newAmount: number, propagateChanges?: boolean) => void;
+  showClearAndMax?: boolean;
+  showEndButton?: boolean;
+  disableButtons?: boolean;
+  onClear?: () => void;
+  onMax?: () => void;
+  onEndButtonClick?: () => void;
+  endButtonTitle?: string;
+  className?: string;
+  addClearMaxMargin?: boolean;
 }
 
 export const AssetInput: React.FC<AssetInputProps> = ({
@@ -30,6 +39,16 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   labelWidth,
   updateAsset,
   updateAmount,
+  showClearAndMax = false,
+  showEndButton = false,
+  disableButtons = true,
+  onClear,
+  onMax,
+  onEndButtonClick,
+  endButtonTitle = '',
+  className,
+  addClearMaxMargin = false,
+  ...props
 }) => {
   const [localInputValue, setLocalInputValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -134,24 +153,23 @@ export const AssetInput: React.FC<AssetInputProps> = ({
     }
   };
 
+  console.log('asset input page add margin?', addClearMaxMargin);
+  const label = variant === 'receive' ? 'Receiving:' : variant === 'send' ? 'Sending:' : undefined;
   return (
     <div
       className={cn(
         variant === 'stake'
-          ? ''
+          ? 'w-[95%]'
           : `flex items-center ${includeBottomMargin ? 'mb-4' : ''} space-x-2`,
       )}
     >
-      {variant !== 'stake' && (
-        <label className={cn(`text-sm text-neutral-1 whitespace-nowrap ${labelWidth}`)}>
-          {variant === 'receive' ? 'Receiving:' : 'Sending:'}
-        </label>
-      )}
       <div className="flex-grow">
         <Input
           variant="primary"
           type="text"
           ref={inputRef}
+          label={label}
+          labelPosition="left"
           placeholder={placeholder}
           step={currentExponent}
           value={localInputValue || ''}
@@ -164,11 +182,21 @@ export const AssetInput: React.FC<AssetInputProps> = ({
             ) : null
           }
           reducedHeight={reducedHeight}
+          showClearAndMax={showClearAndMax}
+          showEndButton={showEndButton}
+          disableButtons={disableButtons}
+          onClear={onClear}
+          onMax={onMax}
+          onEndButtonClick={onEndButtonClick}
+          endButtonTitle={endButtonTitle}
+          addClearMaxMargin={addClearMaxMargin}
           className={cn(
+            className,
             variant === 'stake'
-              ? 'text-white mx-2'
+              ? 'text-white mx-1'
               : 'text-white border border-neutral-2 rounded-md w-full h-10',
           )}
+          {...props}
         />
       </div>
     </div>

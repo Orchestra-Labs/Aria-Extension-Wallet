@@ -21,7 +21,6 @@ interface AddressInputProps {
 
 export const AddressInput: React.FC<AddressInputProps> = ({
   addBottomMargin = true,
-  labelWidth,
   updateReceiveAsset,
 }) => {
   const [address, setAddress] = useAtom(recipientAddressAtom);
@@ -145,25 +144,22 @@ export const AddressInput: React.FC<AddressInputProps> = ({
 
   return (
     <div className={cn(`flex items-baseline ${addBottomMargin ? 'mb-4' : ''} space-x-2`)}>
-      <label className={cn(`text-sm text-neutral-1 whitespace-nowrap ${labelWidth}`)}>
-        Send to:
-      </label>
-      <div className="flex-grow">
-        <Input
-          variant="primary"
-          type="text"
-          status={addressStatus}
-          showMessageText={true}
-          messageText={messageText}
-          placeholder={walletState.address || 'Wallet Address or ICNS'}
-          icon={<QRCodeScannerDialog updateReceiveAsset={updateReceiveAsset} />}
-          value={address}
-          onChange={handleAddressChange}
-          onBlur={handleAddressBlur}
-          onPaste={handleAddressPaste}
-          className="text-white w-full"
-        />
-      </div>
+      <Input
+        variant="primary"
+        type="text"
+        label="Send to:"
+        labelPosition="left"
+        status={addressStatus}
+        showMessageText={true}
+        messageText={messageText}
+        placeholder={walletState.address || 'Wallet Address or ICNS'}
+        icon={<QRCodeScannerDialog updateReceiveAsset={updateReceiveAsset} />}
+        value={address}
+        onChange={handleAddressChange}
+        onBlur={handleAddressBlur}
+        onPaste={handleAddressPaste}
+        className="text-white w-full"
+      />
     </div>
   );
 };

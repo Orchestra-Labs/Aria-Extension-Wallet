@@ -106,13 +106,10 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: add validation for minimum send amount
-  // TODO: ensure maximum sendable amount encorporates fee estimate
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
 
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
-  // TODO: make "clear" and "max" button send screen inputs.  make placement and appearance for these uniform (send and unstake sections)
   // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
 

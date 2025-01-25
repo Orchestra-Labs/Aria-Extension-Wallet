@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CombinedStakingInfo, TransactionResult } from '@/types';
+import { Asset, CombinedStakingInfo, TransactionResult } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { LogoIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
@@ -18,6 +18,7 @@ import {
 import {
   BondStatus,
   DEFAULT_ASSET,
+  defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
   LOCAL_ASSET_REGISTRY,
   TextFieldStatus,
@@ -51,6 +52,7 @@ export const ValidatorScrollTile = ({
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
 
   const [amount, setAmount] = useState(0);
+  const [feeState, setFeeState] = useState(defaultFeeState);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
@@ -141,6 +143,18 @@ export const ValidatorScrollTile = ({
   const website = validator.description.website;
   const isWebsiteValid = isValidUrl(website);
 
+  const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
+    const walletAssets = walletState?.assets || [];
+    const walletAsset = walletAssets.find(asset => asset.denom === sendAsset.denom);
+    if (!walletAsset) return 0;
+
+    const maxAmount = parseFloat(walletAsset.amount || '0');
+    const feeAmount = simulatedFeeAmount ? simulatedFeeAmount : feeState.amount;
+
+    const maxAvailable = Math.max(0, maxAmount - feeAmount);
+    return maxAvailable;
+  };
+
   const handleClick = () => {
     if (onClick) {
       onClick(combinedStakingInfo);
@@ -203,8 +217,10 @@ export const ValidatorScrollTile = ({
 
     const txType = TransactionType.STAKE;
     try {
+      const maxAvailable = calculateMaxAvailable(DEFAULT_ASSET, Number(amount));
+
       const result = await stakeToValidator(
-        amount,
+        isSimulation && amount === '0' ? `${maxAvailable}` : amount,
         LOCAL_ASSET_REGISTRY.note.denom,
         walletState.address,
         validator.operator_address,
@@ -320,31 +336,24 @@ export const ValidatorScrollTile = ({
     }
   };
 
-  // TODO: extract to utils
   const formatFee = (gasWanted: number) => {
     const defaultGasPrice = 0.025;
     const exponent = GREATER_EXPONENT_DEFAULT;
-    const symbol = DEFAULT_ASSET.symbol || 'MLD';
     const feeAmount = gasWanted * defaultGasPrice;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 
-    // Calculate against stake or unstake input or rewards amount
-    let feePercentage = 0;
-    if (selectedAction === 'claim') {
-      feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / rewardAmount) * 100 : 0;
-    } else if (selectedAction === 'stake' || selectedAction === 'unstake') {
-      feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / amount) * 100 : 0;
-    }
-
-    setSimulatedFee({
-      fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
-      textClass:
-        feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
-    });
+    setFeeState(prevState => ({
+      ...prevState,
+      asset: DEFAULT_ASSET,
+      amount: feeInGreaterUnit,
+    }));
   };
 
   const updateFee = async () => {
     if (selectedAction !== 'claim' && (amount === 0 || isNaN(amount))) {
+      if (selectedAction === 'stake') {
+        handleStake('0', true);
+      }
       formatFee(0);
     } else {
       let result = { success: false, message: '', data: { gasWanted: '' } } as TransactionResult;
@@ -363,8 +372,20 @@ export const ValidatorScrollTile = ({
     }
   };
 
+  const setMaxAmount = () => {
+    const asset = DEFAULT_ASSET;
+
+    const maxAvailable = calculateMaxAvailable(asset);
+    setAmount(maxAvailable);
+  };
+
   const resetDefaults = () => {
     setAmount(0);
+    setFeeState(prevState => ({
+      ...prevState,
+      asset: DEFAULT_ASSET,
+      amount: 0,
+    }));
     setSimulatedFee({ fee: '0 MLD', textClass: 'text-blue' });
     setIsClaimToRestake(false);
     setSelectedAction(null);
@@ -375,8 +396,7 @@ export const ValidatorScrollTile = ({
   let secondarySubtitle = null;
   let subtitleStatus = TextFieldStatus.GOOD;
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
-
-  // TODO: fix tile showing amount unstaking as expected percent rewards on all tile when tray is open
+  let amountUnstaking = formattedRewardAmount;
   if (showCurrentValidators) {
     if (userHasUnbonding) {
       value = formatBalanceDisplay(
@@ -398,6 +418,20 @@ export const ValidatorScrollTile = ({
     // subTitle = `${uptime}% uptime`;
 
     value = `${combinedStakingInfo.estimatedReturn || 0}%`;
+    if (userHasUnbonding) {
+      amountUnstaking = formatBalanceDisplay(
+        convertToGreaterUnit(
+          parseFloat(unbondingBalance?.balance || '0'),
+          GREATER_EXPONENT_DEFAULT,
+        ).toFixed(GREATER_EXPONENT_DEFAULT),
+        'MLD',
+      );
+
+      if (userIsUnbonding) {
+        statusColor = TextFieldStatus.WARN;
+        secondarySubtitle = 'Unstaking...';
+      }
+    }
 
     const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
     secondarySubtitle = `${votingPower || 0}%`;
@@ -414,6 +448,22 @@ export const ValidatorScrollTile = ({
       secondarySubtitleStatus = TextFieldStatus.WARN;
     }
   }
+
+  useEffect(() => {
+    const exponent = DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT;
+    const symbol = feeState.asset;
+    const feeAmount = feeState.amount;
+    const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+
+    const feePercentage =
+      amount === 0 ? 0 : feeInGreaterUnit ? (feeInGreaterUnit / amount) * 100 : 0;
+
+    setSimulatedFee({
+      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol.symbol || 'MLD'),
+      textClass:
+        feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
+    });
+  }, [feeState]);
 
   useEffect(() => {
     if (slideTrayIsOpen) updateFee();
@@ -485,7 +535,8 @@ export const ValidatorScrollTile = ({
               {userHasUnbonding && (
                 <>
                   <p className="line-clamp-1">
-                    <strong>Amount Unstaking:</strong> <span className="text-warning">{value}</span>
+                    <strong>Amount Unstaking:</strong>{' '}
+                    <span className="text-warning">{amountUnstaking}</span>
                   </p>
                   <p className="line-clamp-1">
                     <strong>Remaining Time to Unstake:</strong>{' '}
@@ -568,52 +619,34 @@ export const ValidatorScrollTile = ({
               )}
 
               {!isLoading && (selectedAction === 'stake' || selectedAction === 'unstake') && (
-                <>
-                  <div className="flex items-center w-full">
-                    <div className="flex-grow mr-2">
-                      <AssetInput
-                        placeholder={`Enter ${selectedAction} amount`}
-                        variant="stake"
-                        assetState={DEFAULT_ASSET}
-                        amountState={amount}
-                        updateAmount={newAmount => setAmount(newAmount)}
-                        reducedHeight
-                      />
-                    </div>
-                    <Button
-                      size="sm"
-                      className="ml-2 px-2 py-1 rounded-md w-16"
-                      disabled={isLoading}
-                      onClick={() => {
-                        selectedAction === 'stake'
-                          ? handleStake(amount.toString())
-                          : handleUnstake(amount.toString());
-                      }}
-                    >
-                      {selectedAction === 'stake' ? 'Stake' : 'Unstake'}
-                    </Button>
-                  </div>
-                  <div className="flex justify-between w-full mt-1">
-                    <Button
-                      size="xs"
-                      variant="unselected"
-                      className="px-2 rounded-md text-xs"
-                      disabled={isLoading}
-                      onClick={() => setAmount(0)}
-                    >
-                      Clear
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="unselected"
-                      className="px-2 rounded-md text-xs"
-                      disabled={isLoading}
-                      onClick={() => setAmount(delegatedAmount)}
-                    >
-                      Max
-                    </Button>
-                  </div>
-                </>
+                <div className="flex flex-col items-center w-full">
+                  <AssetInput
+                    placeholder={`Enter ${selectedAction} amount`}
+                    variant="stake"
+                    assetState={DEFAULT_ASSET}
+                    amountState={amount}
+                    updateAmount={newAmount => setAmount(newAmount)}
+                    reducedHeight
+                    showClearAndMax
+                    showEndButton
+                    disableButtons={isLoading}
+                    onClear={() => setAmount(0)}
+                    // TODO: delegated amount is not applicable to staking max
+                    onMax={() => {
+                      if (selectedAction === 'stake') {
+                        setMaxAmount();
+                      } else {
+                        setAmount(delegatedAmount);
+                      }
+                    }}
+                    endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+                    onEndButtonClick={() => {
+                      selectedAction === 'stake'
+                        ? handleStake(amount.toString())
+                        : handleUnstake(amount.toString());
+                    }}
+                  />
+                </div>
               )}
 
               {!isLoading && selectedAction === 'claim' && (
@@ -664,7 +697,7 @@ export const ValidatorScrollTile = ({
             <div className="flex justify-between items-center text-blue text-sm font-bold w-full">
               <p>Fee</p>
               <p className={simulatedFee?.textClass}>
-                {simulatedFee && selectedAction ? simulatedFee.fee : '-'}
+                {simulatedFee && amount !== 0 && selectedAction ? simulatedFee.fee : '-'}
               </p>
             </div>
           </div>
