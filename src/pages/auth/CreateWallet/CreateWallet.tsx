@@ -106,8 +106,6 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
-  // TODO: add validation for minimum send amount
-  // TODO: ensure maximum sendable amount encorporates fee estimate
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
 

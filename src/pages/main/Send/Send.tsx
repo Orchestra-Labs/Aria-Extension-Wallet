@@ -21,6 +21,7 @@ import {
   selectedAssetAtom,
   addressVerifiedAtom,
   symphonyAssetsAtom,
+  feeStateAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
@@ -40,7 +41,6 @@ import {
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
 import { AddressInput } from './AddressInput';
-import { userAccountAtom } from '@/atoms/accountAtom';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -62,9 +62,9 @@ export const Send = () => {
   const location = useLocation();
 
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
-  const userAccount = useAtomValue(userAccountAtom);
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
+  const [feeState, setFeeState] = useAtom(feeStateAtom);
   const [changeMap, setChangeMap] = useAtom(changeMapAtom);
   const [callbackChangeMap, setCallbackChangeMap] = useAtom(callbackChangeMapAtom);
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
@@ -146,13 +146,18 @@ export const Send = () => {
     if (!currentRecipientAddress) return;
 
     const sendAsset = sendState.asset;
-    const sendAmount = sendState.amount;
+    let sendAmount = sendState.amount;
     const receiveAsset = receiveState.asset;
 
     if (!sendAsset || !receiveAsset) return;
 
     const assetToSend = walletAssets.find(a => a.denom === sendAsset.denom);
     if (!assetToSend) return;
+
+    if (simulateTransaction && sendAmount === 0) {
+      const maxAvailable = calculateMaxAvailable(sendAsset, 0);
+      sendAmount = maxAvailable / 2;
+    }
 
     const adjustedAmount = (
       sendAmount * Math.pow(10, assetToSend.exponent || GREATER_EXPONENT_DEFAULT)
@@ -186,11 +191,6 @@ export const Send = () => {
         const receiveChain = receiveState.chainName;
         const networkLevel = NetworkLevel.TESTNET;
         const ibcObject = { fromAddress, sendObject, sendChain, receiveChain, networkLevel };
-        console.log('Executing IBC Transaction with the following details:');
-        console.log('From Address:', fromAddress);
-        console.log('Send Chain:', sendChain);
-        console.log('Receive Chain:', receiveChain);
-        console.log('Network Level:', networkLevel);
 
         result = await sendIBC({ ibcObject, simulateTransaction });
         console.log('IBC Transaction Result:', result);
@@ -228,12 +228,12 @@ export const Send = () => {
     return null;
   };
 
-  const calculateMaxAvailable = (sendAsset: Asset) => {
+  const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
     const walletAsset = walletAssets.find(asset => asset.denom === sendAsset.denom);
     if (!walletAsset) return 0;
 
     const maxAmount = parseFloat(walletAsset.amount || '0');
-    const feeAmount = simulatedFee ? parseFloat(simulatedFee.fee) : 0;
+    const feeAmount = simulatedFeeAmount ? simulatedFeeAmount : feeState.amount;
 
     const maxAvailable = Math.max(0, maxAmount - feeAmount);
     return maxAvailable;
@@ -280,100 +280,116 @@ export const Send = () => {
     }
   };
 
-  const updateSendAmount = (newSendAmount: number, propagateChanges: boolean = false) => {
+  const updateSendAmount = async (newSendAmount: number, propagateChanges: boolean = false) => {
     const sendAsset = sendState.asset;
-    if (!sendAsset) {
-      return;
-    }
+    if (!sendAsset) return;
 
-    setSendState(prevState => {
-      return {
+    const simulationResponse = await handleTransaction({ simulateTransaction: true });
+
+    if (simulationResponse && simulationResponse.data) {
+      const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
+      const defaultGasPrice = 0.025;
+      const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+      const feeAmount = gasWanted * defaultGasPrice;
+      const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+
+      // Update fee state
+      setFeeState(prevState => ({
         ...prevState,
-        amount: newSendAmount,
-      };
-    });
-
-    // Handle propagation of changes if required
-    if (propagateChanges) {
-      setChangeMap(prevMap => ({
-        ...prevMap,
-        sendAmount: true,
+        asset: sendState.asset,
+        amount: feeInGreaterUnit,
       }));
 
-      setCallbackChangeMap({
-        sendAsset: false,
-        receiveAsset: false,
-        sendAmount: true,
-        receiveAmount: false,
-      });
-    }
-  };
+      // Recalculate max available based on new fee
+      const maxAvailable = calculateMaxAvailable(sendAsset, feeAmount);
 
-  const updateReceiveAmount = (newReceiveAmount: number, propagateChanges: boolean = false) => {
-    const receiveAsset = receiveState.asset;
-    if (!receiveAsset) {
-      console.log('No receive asset found');
-      return;
-    }
+      console.log('Max available after fee:', maxAvailable);
 
-    setReceiveState(prevState => ({
-      ...prevState,
-      amount: newReceiveAmount,
-    }));
+      // Ensure send amount does not exceed max available
+      const finalSendAmount = Math.min(newSendAmount, maxAvailable);
+      console.log('Final send amount after fee adjustment:', finalSendAmount);
 
-    if (propagateChanges) {
-      console.log('Propagating changes for receive amount');
-      setChangeMap(prevMap => ({
-        ...prevMap,
-        receiveAmount: true,
+      setSendState(prevState => ({
+        ...prevState,
+        amount: finalSendAmount,
       }));
-      setCallbackChangeMap({
-        sendAsset: false,
-        receiveAsset: false,
-        sendAmount: false,
-        receiveAmount: true,
-      });
-    }
-  };
 
-  const updateFee = async () => {
-    if (sendState.amount > 0 && transactionType.isValid) {
-      const simulationResponse = await handleTransaction({ simulateTransaction: true });
+      if (propagateChanges) {
+        setChangeMap(prevMap => ({
+          ...prevMap,
+          sendAmount: true,
+        }));
 
-      if (simulationResponse && simulationResponse.data) {
-        const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
-
-        // TODO: get default gas price from chain registry
-        const defaultGasPrice = 0.025;
-        const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
-        const symbol =
-          (userAccount?.settings.stablecoinFeeElection && sendState.asset.symbol) ||
-          DEFAULT_ASSET.symbol ||
-          'MLD';
-        const feeAmount = gasWanted * defaultGasPrice;
-        const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
-
-        const feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / sendState.amount) * 100 : 0;
-
-        console.log('Fee details:', {
-          feeAmount,
-          feeInGreaterUnit,
-          feePercentage,
+        setCallbackChangeMap({
+          sendAsset: false,
+          receiveAsset: false,
+          sendAmount: true,
+          receiveAmount: false,
         });
-
-        setSimulatedFee({
-          fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
-          textClass:
-            feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
-        });
-      } else {
-        console.error('Simulation did not return gas details');
       }
     } else {
-      setSimulatedFee({
-        fee: '0 MLD',
-        textClass: 'text-blue',
-      });
+      console.error('Failed to retrieve fee details during simulation.');
+    }
+  };
+
+  const updateReceiveAmount = async (
+    newReceiveAmount: number,
+    propagateChanges: boolean = false,
+  ) => {
+    const receiveAsset = receiveState.asset;
+    if (!receiveAsset) return;
+
+    // Run fee simulation
+    const simulationResponse = await handleTransaction({ simulateTransaction: true });
+
+    if (simulationResponse && simulationResponse.data) {
+      const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
+      const defaultGasPrice = 0.025;
+      const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+      const feeAmount = gasWanted * defaultGasPrice;
+      const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+
+      // Update fee state
+      setFeeState(prevState => ({
+        ...prevState,
+        asset: sendState.asset,
+        amount: feeInGreaterUnit,
+      }));
+
+      // Recalculate max available based on new fee
+      const sendAsset = sendState.asset;
+      const maxAvailable = calculateMaxAvailable(sendAsset, feeAmount);
+
+      // Convert receive amount to send amount based on exchange rate
+      const applicableExchangeRate =
+        sendAsset.denom === receiveState.asset?.denom ? 1 : 1 / (exchangeRate || 1);
+      let newSendAmount = newReceiveAmount * applicableExchangeRate;
+
+      // Ensure send amount does not exceed max available
+      if (newSendAmount > maxAvailable) {
+        newSendAmount = maxAvailable;
+        newReceiveAmount = newSendAmount * (exchangeRate || 1);
+      }
+
+      setReceiveState(prevState => ({
+        ...prevState,
+        amount: newReceiveAmount,
+      }));
+
+      if (propagateChanges) {
+        setChangeMap(prevMap => ({
+          ...prevMap,
+          receiveAmount: true,
+        }));
+        setCallbackChangeMap({
+          sendAsset: false,
+          receiveAsset: false,
+          sendAmount: false,
+          receiveAmount: true,
+        });
+      }
+    } else {
+      console.error('Failed to retrieve fee details during simulation.');
     }
   };
 
@@ -383,7 +399,7 @@ export const Send = () => {
     const network = sendState.networkLevel;
 
     if (!sendAsset || !receiveAsset) {
-      console.log('Missing assets for transaction type update');
+      console.error('Missing assets for transaction type update');
       return;
     }
 
@@ -536,9 +552,28 @@ export const Send = () => {
         setMap(prevMap => ({ ...prevMap, receiveAmount: false }));
       }
     }
+  };
 
-    // TODO: add fee update to changemap?
-    updateFee();
+  const setMaxAmount = (type: 'send' | 'receive') => {
+    const asset = type === 'send' ? sendState.asset : receiveState.asset;
+    if (!asset) return;
+
+    const maxAvailable = calculateMaxAvailable(asset);
+    if (type === 'send') {
+      updateSendAmount(maxAvailable, true);
+    } else {
+      const applicableExchangeRate =
+        sendState.asset.denom === receiveState.asset.denom ? 1 : exchangeRate || 1;
+      updateReceiveAmount(maxAvailable * applicableExchangeRate, true);
+    }
+  };
+
+  const clearAmount = (type: 'send' | 'receive') => {
+    if (type === 'send') {
+      updateSendAmount(0, true);
+    } else {
+      updateReceiveAmount(0, true);
+    }
   };
 
   const resetStates = () => {
@@ -552,6 +587,26 @@ export const Send = () => {
   useEffect(() => {
     propagateChanges();
   }, [changeMap]);
+
+  useEffect(() => {
+    const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+    const symbol = feeState.asset;
+    const feeAmount = feeState.amount;
+    const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+
+    const feePercentage =
+      sendState.amount === 0
+        ? 0
+        : feeInGreaterUnit
+          ? (feeInGreaterUnit / sendState.amount) * 100
+          : 0;
+
+    setSimulatedFee({
+      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol.symbol || 'MLD'),
+      textClass:
+        feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
+    });
+  }, [feeState]);
 
   // Update on late exchangeRate returns
   useEffect(() => {
@@ -609,8 +664,8 @@ export const Send = () => {
             updateAmount={updateSendAmount}
             showClearAndMax
             disableButtons={isLoading}
-            onClear={() => {}}
-            onMax={() => {}}
+            onClear={() => clearAmount('send')}
+            onMax={() => setMaxAmount('send')}
             includeBottomMargin={false}
             addClearMaxMargin
           />
@@ -632,8 +687,8 @@ export const Send = () => {
             updateAmount={updateReceiveAmount}
             showClearAndMax
             disableButtons={isLoading}
-            onClear={() => {}}
-            onMax={() => {}}
+            onClear={() => clearAmount('receive')}
+            onMax={() => setMaxAmount('receive')}
             includeBottomMargin={false}
             addClearMaxMargin
           />

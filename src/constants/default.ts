@@ -172,3 +172,9 @@ export const defaultReceiveState = {
   chainName: DEFAULT_CHAIN_NAME,
   networkLevel: NetworkLevel.TESTNET,
 };
+export const defaultFeeState = {
+  asset: DEFAULT_ASSET,
+  amount: 0,
+  chainName: DEFAULT_CHAIN_NAME,
+  networkLevel: NetworkLevel.TESTNET,
+};
