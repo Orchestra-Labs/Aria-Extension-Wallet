@@ -396,8 +396,7 @@ export const ValidatorScrollTile = ({
   let secondarySubtitle = null;
   let subtitleStatus = TextFieldStatus.GOOD;
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
-
-  // TODO: fix tile showing amount unstaking as expected percent rewards on all tile when tray is open
+  let amountUnstaking = formattedRewardAmount;
   if (showCurrentValidators) {
     if (userHasUnbonding) {
       value = formatBalanceDisplay(
@@ -419,6 +418,20 @@ export const ValidatorScrollTile = ({
     // subTitle = `${uptime}% uptime`;
 
     value = `${combinedStakingInfo.estimatedReturn || 0}%`;
+    if (userHasUnbonding) {
+      amountUnstaking = formatBalanceDisplay(
+        convertToGreaterUnit(
+          parseFloat(unbondingBalance?.balance || '0'),
+          GREATER_EXPONENT_DEFAULT,
+        ).toFixed(GREATER_EXPONENT_DEFAULT),
+        'MLD',
+      );
+
+      if (userIsUnbonding) {
+        statusColor = TextFieldStatus.WARN;
+        secondarySubtitle = 'Unstaking...';
+      }
+    }
 
     const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
     secondarySubtitle = `${votingPower || 0}%`;
@@ -522,7 +535,8 @@ export const ValidatorScrollTile = ({
               {userHasUnbonding && (
                 <>
                   <p className="line-clamp-1">
-                    <strong>Amount Unstaking:</strong> <span className="text-warning">{value}</span>
+                    <strong>Amount Unstaking:</strong>{' '}
+                    <span className="text-warning">{amountUnstaking}</span>
                   </p>
                   <p className="line-clamp-1">
                     <strong>Remaining Time to Unstake:</strong>{' '}
