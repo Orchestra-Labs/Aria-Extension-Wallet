@@ -52,7 +52,7 @@ const OPTIONS = [
     to: ROUTES.APP.VIEW_TUTORIAL,
   },
   {
-    id: 5,
+    id: 6,
     name: 'Contact Us',
     icon: <Discord />,
     target: '_blank',
