@@ -6,6 +6,7 @@ import {
   NotebookPenIcon,
   NotebookTextIcon,
   Settings,
+  UserCheck2,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -46,13 +47,20 @@ const OPTIONS = [
   },
   {
     id: 5,
+    name: 'Edit Saved Addresses',
+    icon: <UserCheck2 width={16} height={16} />,
+    target: '',
+    to: ROUTES.APP.SETTINGS,
+  },
+  {
+    id: 6,
     name: 'View Tutorial',
     icon: <GraduationCap width={16} height={16} />,
     target: '',
     to: ROUTES.APP.VIEW_TUTORIAL,
   },
   {
-    id: 5,
+    id: 7,
     name: 'Contact Us',
     icon: <Discord />,
     target: '_blank',

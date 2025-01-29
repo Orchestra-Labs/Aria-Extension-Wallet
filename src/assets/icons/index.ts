@@ -9,6 +9,7 @@ export * from './EyeOpen';
 export * from './VerifyFailure';
 export * from './FullArrowRight';
 export * from './History';
+export * from './Home';
 export * from './Link';
 export * from './Logo';
 export * from './LogoIcon';

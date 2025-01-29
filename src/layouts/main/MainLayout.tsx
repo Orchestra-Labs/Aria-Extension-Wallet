@@ -1,7 +1,7 @@
 import React, { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
-import { LogoIcon } from '@/assets/icons';
+import { Home, LogoIcon } from '@/assets/icons';
 import { OptionsDialog } from '@/components';
 import { ROUTES } from '@/constants';
 import { useAtomValue } from 'jotai';
@@ -13,8 +13,12 @@ const MainLayout: React.FC = () => {
   return (
     <div className="max-w-full bg-background-dark-grey h-full flex flex-col">
       <header className="bg-gradient-to-b from-[#202022] to-[#33334652] h-20 p-4 flex items-center">
-        <NavLink className="flex max-h-12 mr-4" to={ROUTES.APP.ROOT}>
-          <LogoIcon className="h-auto w-auto" />
+        <NavLink
+          className="relative flex max-h-14 max-w-14 mr-4 rounded-full overflow-hidden bg-black border border-blue"
+          to={ROUTES.APP.ROOT}
+        >
+          <LogoIcon className="h-auto w-auto my-1" />
+          <Home className="absolute bottom-0 right-0 w-6 h-6 text-black mr-1" />
         </NavLink>
         {/* TODO: change text for text-button as below so user can change wallet selection */}
         {/* <div

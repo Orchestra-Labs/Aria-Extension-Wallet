@@ -106,8 +106,10 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: add validation for minimum send amount
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
+  // TODO: add amount to receive tile "exclusive" feature
 
   // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
   // TODO: add feeLoading state so user knows fees are updating
