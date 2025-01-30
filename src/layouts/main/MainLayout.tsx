@@ -11,7 +11,7 @@ const MainLayout: React.FC = () => {
   const userWallet = useAtomValue(userWalletAtom);
 
   return (
-    <div className="max-w-full bg-background-dark-grey h-full flex flex-col w-[420px] h-[600px]">
+    <div className="max-w-full bg-background-dark-grey flex flex-col w-[420px] h-[600px]">
       <header className="bg-gradient-to-b from-[#202022] to-[#33334652] h-20 p-4 flex items-center">
         <NavLink className="flex max-h-12 mr-4" to={ROUTES.APP.ROOT}>
           <LogoIcon className="h-auto w-auto" />
