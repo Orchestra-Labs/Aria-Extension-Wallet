@@ -1,17 +1,17 @@
+import { useAtomValue } from 'jotai';
 import React, { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { LogoIcon } from '@/assets/icons';
+import { userWalletAtom } from '@/atoms';
 import { OptionsDialog } from '@/components';
 import { ROUTES } from '@/constants';
-import { useAtomValue } from 'jotai';
-import { userWalletAtom } from '@/atoms';
 
 const MainLayout: React.FC = () => {
   const userWallet = useAtomValue(userWalletAtom);
 
   return (
-    <div className="max-w-full bg-background-dark-grey h-full flex flex-col">
+    <div className="max-w-full bg-background-dark-grey h-full flex flex-col w-[420px] h-[600px]">
       <header className="bg-gradient-to-b from-[#202022] to-[#33334652] h-20 p-4 flex items-center">
         <NavLink className="flex max-h-12 mr-4" to={ROUTES.APP.ROOT}>
           <LogoIcon className="h-auto w-auto" />

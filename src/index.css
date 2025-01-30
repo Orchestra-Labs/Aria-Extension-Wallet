@@ -30,8 +30,6 @@ body {
   margin: 0;
   padding: 0;
   overflow: auto;
-  width: 420px;
-  height: 600px;
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 

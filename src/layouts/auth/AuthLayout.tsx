@@ -11,7 +11,7 @@ const AuthLayout: React.FC = () => {
     navigate(ROUTES.APP.ROOT);
   };
   return (
-    <div className="max-w-full bg-background-black h-full p-5 flex flex-col">
+    <div className="max-w-full bg-background-black h-full p-5 flex flex-col w-[420px] h-[600px]">
       <header className="py-2 flex justify-center items-center">
         <Logo className="h-9" role="button" onClick={onLogoClick} />
       </header>
