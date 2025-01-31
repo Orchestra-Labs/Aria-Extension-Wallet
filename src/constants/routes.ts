@@ -15,6 +15,7 @@ export const ROUTES = {
     VIEW_PASSPHRASE: '/view-passphrase',
     CHANGE_PASSWORD: '/change-password',
     VIEW_TUTORIAL: '/view-tutorial',
+    MEDIA_ONBOARDING: '/media-onboarding',
   },
   AUTH: {
     ROOT: AUTH_ROOT,
