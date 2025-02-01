@@ -1,11 +1,13 @@
-import React, { createContext, useContext, ReactNode, useEffect } from 'react';
-import { getAddress, getSessionToken, userCanLogIn } from '@/helpers';
 import { useAtomValue, useSetAtom } from 'jotai';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+
 import { walletAddressAtom } from '@/atoms';
-import { useRefreshData } from '@/hooks';
-import { isLoggedInAtom } from '@/atoms/isLoggedInAtom';
-import { getAccountByID } from '@/helpers/dataHelpers/account';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { isLoggedInAtom } from '@/atoms/isLoggedInAtom';
+import { ScreenLoader } from '@/components';
+import { getAddress, getSessionToken, userCanLogIn } from '@/helpers';
+import { getAccountByID } from '@/helpers/dataHelpers/account';
+import { useRefreshData } from '@/hooks';
 
 interface AuthContextType {
   canLogIn: boolean;
@@ -29,7 +31,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const setWalletAddress = useSetAtom(walletAddressAtom);
   const setUserAccount = useSetAtom(userAccountAtom);
 
+  const [loading, setLoading] = useState(true);
+
   const initializeWallet = async () => {
+    if (!isLoggedIn) return;
     const sessionToken = getSessionToken();
     if (!sessionToken?.mnemonic) {
       return;
@@ -48,10 +53,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
-      initializeWallet();
-    }
+    initializeWallet().finally(() => {
+      setLoading(false);
+    });
   }, [isLoggedIn]);
+
+  if (loading) return <ScreenLoader />;
 
   return <AuthContext.Provider value={{ canLogIn, isLoggedIn }}>{children}</AuthContext.Provider>;
 };

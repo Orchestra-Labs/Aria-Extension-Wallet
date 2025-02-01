@@ -1,11 +1,13 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { forwardRef, useImperativeHandle } from 'react';
-import { cn } from '@/helpers/utils';
+import { useGesture } from '@use-gesture/react';
+import { forwardRef, useEffect, useImperativeHandle } from 'react';
+import { useRef, useState } from 'react';
+
 import { X } from '@/assets/icons';
+import { cn } from '@/helpers/utils';
+
 import { Button } from '../Button';
 import { Separator } from '../Separator';
-import { useRef, useState } from 'react';
-import { useGesture } from '@use-gesture/react';
 
 interface SlideTrayProps {
   triggerComponent: React.ReactNode;
@@ -18,6 +20,7 @@ interface SlideTrayProps {
   reducedTopMargin?: boolean;
   status?: 'error' | 'warn' | 'good';
   onClose?: () => void;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const SlideTray = forwardRef<unknown, SlideTrayProps>(
@@ -33,11 +36,18 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
       reducedTopMargin = false,
       status = 'good',
       onClose,
+      onOpenChange,
     },
     ref,
   ) => {
     const trayRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
+
+    useEffect(() => {
+      onOpenChange?.(open);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
     const startY = useRef<number>(0);
 
     const [isDragging, setIsDragging] = useState(false);
@@ -142,10 +152,15 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
       }
     };
 
-    useImperativeHandle(ref, () => ({
-      closeWithAnimation: dismissTray,
-      isOpen: () => open,
-    }));
+    useImperativeHandle(
+      ref,
+      () => ({
+        closeWithAnimation: dismissTray,
+        isOpen: () => open,
+      }),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [open],
+    );
 
     const handleOverlayClick = () => {
       dismissTray();
@@ -155,8 +170,8 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
     return (
       <DialogPrimitive.Root
         open={open}
-        onOpenChange={newOpen => {
-          if (!newOpen) dismissTray();
+        onOpenChange={opening => {
+          if (!opening) dismissTray();
           else setOpen(true);
         }}
       >

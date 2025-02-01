@@ -3,6 +3,7 @@ import { Navigate, useRoutes } from 'react-router-dom';
 
 import { ROUTES } from '@/constants';
 import { AuthGuard, GuestGuard } from '@/guards';
+import { ExpandedLayout } from '@/layouts';
 import {
   AddNewNetwork,
   ChangePassword,
@@ -11,6 +12,7 @@ import {
   ImportWallet,
   Login,
   Main,
+  MediaOnboardingScreen,
   NewWallet,
   Send,
   SettingsScreen,
@@ -98,6 +100,16 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.VIEW_TUTORIAL,
           element: <SwapTutorial />,
+        },
+      ],
+    },
+    {
+      path: ROUTES.APP.ROOT,
+      element: <ExpandedLayout />,
+      children: [
+        {
+          path: ROUTES.APP.MEDIA_ONBOARDING,
+          element: <MediaOnboardingScreen />,
         },
       ],
     },

@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { SlideTray, Button } from '@/ui-kit';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { filteredAssetsAtom, recipientAddressAtom } from '@/atoms';
-import { QRCode } from '@/assets/icons';
-import { QrReader } from 'react-qr-reader';
 import { BrowserQRCodeReader } from '@zxing/browser';
-import { cn } from '@/helpers';
+import { useAtomValue, useSetAtom } from 'jotai';
+import React, { useRef, useState } from 'react';
+import BarcodeScannerComponent from 'react-qr-barcode-scanner';
+import { usePermission } from 'react-use';
+
+import { QRCode } from '@/assets/icons';
+import { filteredAssetsAtom, recipientAddressAtom } from '@/atoms';
+import { cn, openMediaOnboardingTab } from '@/helpers';
 import { Asset } from '@/types';
+import { Button, SlideTray } from '@/ui-kit';
 
 interface QRCodeScannerDialogProps {
   updateReceiveAsset: (asset: Asset, propagateChanges: boolean) => void;
@@ -21,8 +23,12 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  const cameraPermissionState = usePermission({ name: 'camera' });
+
+  const cameraPermissionGranted = cameraPermissionState === 'granted';
+
   const qrCodeReader = new BrowserQRCodeReader();
-  const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
+  const [slideTrayIsOpen, setSlideTrayIsOpen] = useState(false);
 
   const handleScan = (result: string | null) => {
     if (result) {
@@ -53,6 +59,8 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
     }
   };
 
+  const onRequestCameraPermission = openMediaOnboardingTab
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
@@ -61,7 +69,9 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
         const result = await qrCodeReader.decodeFromImageUrl(url);
         handleScan(result.getText());
         URL.revokeObjectURL(url);
-      } catch (error) {}
+      } catch (error) {
+        console.error('Error scanning file:', error);
+      }
     }
   };
 
@@ -90,22 +100,6 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
     setIsDragOver(false);
   };
 
-  const requestCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop());
-      setPermissionDenied(false);
-    } catch (error) {
-      setPermissionDenied(true);
-    }
-  };
-
-  useEffect(() => {
-    if (slideTrayIsOpen && !permissionDenied) {
-      requestCameraPermission();
-    }
-  }, [slideTrayIsOpen]);
-
   const borderColor = isDragOver
     ? 'border-blue-pressed'
     : slideTrayIsOpen && !permissionDenied
@@ -123,6 +117,7 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
       }
       title="Scan Address"
       showBottomBorder
+      onOpenChange={setSlideTrayIsOpen}
     >
       <div className="flex flex-col items-center space-yt-4 yb-2">
         {/* Camera View & Drag/Drop Area */}
@@ -154,20 +149,22 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
             )}
           />
 
-          {slideTrayIsOpen ? (
-            <QrReader
-              onResult={(result, error) => {
-                if (result) handleScan(result.getText());
+          {cameraPermissionGranted && (
+            <BarcodeScannerComponent
+              onUpdate={(error, result) => {
+                const textResult = (result as { getText: () => string })?.getText();
+                if (textResult) handleScan(textResult);
                 if (error) handleError(error);
               }}
-              constraints={{ facingMode: 'environment' }}
-              className="w-[96.8%] h-[100%]"
+              stopStream={!slideTrayIsOpen}
             />
-          ) : (
-            <p className="text-gray-dark text-center">Enable camera or add file</p>
+          )}
+          {!cameraPermissionGranted && (
+            <button className="text-gray-dark text-center" onClick={onRequestCameraPermission}>
+              <span className="text-blue">Enable camera</span> or add file
+            </button>
           )}
         </div>
-
         {/* File Explorer Button */}
         <Button
           variant="secondary"
