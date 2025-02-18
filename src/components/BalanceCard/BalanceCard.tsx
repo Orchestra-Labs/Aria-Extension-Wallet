@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { Loader, ReceiveDialog, ValidatorSelectDialog } from '@/components';
 import { ROUTES } from '@/constants';
 import { Button } from '@/ui-kit';
@@ -151,6 +151,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           <Triangle className="w-4 h-4 rotate-90" />
         </div>
       </Button>
+      <div className="absolute top-2.5 right-2.5">
+        <Button variant={'selected'} size="xsmall" className="px-1 rounded text-xs" asChild>
+          <Link to={ROUTES.APP.POOL_STATUS}>Pool Status</Link>
+        </Button>
+      </div>
     </div>
   );
 };

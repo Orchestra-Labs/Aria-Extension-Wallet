@@ -13,6 +13,9 @@ import { Button } from '@/ui-kit';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { EditCoinListScreen } from '../EditCoinListScreen';
 import { SwapTutorial } from '../SwapTutorial';
+import { PoolStatus } from './PoolStatus';
+import { useLocation } from 'react-router-dom';
+import { ROUTES } from '@/constants';
 
 export const Main = () => {
   const swiperRef = useRef<SwiperClass | null>(null);
@@ -52,6 +55,10 @@ export const Main = () => {
     setSearchTerm('');
   }, [activeIndex]);
 
+  const location = useLocation();
+
+  const poolStatusVisible = location?.pathname === ROUTES.APP.POOL_STATUS;
+
   // TODO: make tiles name of chain with dropdown on right side.  coins for that chain are slightly shifted right
   // TODO: allow search by chain name
   // TODO: modify editcoinlistscreen to different display for tiles.
@@ -63,6 +70,10 @@ export const Main = () => {
 
   if (routeToVisibilitySelection) {
     return <EditCoinListScreen />;
+  }
+
+  if (poolStatusVisible) {
+    return <PoolStatus />;
   }
 
   return (

@@ -117,6 +117,8 @@ export const CHAIN_ENDPOINTS = {
   getUptime: '/cosmos/slashing/v1beta1/signing_infos/',
   getIBCConnections: '/ibc/core/channel/v1/channels',
   sendIbcMessage: '/cosmos/tx/v1beta1/txs',
+  getModuleAccounts: '/cosmos/auth/v1beta1/module_accounts',
+  getTobinTaxRate: '/symphony/treasury/v1beta1/tax_rate',
 };
 
 type LocalChainRegistryType = {

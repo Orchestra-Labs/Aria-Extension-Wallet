@@ -290,3 +290,21 @@ export interface TransactionState {
   chainName: string;
   networkLevel: NetworkLevel;
 }
+
+export interface BaseAccount {
+  address: string;
+  pub_key: null;
+  account_number: string;
+  sequence: string;
+}
+
+export interface ModuleAccount {
+  '@type': '/cosmos.auth.v1beta1.ModuleAccount';
+  base_account: BaseAccount;
+  name: string;
+  permissions: string[];
+}
+
+export interface CustomQueryOptions {
+  enabled?: boolean;
+}
