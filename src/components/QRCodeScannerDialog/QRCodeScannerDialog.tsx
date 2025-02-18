@@ -59,7 +59,7 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
     }
   };
 
-  const onRequestCameraPermission = openMediaOnboardingTab
+  const onRequestCameraPermission = openMediaOnboardingTab;
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
