@@ -106,6 +106,10 @@ export const CreateWallet = () => {
 
   /* ******************************************************************************************* */
   /* David Current TODOs */
+  // TODO: add view for instant showing of reserve health, reserve fee, and exchange
+  // TODO: modify receiver to open new tile that changes receive asset and amount (invoicing QR code)
+  // TODO: add button under address for select address (from saved).  button on there to go to edit saved addresses page
+
   // TODO: add validation for minimum send amount
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
