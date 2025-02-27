@@ -7,6 +7,7 @@ export * from './CreatePasswordForm';
 export * from './Header';
 export * from './Loader';
 export * from './OptionsDialog';
+export * from './PoolStatusBlock';
 export * from './QRCodeContainer';
 export * from './QRCodeScannerDialog';
 export * from './ReceiveDialog';

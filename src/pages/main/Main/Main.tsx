@@ -64,7 +64,6 @@ export const Main = () => {
   if (routeToVisibilitySelection) {
     return <EditCoinListScreen />;
   }
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Swiper Component for Balance Cards */}
