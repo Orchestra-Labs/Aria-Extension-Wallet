@@ -1,5 +1,6 @@
 export * from './useExchangeAssets';
 export * from './useExchangeRate';
+export * from './useExchangeRequirements';
 export * from './useInactivityCheck';
 export * from './useLogout';
 export * from './useRefreshData';

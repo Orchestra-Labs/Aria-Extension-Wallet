@@ -1,11 +1,11 @@
-import { Link, NavLink } from 'react-router-dom';
-import { Loader, ReceiveDialog, ValidatorSelectDialog } from '@/components';
-import { ROUTES } from '@/constants';
+import { useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
 import { Button } from '@/ui-kit';
 import { useAtomValue } from 'jotai';
 import { isInitialDataLoadAtom, walletAssetsAtom, validatorDataAtom } from '@/atoms';
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
-import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
+import { ROUTES, DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
 import { Triangle } from 'lucide-react';
 
 interface BalanceCardProps {
@@ -18,6 +18,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const walletAssets = useAtomValue(walletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
+
+  const [showReserveStatus, setShowReserveStatus] = useState(false);
 
   const symbol = LOCAL_ASSET_REGISTRY.note.symbol || DEFAULT_ASSET.symbol || 'MLD';
   const currentExponent = LOCAL_ASSET_REGISTRY.note.exponent || GREATER_EXPONENT_DEFAULT;
@@ -61,9 +63,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     );
   }
 
-  console.log('current step', currentStep);
   const leftPanelEnabled = currentStep > 0;
-  console.log('left panel is disabled?', !leftPanelEnabled);
   const rightPanelEnabled = currentStep < totalSteps - 1;
 
   const panelButtonClasses = `border-none text-neutral-1 rounded-none text-blue w-6
@@ -73,7 +73,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   return (
     <div className="h-44 border rounded-xl border-neutral-4 flex relative overflow-hidden">
-      {/* TODO: fix this not showing as disabled */}
       {/* Left-Side Panel Button */}
       <Button
         variant="blank"
@@ -87,61 +86,99 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
         </div>
       </Button>
 
+      {showReserveStatus && currentStep === 0 && (
+        <PoolStatusBlock onBack={() => setShowReserveStatus(false)} />
+      )}
+
       {/* Data Block */}
-      <div className="py-4 flex flex-grow flex-col items-center relative">
-        {/* Data Section */}
-        <div className="flex flex-grow flex-col items-center text-center">
-          <p className="text-base text-neutral-1">{title}</p>
-          {isInitialDataLoad ? (
-            <Loader scaledHeight />
-          ) : (
-            <>
-              <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
-              <p className="text-sm text-neutral-1 line-clamp-1">
-                {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
-              </p>
-            </>
-          )}
-        </div>
+      {!showReserveStatus && (
+        <>
+          <div className="py-4 flex flex-grow flex-col items-center relative">
+            {/* Data Section */}
+            <div className="flex flex-grow flex-col items-center text-center w-full">
+              <div className="flex justify-between items-center w-full px-4">
+                <div className="flex flex-1">
+                  <span>&nbsp;</span>
+                </div>
+                <div className="flex flex-1">
+                  <span>&nbsp;</span>
+                </div>
+                <div className="flex">
+                  <p className="text-base text-neutral-1">{title}</p>
+                </div>
+                <div className="flex flex-1">
+                  <span>&nbsp;</span>
+                </div>
+                {currentStep === 0 ? (
+                  <div className="flex flex-1 justify-center">
+                    <Button
+                      variant="selected"
+                      size="xsmall"
+                      className="px-1 rounded text-xs"
+                      onClick={() => setShowReserveStatus(!showReserveStatus)}
+                    >
+                      Reserve
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-1">
+                    <span>&nbsp;</span>
+                  </div>
+                )}
+              </div>
 
-        {/* Buttons Section */}
-        <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
-          {currentStep === 0 ? (
-            <>
-              <Button className="w-full" asChild>
-                <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
-              </Button>
-              <ReceiveDialog asset={DEFAULT_ASSET} />
-            </>
-          ) : (
-            <>
-              <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
-              <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
-            </>
-          )}
-        </div>
+              {isInitialDataLoad ? (
+                <Loader scaledHeight />
+              ) : (
+                <>
+                  <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
+                  <p className="text-sm text-neutral-1 line-clamp-1">
+                    {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
+                  </p>
+                </>
+              )}
+            </div>
 
-        {/* Pagination Dots */}
-        <div className="flex justify-center space-x-2 mt-2">
-          {[...Array(totalSteps)].map((_, index) =>
-            index === currentStep ? (
-              <span key={index} className="w-2 h-2 rounded-full bg-blue" />
-            ) : (
-              <Button
-                key={index}
-                variant="unselected"
-                size="blank"
-                onClick={() => swipeTo(index)}
-                className="w-2 h-2 rounded-full bg-neutral-4"
-              />
-            ),
-          )}
-        </div>
-      </div>
+            {/* Buttons Section */}
+            <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
+              {currentStep === 0 ? (
+                <>
+                  <Button className="w-full" asChild>
+                    <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                  </Button>
+                  <ReceiveDialog asset={DEFAULT_ASSET} />
+                </>
+              ) : (
+                <>
+                  <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
+                  <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
+                </>
+              )}
+            </div>
+
+            {/* Pagination Dots */}
+            <div className="flex justify-center space-x-2 mt-2">
+              {[...Array(totalSteps)].map((_, index) =>
+                index === currentStep ? (
+                  <span key={index} className="w-2 h-2 rounded-full bg-blue" />
+                ) : (
+                  <Button
+                    key={index}
+                    variant="unselected"
+                    size="blank"
+                    onClick={() => swipeTo(index)}
+                    className="w-2 h-2 rounded-full bg-neutral-4"
+                  />
+                ),
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Right-Side Panel Button */}
       <Button
-        variant="blank"
+        variant="selected"
         size="blank"
         className={`border-l disabled:border-l ${panelButtonClasses}`}
         disabled={!rightPanelEnabled}
@@ -151,11 +188,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           <Triangle className="w-4 h-4 rotate-90" />
         </div>
       </Button>
-      <div className="absolute top-2.5 right-2.5">
-        <Button variant={'selected'} size="xsmall" className="px-1 rounded text-xs" asChild>
-          <Link to={ROUTES.APP.POOL_STATUS}>Pool Status</Link>
-        </Button>
-      </div>
     </div>
   );
 };

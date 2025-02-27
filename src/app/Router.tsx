@@ -101,10 +101,6 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
           path: ROUTES.APP.VIEW_TUTORIAL,
           element: <SwapTutorial />,
         },
-        {
-          path: ROUTES.APP.POOL_STATUS,
-          element: <Main />,
-        },
       ],
     },
     {

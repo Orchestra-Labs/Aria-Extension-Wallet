@@ -16,7 +16,6 @@ export const ROUTES = {
     CHANGE_PASSWORD: '/change-password',
     VIEW_TUTORIAL: '/view-tutorial',
     MEDIA_ONBOARDING: '/media-onboarding',
-    POOL_STATUS: '/pool-status',
   },
   AUTH: {
     ROOT: AUTH_ROOT,
