@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && vite build --config vite.content-script.config.ts && npx vite build --config vite.background-script.config.ts && npx vite build --config vite.injected-script.config.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc",
@@ -16,6 +16,7 @@
     "@cosmjs/amino": "^0.32.4",
     "@cosmjs/encoding": "^0.32.4",
     "@cosmjs/stargate": "^0.32.4",
+    "@json-rpc-tools/utils": "^1.7.6",
     "@orchestra-labs/symphonyjs": "^1.0.29",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-dialog": "~1.0.5",
@@ -23,6 +24,7 @@
     "@radix-ui/react-select": "~2.0.0",
     "@radix-ui/react-slot": "~1.0.2",
     "@radix-ui/react-toast": "^1.2.2",
+    "@reown/walletkit": "^1.2.3",
     "@tanstack/react-query": "^5.52.1",
     "@tippyjs/react": "^4.2.6",
     "@types/node": "~20.12.3",
@@ -30,11 +32,13 @@
     "@types/react-dom": "~18.2.22",
     "@use-gesture/react": "^10.3.1",
     "@vitejs/plugin-react": "~4.2.1",
+    "@walletconnect/core": "^2.19.2",
     "@zxing/browser": "^0.1.5",
     "autoprefixer": "~10.4.19",
     "bech32": "^2.0.0",
     "bignumber.js": "^9.1.2",
     "bip39": "^3.1.0",
+    "buffer": "^6.0.3",
     "class-variance-authority": "~0.7.0",
     "clsx": "~2.1.0",
     "crypto-js": "^4.2.0",
@@ -60,7 +64,9 @@
     "vite-tsconfig-paths": "~4.3.2"
   },
   "devDependencies": {
+    "@types/chrome": "^0.0.309",
     "@types/crypto-js": "^4.2.2",
+    "@types/webextension-polyfill": "^0.12.3",
     "@typescript-eslint/eslint-plugin": "~7.5.0",
     "@typescript-eslint/parser": "~7.5.0",
     "eslint": "~8.57.0",
@@ -77,6 +83,6 @@
     "prettier": "~3.2.5"
   },
   "engines": {
-    "node": "~20.11.0"
+    "node": "~20.18.3"
   }
 }

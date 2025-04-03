@@ -1,4 +1,5 @@
 import './App.css';
+import '../globals';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense } from 'react';
@@ -8,6 +9,7 @@ import { AppRouter } from '@/app/Router';
 import { ScreenLoader, Toaster } from '@/components';
 import { DataProvider } from '@/data';
 import { AuthProvider } from '@/guards';
+import { InitWalletConnectManager } from '@/managers/InitWalletConnectManager';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,7 +27,9 @@ function App() {
         <DataProvider />
         <HashRouter>
           <Suspense fallback={<ScreenLoader />}>
-            <AppRouter />
+            <InitWalletConnectManager>
+              <AppRouter />
+            </InitWalletConnectManager>
             <Toaster />
           </Suspense>
         </HashRouter>

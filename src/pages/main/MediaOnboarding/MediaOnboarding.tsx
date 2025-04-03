@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useState } from 'react';
 
 import { ROUTES } from '@/constants';
-import { openExtensionWindow } from '@/helpers';
+import { getExtensionUrl, openExtensionWindow } from '@/helpers';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, Button } from '@/ui-kit';
 
 const browser = Bowser.getParser(window.navigator.userAgent);
@@ -44,7 +44,8 @@ export const MediaOnboardingScreen: React.FC = () => {
 
   useEffect(() => {
     if (audioAllowed || videoAllowed) {
-      openExtensionWindow(ROUTES.APP.SEND);
+      const url = getExtensionUrl(ROUTES.APP.SEND);
+      openExtensionWindow(url.toString());
       window.close();
     }
   }, [audioAllowed, videoAllowed]);

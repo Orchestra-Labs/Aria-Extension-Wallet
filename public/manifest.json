@@ -12,14 +12,28 @@
     "48": "icon.png",
     "128": "icon.png"
   },
+  "background": {
+    "service_worker": "background-script.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "host_permissions": ["https://*/*", "http://*/*"],
-  "permissions": ["clipboardWrite"],
+  "permissions": ["clipboardWrite", "activeTab", "tabs", "storage"],
   "web_accessible_resources": [
     {
       "resources": ["index.html"],
+      "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["injected-script.js"],
       "matches": ["<all_urls>"]
     }
   ]

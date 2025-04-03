@@ -1,13 +1,10 @@
+import { WINDOW_SIZE } from '@/constants';
+
 import { Loader } from '../Loader';
 
 const ScreenLoader = () => {
   return (
-    <div
-      style={{
-        height: window.innerHeight,
-        width: window.innerWidth,
-      }}
-    >
+    <div style={WINDOW_SIZE}>
       <Loader />
     </div>
   );

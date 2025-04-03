@@ -1,19 +1,20 @@
-export const openExtensionWindow = (url?: string) => {
-  const extensionURL = 'index.html' + '#' + url;
+import { WINDOW_SIZE } from '@/constants/default';
+
+export const openExtensionWindow = (url: string) => {
   if ('chrome' in window) {
-    (window.chrome as any).windows.create({
-      url: extensionURL,
+    window.chrome.windows.create({
+      url: url,
       type: 'popup',
-      width: 420,
-      height: 600,
+      width: WINDOW_SIZE.width,
+      height: WINDOW_SIZE.height,
     });
-    if ('browser' in window) {
-      (window.browser as any).windows.create({
-        url: extensionURL,
-        type: 'popup',
-        width: 420,
-        height: 600,
-      });
-    }
+  }
+  if ('browser' in window) {
+    window.browser?.windows.create({
+      url: url,
+      type: 'popup',
+      width: WINDOW_SIZE.width,
+      height: WINDOW_SIZE.height,
+    });
   }
 };
