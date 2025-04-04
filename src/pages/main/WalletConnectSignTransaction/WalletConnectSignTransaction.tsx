@@ -8,7 +8,7 @@ import { Header, WCProposalButtons } from '@/components';
 import { WCProposalMetadata } from '@/components';
 import { ROUTES } from '@/constants';
 import { COSMOS_CHAINS } from '@/constants/wc';
-import { sleep } from '@/helpers';
+import { closeAllExtensionPopups, sleep } from '@/helpers';
 import { walletkit } from '@/helpers/walletConnect';
 import { useToast } from '@/hooks';
 import { useApproveWCTransactionMutation, useRejectWCTransactionMutation } from '@/queries';
@@ -50,6 +50,7 @@ export const WalletConnectSignTransaction: React.FC = () => {
   const closeScreen = () => {
     navigate({ pathname: ROUTES.APP.ROOT, search: '' });
     window.location.search = '';
+    return closeAllExtensionPopups();
   };
 
   const { mutate: approveWCTransaction, isPending: approvingTransaction } =
@@ -70,8 +71,8 @@ export const WalletConnectSignTransaction: React.FC = () => {
             duration: 5000,
           });
         },
-        onSuccess: () => {
-          closeScreen();
+        onSuccess: async () => {
+          await closeScreen();
         },
       },
     );
@@ -88,18 +89,18 @@ export const WalletConnectSignTransaction: React.FC = () => {
             duration: 5000,
           });
           await sleep(5000);
-          closeScreen();
+          await closeScreen();
         },
-        onSuccess: () => {
-          closeScreen();
+        onSuccess: async () => {
+          await closeScreen();
         },
       },
     );
   };
 
-  const onCloseClick = () => {
-    onReject();
-    closeScreen();
+  const onCloseClick = async () => {
+    await onReject();
+    await closeScreen();
   };
 
   const { name } = metadata;
