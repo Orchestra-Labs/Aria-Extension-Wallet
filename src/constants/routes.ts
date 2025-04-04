@@ -16,6 +16,13 @@ export const ROUTES = {
     CHANGE_PASSWORD: '/change-password',
     VIEW_TUTORIAL: '/view-tutorial',
     MEDIA_ONBOARDING: '/media-onboarding',
+    WALLET_CONNECT: {
+      INIT_SESSION: '/wallet-connect-init-session',
+      SIGN_TRANSACTION: '/wallet-connect-sign-transaction',
+      APPROVE_SESSION: '/wallet-connect-approve-session',
+      INIT_SESSION_INPUT: '/wallet-connect-init-session-input',
+      LOADER: '/wallet-connect-loader',
+    },
   },
   AUTH: {
     ROOT: AUTH_ROOT,

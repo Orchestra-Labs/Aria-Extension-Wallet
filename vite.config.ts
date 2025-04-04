@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      buffer: 'buffer/',
     },
   },
   plugins: [react(), viteTsconfigPaths()],
@@ -53,6 +54,20 @@ export default defineConfig({
         target: 'https://symphony-testnet-api.cogwheel.zone',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/cogwheel-rest/, ''),
+      },
+    },
+  },
+
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        'injected-script': 'src/scripts/injected-script.ts',
+      },
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        format: 'esm', // ES module
       },
     },
   },

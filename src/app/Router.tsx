@@ -20,6 +20,11 @@ import {
   Transaction,
   TransactionsHistory,
   ViewPassphrase,
+  WalletConnectApproveSession,
+  WalletConnectInitSession,
+  WalletConnectInitSessionInput,
+  WalletConnectLoader,
+  WalletConnectSignTransaction,
 } from '@/pages';
 
 const AuthLayout = lazy(() => import('@/layouts/auth/AuthLayout'));
@@ -100,6 +105,26 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.VIEW_TUTORIAL,
           element: <SwapTutorial />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.INIT_SESSION,
+          element: <WalletConnectInitSession />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.APPROVE_SESSION,
+          element: <WalletConnectApproveSession />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.SIGN_TRANSACTION,
+          element: <WalletConnectSignTransaction />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.INIT_SESSION_INPUT,
+          element: <WalletConnectInitSessionInput />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.LOADER,
+          element: <WalletConnectLoader />,
         },
       ],
     },

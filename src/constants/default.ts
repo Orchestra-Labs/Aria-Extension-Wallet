@@ -1,5 +1,11 @@
 import { Asset } from '@/types';
+
 import { NetworkLevel } from './enums';
+
+export const WINDOW_SIZE = {
+  width: 420,
+  height: 600,
+};
 
 export const VALID_PASSWORD_LENGTH = 8;
 

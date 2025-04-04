@@ -24,3 +24,5 @@ export * from './TutorialDisplay';
 export * from './ValidatorScrollTile';
 export * from './ValidatorSelectDialog';
 export * from './WalletSuccessScreen';
+export * from './WCProposalButtons';
+export * from './WCProposalMetadata';

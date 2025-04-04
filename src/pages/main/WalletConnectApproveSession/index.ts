@@ -1,0 +1,1 @@
+export { WalletConnectApproveSession } from './WalletConnectApproveSession';

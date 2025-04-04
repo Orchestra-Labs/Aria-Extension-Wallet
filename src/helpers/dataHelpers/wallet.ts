@@ -1,9 +1,11 @@
 import { Secp256k1HdWallet } from '@cosmjs/amino';
-import { encryptMnemonic } from './crypto';
-import { WALLET_PREFIX } from '@/constants';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
+
+import { WALLET_PREFIX } from '@/constants';
 import { WalletRecord } from '@/types';
+
 import { generateUUID } from '../uuid';
+import { encryptMnemonic } from './crypto';
 
 export const createWallet = async (
   mnemonic: string,
@@ -56,6 +58,14 @@ export async function createOfflineSignerFromMnemonic(
     prefix: WALLET_PREFIX,
   });
   console.log('Offline signer created successfully');
+  return hdWallet;
+}
+
+export async function createAminoSignerFromMnemonic(mnemonic: string) {
+  const hdWallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
+    prefix: WALLET_PREFIX,
+  });
+  console.log('Amino signer created successfully');
   return hdWallet;
 }
 
