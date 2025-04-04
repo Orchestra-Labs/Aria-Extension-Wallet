@@ -13,4 +13,5 @@ export * from './WalletConnectApproveSession';
 export * from './WalletConnectInitSession';
 export * from './WalletConnectInitSessionInput';
 export * from './WalletConnectLoader';
+export * from './WalletConnectPairings';
 export * from './WalletConnectSignTransaction';
