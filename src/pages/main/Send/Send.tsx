@@ -23,7 +23,7 @@ import {
   symphonyAssetsAtom,
   feeStateAtom,
 } from '@/atoms';
-import { Asset, TransactionResult, TransactionSuccess } from '@/types';
+import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
 import {
   formatBalanceDisplay,
@@ -247,6 +247,9 @@ export const Send = () => {
       },
     }));
     setChangeMap(prevMap => ({ ...prevMap, sendAsset: true }));
+    updateTransactionType({
+      sendStateOverride: { ...sendState, asset: newAsset },
+    });
 
     if (propagateChanges) {
       setCallbackChangeMap({
@@ -269,6 +272,9 @@ export const Send = () => {
       ...prevMap,
       receiveAsset: true,
     }));
+    updateTransactionType({
+      receiveStateOverride: { ...receiveState, asset: newAsset },
+    });
 
     if (propagate) {
       setCallbackChangeMap({
@@ -313,6 +319,9 @@ export const Send = () => {
         ...prevState,
         amount: finalSendAmount,
       }));
+      updateTransactionType({
+        sendStateOverride: { ...sendState, amount: finalSendAmount },
+      });
 
       if (propagateChanges) {
         setChangeMap(prevMap => ({
@@ -375,6 +384,9 @@ export const Send = () => {
         ...prevState,
         amount: newReceiveAmount,
       }));
+      updateTransactionType({
+        receiveStateOverride: { ...receiveState, amount: newReceiveAmount },
+      });
 
       if (propagateChanges) {
         setChangeMap(prevMap => ({
@@ -393,10 +405,16 @@ export const Send = () => {
     }
   };
 
-  const updateTransactionType = async () => {
-    const sendAsset = sendState.asset;
-    const receiveAsset = receiveState.asset;
-    const network = sendState.networkLevel;
+  const updateTransactionType = async ({
+    sendStateOverride = sendState,
+    receiveStateOverride = receiveState,
+  }: {
+    sendStateOverride?: TransactionState;
+    receiveStateOverride?: TransactionState;
+  } = {}) => {
+    const sendAsset = sendStateOverride.asset;
+    const receiveAsset = receiveStateOverride.asset;
+    const network = sendStateOverride.networkLevel;
 
     if (!sendAsset || !receiveAsset) {
       console.error('Missing assets for transaction type update');
@@ -409,13 +427,13 @@ export const Send = () => {
         recipientAddress,
         network,
       });
+
       const isSwapEnabled = isValidSwap({ sendAsset, receiveAsset });
       const isValidTransactionEnabled = await isValidTransaction({
         sendAddress: walletState.address,
         recipientAddress,
-        sendState,
-        receiveState,
-        network,
+        sendState: sendStateOverride,
+        receiveState: receiveStateOverride,
       });
 
       const newTransactionType = {
@@ -430,12 +448,6 @@ export const Send = () => {
       const maxSendable = calculateMaxAvailable(sendAsset);
       const applicableExchangeRate = sendAsset.denom === receiveAsset.denom ? 1 : exchangeRate || 1;
       const maxReceivable = maxSendable * applicableExchangeRate;
-
-      console.log('Transaction placeholders:', {
-        maxSendable,
-        applicableExchangeRate,
-        maxReceivable,
-      });
 
       setSendPlaceholder(
         `Max: ${formatBalanceDisplay(`${maxSendable}`, sendAsset.symbol || 'MLD')}`,
@@ -467,10 +479,6 @@ export const Send = () => {
     setMap = setChangeMap,
     isExchangeRateUpdate = false,
   ) => {
-    if (map.sendAsset || map.receiveAsset) {
-      updateTransactionType();
-    }
-
     if (map.sendAsset) {
       const sendAsset = sendState.asset;
       const sendAmount = sendState.amount;
@@ -622,7 +630,6 @@ export const Send = () => {
     setUserIsOnPage(true);
     updateSendAsset(selectedAsset);
     updateReceiveAsset(selectedAsset);
-    updateTransactionType();
 
     return () => {
       setUserIsOnPage(false);

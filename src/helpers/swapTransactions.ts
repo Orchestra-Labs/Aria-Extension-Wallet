@@ -16,12 +16,7 @@ export const isValidSwap = ({
   sendAsset: Asset;
   receiveAsset: Asset;
 }) => {
-  console.log('Checking swap validity:');
-  console.log('Send Asset:', sendAsset);
-  console.log('Receive Asset:', receiveAsset);
-
   const result = !sendAsset.isIbc && !receiveAsset.isIbc && sendAsset.denom !== receiveAsset.denom;
-  console.log('Is valid swap:', result);
 
   return result;
 };
