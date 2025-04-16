@@ -9,7 +9,7 @@
 ## Prerequisites:
 
 - This project is using `yarn` as a package manager
-- Node: v20.11.0
+- Node: v20.18.3
 
 In the project directory, you can run:
 
