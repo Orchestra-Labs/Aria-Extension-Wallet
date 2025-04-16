@@ -3,8 +3,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
 import { isValidSend } from './sendTransactions';
-import { NetworkLevel, TextFieldStatus } from '@/constants';
-import { isIBC } from './ibcTransactions';
+import { TextFieldStatus } from '@/constants';
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs, { strict: false }));
@@ -50,23 +49,19 @@ export const isValidTransaction = async ({
   recipientAddress,
   sendState,
   receiveState,
-  network,
 }: {
   sendAddress: string;
   recipientAddress: string;
   sendState: TransactionState;
   receiveState: TransactionState;
-  network: NetworkLevel;
 }) => {
   if (sendState.networkLevel !== receiveState.networkLevel) {
+    console.warn('[isValidTransaction] Network levels do not match');
     return false;
   }
 
-  if (sendAddress && recipientAddress) {
-    const isValidIBC = await isIBC({ sendAddress, recipientAddress, network });
-    if (!isValidIBC) {
-      return false;
-    }
+  if (!(sendAddress && recipientAddress)) {
+    return false;
   }
 
   const sendAsset = sendState.asset;
