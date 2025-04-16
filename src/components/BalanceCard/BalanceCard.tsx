@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
 import { Button } from '@/ui-kit';
@@ -7,6 +7,8 @@ import { isInitialDataLoadAtom, walletAssetsAtom, validatorDataAtom } from '@/at
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
 import { ROUTES, DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
 import { Triangle } from 'lucide-react';
+import BigNumber from 'bignumber.js';
+import { useExchangeRate } from '@/hooks';
 
 interface BalanceCardProps {
   currentStep: number;
@@ -20,6 +22,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const validatorData = useAtomValue(validatorDataAtom);
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
+  const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
   const symbol = LOCAL_ASSET_REGISTRY.note.symbol || DEFAULT_ASSET.symbol || 'MLD';
   const currentExponent = LOCAL_ASSET_REGISTRY.note.exponent || GREATER_EXPONENT_DEFAULT;
@@ -28,17 +31,24 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   let primaryText = '';
   let secondaryText;
 
+  const totalMLD = useMemo(() => {
+    return walletAssets.reduce((sum, asset) => {
+      const denom = asset.denom;
+      const amount = new BigNumber(asset.amount || 0);
+
+      // Use exchangeRate from hook if available, otherwise assume 1 for same denom
+      const rate = denom === LOCAL_ASSET_REGISTRY.note.denom ? 1 : exchangeRate;
+
+      return sum.plus(amount.multipliedBy(rate || 0));
+    }, new BigNumber(0));
+  }, [walletAssets, exchangeRate]);
+
   if (currentStep === 0) {
-    title = 'Available balance';
+    title = 'Total Available Balance';
 
-    const totalAvailableMLD = walletAssets
-      .filter(asset => asset.denom === LOCAL_ASSET_REGISTRY.note.denom)
-      .reduce((sum, asset) => sum + parseFloat(asset.amount), 0)
-      .toFixed(currentExponent);
-
-    primaryText = formatBalanceDisplay(totalAvailableMLD, symbol);
+    primaryText = formatBalanceDisplay(totalMLD.toFixed(GREATER_EXPONENT_DEFAULT), symbol);
   } else if (currentStep === 1) {
-    title = 'Staked balance';
+    title = 'Staked Balance';
 
     const totalStakedRewards = validatorData.reduce((sum, item) => {
       const rewardSum = item.rewards?.reduce(
@@ -127,7 +137,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                 )}
               </div>
 
-              {isInitialDataLoad ? (
+              {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
                 <Loader scaledHeight />
               ) : (
                 <>
