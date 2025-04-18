@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
 import { useAtomValue } from 'jotai';
+import React, { ChangeEvent, useMemo, useState } from 'react';
+
 import { walletStateAtom } from '@/atoms';
-import { Button, CopyTextField, SlideTray } from '@/ui-kit';
-import { truncateWalletAddress } from '@/helpers';
 import { WALLET_PREFIX } from '@/constants';
-import { QRCodeContainer } from '../QRCodeContainer';
+import { truncateWalletAddress } from '@/helpers';
+import { useDebounce } from '@/hooks';
 import { Asset } from '@/types';
+import { Button, CopyTextField, Input, SlideTray } from '@/ui-kit';
+
+import { QRCodeContainer } from '../QRCodeContainer';
 
 interface ReceiveDialogProps {
   buttonSize?: 'default' | 'medium' | 'small' | 'xsmall';
@@ -14,17 +17,29 @@ interface ReceiveDialogProps {
 
 export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
   const walletState = useAtomValue(walletStateAtom);
-
+  const [amount, setAmount] = useState<number>();
+  const debouncedAmount = useDebounce(amount);
   const [includeCoinPreference, setIncludeCoinPreference] = useState(false);
 
-  const walletAddress = walletState.address;
-  const walletDisplayAddress = truncateWalletAddress(WALLET_PREFIX, walletAddress);
+  const handleChangeAmount = (e: ChangeEvent<HTMLInputElement>) =>
+    setAmount(Number(e.target.value) || undefined);
 
-  const qrDataWithAddress = JSON.stringify({
-    address: walletAddress,
-    denomPreference: asset.denom,
-  });
-  const qrData = includeCoinPreference ? qrDataWithAddress : walletAddress;
+  const walletDisplayAddress = useMemo(
+    () => truncateWalletAddress(WALLET_PREFIX, walletState.address),
+    [walletState.address],
+  );
+
+  const qrData = useMemo<string>(
+    () =>
+      includeCoinPreference
+        ? JSON.stringify({
+            address: walletState.address,
+            denomPreference: asset.denom,
+            amount: debouncedAmount || 0,
+          })
+        : walletState.address,
+    [asset.denom, debouncedAmount, includeCoinPreference, walletState.address],
+  );
 
   return (
     <SlideTray
@@ -38,7 +53,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
       reducedTopMargin
     >
       <div className="flex flex-col items-center">
-        <div className="mb-2">
+        <div className="mb-3">
           <span>Aria Wallet Exclusive:</span>
           <Button
             variant={!includeCoinPreference ? 'unselected' : 'selectedEnabled'}
@@ -50,13 +65,28 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
           </Button>
         </div>
 
+        {includeCoinPreference && (
+          <div className="flex justify-center mb-3">
+            <Input
+              variant="primary"
+              type="number"
+              label="Amount"
+              labelPosition="left"
+              placeholder="Enter the amount of receive"
+              defaultValue={0}
+              onChange={handleChangeAmount}
+              onDurationChange={console.log}
+            />
+          </div>
+        )}
+
         <QRCodeContainer qrCodeValue={qrData} />
 
         {/* Wallet Address */}
         <CopyTextField
           variant="transparent"
           displayText={walletDisplayAddress}
-          copyText={walletAddress}
+          copyText={walletState.address}
           iconHeight={16}
         />
       </div>

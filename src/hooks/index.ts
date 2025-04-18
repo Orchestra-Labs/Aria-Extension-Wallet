@@ -1,3 +1,4 @@
+export { useDebounce } from './useDebounce';
 export * from './useExchangeAssets';
 export * from './useExchangePoolBalance';
 export * from './useExchangeRate';
