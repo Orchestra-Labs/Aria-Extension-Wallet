@@ -13,7 +13,7 @@ import {
   selectTextColorByStatus,
   stakeToValidator,
   truncateWalletAddress,
-  unstakeFromValidator,
+  claimAndUnstake,
 } from '@/helpers';
 import {
   BondStatus,
@@ -250,7 +250,7 @@ export const ValidatorScrollTile = ({
 
     const txType = TransactionType.UNSTAKE;
     try {
-      const result = await unstakeFromValidator({
+      const result = await claimAndUnstake({
         amount,
         delegations: delegationResponse,
         simulateOnly: isSimulation,
@@ -409,6 +409,7 @@ export const ValidatorScrollTile = ({
 
       if (userIsUnbonding) {
         statusColor = TextFieldStatus.WARN;
+        amountUnstaking = value;
         secondarySubtitle = 'Unstaking...';
       }
     }
@@ -429,6 +430,7 @@ export const ValidatorScrollTile = ({
 
       if (userIsUnbonding) {
         statusColor = TextFieldStatus.WARN;
+        amountUnstaking = value;
         secondarySubtitle = 'Unstaking...';
       }
     }
