@@ -409,6 +409,7 @@ export const ValidatorScrollTile = ({
 
       if (userIsUnbonding) {
         statusColor = TextFieldStatus.WARN;
+        amountUnstaking = value;
         secondarySubtitle = 'Unstaking...';
       }
     }
@@ -429,6 +430,7 @@ export const ValidatorScrollTile = ({
 
       if (userIsUnbonding) {
         statusColor = TextFieldStatus.WARN;
+        amountUnstaking = value;
         secondarySubtitle = 'Unstaking...';
       }
     }
