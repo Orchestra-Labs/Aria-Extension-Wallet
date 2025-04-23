@@ -272,7 +272,7 @@ export const stakeToValidator = async (
   }
 };
 
-export const unstakeFromValidator = async ({
+export const claimAndUnstake = async ({
   delegations,
   amount,
   simulateOnly = false,
@@ -283,16 +283,24 @@ export const unstakeFromValidator = async ({
 }): Promise<TransactionResult> => {
   const endpoint = CHAIN_ENDPOINTS.undelegateFromValidator;
   const delegationsArray = Array.isArray(delegations) ? delegations : [delegations];
-  const isSingleDelegation = delegationsArray.length === 1 && amount;
+  const delegatorAddress = delegationsArray[0].delegation.delegator_address;
+  const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
 
-  // If there's a single delegation and amount is provided, format the amount
-  const messages = isSingleDelegation
+  // Build claim reward messages
+  const claimMessages = buildClaimMessage({
+    endpoint: CHAIN_ENDPOINTS.claimRewards,
+    delegatorAddress,
+    validatorAddress: validatorAddresses,
+  });
+
+  // Build undelegate messages
+  const unstakeMessages = amount
     ? buildClaimMessage({
         endpoint,
-        delegatorAddress: delegationsArray[0].delegation.delegator_address,
-        validatorAddress: delegationsArray[0].delegation.validator_address,
+        delegatorAddress,
+        validatorAddress: validatorAddresses[0],
         amount: (
-          parseFloat(amount!) *
+          parseFloat(amount) *
           Math.pow(
             10,
             LOCAL_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
@@ -306,42 +314,56 @@ export const unstakeFromValidator = async ({
         delegations: delegationsArray,
       });
 
-  try {
-    const response = await queryRpcNode({
-      endpoint,
-      messages,
-      simulateOnly,
-    });
+  const messages = [...claimMessages, ...unstakeMessages];
 
-    if (!response) {
-      return {
-        success: false,
-        message: 'No response received from transaction',
-        data: { code: 1 },
-      };
-    }
+  // Simulate first
+  const simulationResult = await queryRpcNode({
+    endpoint,
+    messages,
+    simulateOnly: true,
+  });
 
-    if (simulateOnly) {
-      return { success: true, message: 'Simulation successful', data: response };
-    }
-
-    return {
-      success: true,
-      message: 'Transaction successful',
-      data: {
-        code: response.code || 0,
-        txHash: response.txHash,
-        gasUsed: response.gasUsed,
-        gasWanted: response.gasWanted,
-        height: response.height,
-      },
-    };
-  } catch (error) {
-    console.error('Error during unstaking:', error);
+  if (!simulationResult || simulationResult.code !== 0) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      data: { code: 1 },
+      message: 'Simulation failed',
+      data: simulationResult,
     };
   }
+
+  const estimatedGas = parseFloat(simulationResult.gasWanted || '0') * 1.1;
+  const feeAmount = Math.ceil(estimatedGas * 0.025);
+
+  if (simulateOnly) {
+    return {
+      success: true,
+      message: 'Simulation successful',
+      data: simulationResult,
+    };
+  }
+
+  // Execute transaction
+  const executionResult = await queryRpcNode({
+    endpoint,
+    messages,
+    simulateOnly: false,
+    fee: {
+      amount: [{ denom: DEFAULT_ASSET.denom, amount: feeAmount.toFixed(0) }],
+      gas: estimatedGas.toFixed(0),
+    },
+  });
+
+  if (!executionResult || executionResult.code !== 0) {
+    return {
+      success: false,
+      message: 'Transaction failed',
+      data: executionResult,
+    };
+  }
+
+  return {
+    success: true,
+    message: 'Transaction successful',
+    data: executionResult,
+  };
 };

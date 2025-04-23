@@ -16,7 +16,7 @@ import {
   claimRewards,
   formatBalanceDisplay,
   truncateWalletAddress,
-  unstakeFromValidator,
+  claimAndUnstake,
 } from '@/helpers';
 import { CombinedStakingInfo } from '@/types';
 import { useRefreshData, useToast } from '@/hooks';
@@ -239,7 +239,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     }));
 
     try {
-      const result = await unstakeFromValidator({
+      const result = await claimAndUnstake({
         delegations: delegations,
         simulateOnly,
       });
