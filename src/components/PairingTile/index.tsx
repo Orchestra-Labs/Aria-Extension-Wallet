@@ -1,0 +1,1 @@
+export { PairingTile } from './PairingTile';

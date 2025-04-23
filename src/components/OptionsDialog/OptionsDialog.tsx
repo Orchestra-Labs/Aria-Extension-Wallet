@@ -1,6 +1,7 @@
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
 import {
   EditIcon,
+  Globe,
   GraduationCap,
   LogOut,
   NotebookPenIcon,
@@ -11,9 +12,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { ArrowLeft, Discord, DotsVertical } from '@/assets/icons';
-import { Button, DialogContent } from '@/ui-kit';
-import { useLogout } from '@/hooks';
 import { ROUTES } from '@/constants';
+import { useLogout } from '@/hooks';
+import { Button, DialogContent } from '@/ui-kit';
 
 const OPTIONS = [
   {
@@ -57,6 +58,13 @@ const OPTIONS = [
     icon: <Discord />,
     target: '_blank',
     to: 'https://discord.gg/symphony-1162823265975279636',
+  },
+  {
+    id: 7,
+    name: 'Connected dApps',
+    icon: <Globe />,
+    target: '',
+    to: ROUTES.APP.WALLET_CONNECT.PAIRINGS,
   },
 ];
 

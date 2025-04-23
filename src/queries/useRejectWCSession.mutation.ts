@@ -15,6 +15,12 @@ const rejectWCSession = async ({ proposal }: Params) => {
     id: proposal.id,
     reason: getSdkError('USER_REJECTED_METHODS'),
   });
+
+  // manually disconnect when session was rejected
+  const topic = proposal.params.pairingTopic;
+  if (topic) {
+    await walletkit.core.pairing.disconnect({ topic });
+  }
 };
 
 export const useRejectWCSessionMutation = (

@@ -24,6 +24,7 @@ import {
   WalletConnectInitSession,
   WalletConnectInitSessionInput,
   WalletConnectLoader,
+  WalletConnectPairings,
   WalletConnectSignTransaction,
 } from '@/pages';
 
@@ -125,6 +126,10 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         {
           path: ROUTES.APP.WALLET_CONNECT.LOADER,
           element: <WalletConnectLoader />,
+        },
+        {
+          path: ROUTES.APP.WALLET_CONNECT.PAIRINGS,
+          element: <WalletConnectPairings />,
         },
       ],
     },

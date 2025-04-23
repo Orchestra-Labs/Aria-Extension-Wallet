@@ -22,6 +22,7 @@ export const ROUTES = {
       APPROVE_SESSION: '/wallet-connect-approve-session',
       INIT_SESSION_INPUT: '/wallet-connect-init-session-input',
       LOADER: '/wallet-connect-loader',
+      PAIRINGS: '/wallet-connect/pairings',
     },
   },
   AUTH: {

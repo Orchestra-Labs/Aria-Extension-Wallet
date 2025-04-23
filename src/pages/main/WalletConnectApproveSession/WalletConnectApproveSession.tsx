@@ -8,6 +8,7 @@ import { Header, WCProposalButtons } from '@/components';
 import { WCProposalMetadata } from '@/components';
 import { ROUTES } from '@/constants';
 import { COSMOS_CHAINS } from '@/constants/wc';
+import { closeAllExtensionPopups } from '@/helpers';
 import { useSupportedWCNamespaces, useToast } from '@/hooks';
 import { useApproveWCSessionMutation } from '@/queries/useApproveWCSession.mutation';
 import { useRejectWCSessionMutation } from '@/queries/useRejectWCSession.mutation';
@@ -49,6 +50,7 @@ export const WalletConnectApproveSession: React.FC = () => {
   const closeScreen = () => {
     navigate({ pathname: ROUTES.APP.ROOT, search: '' });
     window.location.search = '';
+    return closeAllExtensionPopups();
   };
 
   const onApprove = () => {
@@ -66,7 +68,7 @@ export const WalletConnectApproveSession: React.FC = () => {
           });
         },
         onSuccess: async () => {
-          closeScreen();
+          await closeScreen();
         },
       },
     );
@@ -84,16 +86,16 @@ export const WalletConnectApproveSession: React.FC = () => {
             description: (e as Error)?.message,
           });
         },
-        onSuccess: () => {
-          closeScreen();
+        onSuccess: async () => {
+          await closeScreen();
         },
       },
     );
   };
 
-  const onCloseClick = () => {
+  const onCloseClick = async () => {
     onReject();
-    closeScreen();
+    await closeScreen();
   };
 
   const { name } = metadata;
