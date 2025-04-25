@@ -54,14 +54,13 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
     >
       <div className="flex flex-col items-center">
         <div className="mb-3">
-          <span>{`Include data? (Aria Only):`}</span>
           <Button
             variant={!includeCoinPreference ? 'unselectedEnabled' : 'selectedEnabled'}
             size="small"
             onClick={() => setIncludeCoinPreference(!includeCoinPreference)}
             className="ml-1 px-2 rounded-md text-xs"
           >
-            {includeCoinPreference ? 'Remove Data' : 'Include data'}
+            {includeCoinPreference ? 'Remove Data' : 'Include data (Aria Only)'}
           </Button>
         </div>
 
