@@ -18,8 +18,8 @@ interface ReceiveDialogProps {
 export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
   const walletState = useAtomValue(walletStateAtom);
   const [amount, setAmount] = useState<number>();
-  const debouncedAmount = useDebounce(amount);
   const [includeCoinPreference, setIncludeCoinPreference] = useState(false);
+  const debouncedAmount = useDebounce(amount);
 
   const handleChangeAmount = (e: ChangeEvent<HTMLInputElement>) =>
     setAmount(Number(e.target.value) || undefined);
@@ -54,14 +54,14 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
     >
       <div className="flex flex-col items-center">
         <div className="mb-3">
-          <span>Aria Wallet Exclusive:</span>
+          <span>{`Include data? (Aria Only):`}</span>
           <Button
-            variant={!includeCoinPreference ? 'unselected' : 'selectedEnabled'}
+            variant={!includeCoinPreference ? 'unselectedEnabled' : 'selectedEnabled'}
             size="small"
             onClick={() => setIncludeCoinPreference(!includeCoinPreference)}
             className="ml-1 px-2 rounded-md text-xs"
           >
-            {`${includeCoinPreference ? 'Receiving' : 'Receive'} ${asset.symbol}${includeCoinPreference ? '' : '?'}`}
+            {includeCoinPreference ? 'Remove Data' : 'Include data'}
           </Button>
         </div>
 
@@ -72,17 +72,16 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
               type="number"
               label="Amount"
               labelPosition="left"
-              placeholder="Enter the amount of receive"
+              placeholder="Enter the amount to receive"
+              reducedHeight
               defaultValue={0}
               onChange={handleChangeAmount}
-              onDurationChange={console.log}
             />
           </div>
         )}
 
         <QRCodeContainer qrCodeValue={qrData} />
 
-        {/* Wallet Address */}
         <CopyTextField
           variant="transparent"
           displayText={walletDisplayAddress}

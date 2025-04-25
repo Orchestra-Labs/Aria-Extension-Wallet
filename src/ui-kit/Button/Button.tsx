@@ -38,6 +38,12 @@ const buttonVariants = cva<ButtonConfig>(
           'active:bg-grey-pressed-secondary active:text-neutral-1 active:border-grey',
           'disabled:border-neutral-3 disabled:text-neutral-3 disabled:bg-transparent',
         ],
+        unselectedEnabled: [
+          'text-neutral-1 border border-grey',
+          'hover:bg-grey hover:text-grey-dark hover:border-grey',
+          'active:bg-grey-pressed-secondary active:text-neutral-1 active:border-grey',
+          'disabled:border-neutral-3 disabled:text-neutral-3 disabled:bg-transparent',
+        ],
         selected: [
           'text-blue border bg-transparent',
           'cursor-default',
