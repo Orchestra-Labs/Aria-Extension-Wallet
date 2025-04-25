@@ -80,7 +80,7 @@ export const PoolStatusBlock = ({ onBack }: PoolStatusBlockProps) => {
                   </div>
                   <div className="flex flex-1 justify-center">
                     <Button
-                      variant="selected"
+                      variant="selectedEnabled"
                       size="xsmall"
                       className="px-1 rounded text-xs"
                       onClick={onBack}
