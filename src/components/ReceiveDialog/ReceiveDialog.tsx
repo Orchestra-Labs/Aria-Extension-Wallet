@@ -69,7 +69,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
             <Input
               variant="primary"
               type="number"
-              label="Amount"
+              label="Amount:"
               labelPosition="left"
               placeholder="Enter the amount to receive"
               reducedHeight
