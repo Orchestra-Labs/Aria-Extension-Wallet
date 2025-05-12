@@ -1,5 +1,5 @@
 import { Input } from '@/ui-kit';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   addressVerifiedAtom,
   receiveStateAtom,
@@ -15,15 +15,17 @@ import { bech32 } from 'bech32';
 
 interface AddressInputProps {
   addBottomMargin?: boolean;
-  labelWidth?: string;
   updateReceiveAsset: (asset: Asset, propagateChanges: boolean) => void;
+  updateTransactionType: () => void;
 }
 
 export const AddressInput: React.FC<AddressInputProps> = ({
   addBottomMargin = true,
   updateReceiveAsset,
+  updateTransactionType,
 }) => {
-  const [address, setAddress] = useAtom(recipientAddressAtom);
+  const [address, setAddress] = useState('');
+  const setRecipientAddress = useSetAtom(recipientAddressAtom);
   const setAddressVerified = useSetAtom(addressVerifiedAtom);
   const setReceiveState = useSetAtom(receiveStateAtom);
   const walletState = useAtomValue(walletStateAtom);
@@ -77,6 +79,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         ...prevState,
         chainName: matchedChain.coin.toLowerCase(),
       }));
+      updateTransactionType();
     } catch (error) {
       setAddressStatus(InputStatus.ERROR);
       setMessageText('Invalid Bech32 encoding.');
@@ -93,10 +96,17 @@ export const AddressInput: React.FC<AddressInputProps> = ({
       setAllowValidatePassword(true);
     }
 
+    setAddress(newAddress);
+
     // Reset validation when empty
-    if (trimmedAddress === '') {
+    if (newAddress === '') {
       setAllowValidatePassword(false);
       setAddressStatus(InputStatus.NEUTRAL);
+      setRecipientAddress(walletState.address);
+      setAddressVerified(true);
+      updateTransactionType();
+    } else {
+      setRecipientAddress(trimmedAddress);
     }
 
     if (allowValidateAddress) {
@@ -118,9 +128,14 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     setAddress(trimmedAddress);
 
     // Start validating immediately after paste
-    if (trimmedAddress.length > 0) {
+    setAddress(trimmedAddress);
+    if (trimmedAddress === '') {
+      setRecipientAddress(walletState.address);
+    } else {
+      setRecipientAddress(trimmedAddress);
       setAllowValidatePassword(true);
     }
+
     validateAddress();
   };
 
