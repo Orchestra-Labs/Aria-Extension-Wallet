@@ -845,7 +845,6 @@ export const Send = () => {
 
         {/* 
           TODO: add labels above text in fee block
-          TODO: should be able to swap.  is it down or an error?  everything HXAU to HEUR is showing as 1 MLD.  HETH and HBTC are the only ones not
           TODO: view error then resolve to list
         */}
 
