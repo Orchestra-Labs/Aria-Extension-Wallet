@@ -31,13 +31,15 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
   const [slideTrayIsOpen, setSlideTrayIsOpen] = useState(false);
 
   const handleScan = (result: string | null) => {
+    console.log('[QR SCAN] handleScan() called with:', result);
     if (result) {
       try {
         const parsedResult = JSON.parse(result);
-        if (parsedResult.address && parsedResult.denomPreference) {
-          const preferredAsset = filteredAssets.find(
-            asset => asset.denom === parsedResult.denomPreference,
-          );
+        console.log('[QR SCAN] Parsed result:', parsedResult);
+        if (parsedResult.address && parsedResult.denom) {
+          console.log('[QR SCAN] Searching for asset with denom:', parsedResult.denom);
+          const preferredAsset = filteredAssets.find(asset => asset.denom === parsedResult.denom);
+          console.log('[QR SCAN] Matched asset:', preferredAsset);
 
           setAddress(parsedResult.address);
           updateReceiveAsset(preferredAsset as Asset, true);

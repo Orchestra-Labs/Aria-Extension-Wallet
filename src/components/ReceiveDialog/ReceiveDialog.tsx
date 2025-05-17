@@ -34,7 +34,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
       showPreferenceInput
         ? JSON.stringify({
             address: walletState.address,
-            denomPreference: selectedAsset.denom,
+            denom: selectedAsset.denom,
             amount: debouncedAmount || 0,
           })
         : walletState.address,

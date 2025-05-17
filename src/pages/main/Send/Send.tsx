@@ -694,11 +694,6 @@ export const Send = () => {
   useEffect(() => {
     const hasPendingChanges = Object.values(changeMap).some(Boolean);
 
-    console.log('[useEffect] hasPendingChanges:', hasPendingChanges);
-    console.log('[useEffect] sendState.amount:', sendState.amount);
-    console.log('[useEffect] receiveState.amount:', receiveState.amount);
-    console.log('[changeMap]', changeMap);
-
     if (
       !hasPendingChanges &&
       ((sendState.amount > 0 && receiveState.amount > 0) ||
