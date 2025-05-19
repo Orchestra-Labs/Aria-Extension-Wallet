@@ -35,7 +35,6 @@ import {
   isValidSwap,
   isValidTransaction,
   removeSessionStorageItem,
-  removeTrailingZeroes,
   sendIBC,
   sendTransaction,
   setSessionStorageItem,
@@ -461,7 +460,7 @@ export const Send = () => {
       setReceivePlaceholder(
         !newTransactionType.isSwap
           ? 'No exchange on current pair'
-          : `Max: ${removeTrailingZeroes(maxReceivable)}${receiveAsset.symbol}`,
+          : `Max: ${formatBalanceDisplay(`${maxReceivable}`, receiveAsset.symbol || 'MLD')}`,
       );
 
       return newTransactionType;

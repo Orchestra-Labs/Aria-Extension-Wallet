@@ -43,6 +43,7 @@
     "clsx": "~2.1.0",
     "crypto-js": "^4.2.0",
     "framer-motion": "^11.11.10",
+    "html5-qrcode": "^2.3.8",
     "jotai": "^2.10.0",
     "lucide-react": "~0.367.0",
     "mic-check": "^1.1.0",
