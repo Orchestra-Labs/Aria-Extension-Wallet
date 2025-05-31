@@ -3,13 +3,15 @@ import { AssetSelectDialog } from '@/components';
 import { cn, getRegexForDecimals } from '@/helpers/utils';
 import { Asset } from '@/types';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
-import { GREATER_EXPONENT_DEFAULT } from '@/constants';
+import { GREATER_EXPONENT_DEFAULT, InputStatus } from '@/constants';
 import { formatNumberWithCommas, stripNonNumerics } from '@/helpers';
 
 interface AssetInputProps {
   isDisabled?: boolean;
   placeholder: string;
   variant?: 'send' | 'receive' | 'stake';
+  status?: InputStatus;
+  messageText?: string;
   assetState: Asset | null;
   amountState: number;
   reducedHeight?: boolean;
@@ -32,6 +34,8 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   isDisabled = false,
   placeholder = '',
   variant = 'stake',
+  status = InputStatus.NEUTRAL,
+  messageText = '',
   assetState,
   amountState,
   reducedHeight = false,
@@ -168,6 +172,9 @@ export const AssetInput: React.FC<AssetInputProps> = ({
           variant="primary"
           type="text"
           ref={inputRef}
+          status={status}
+          messageText={messageText}
+          showMessageText={!!messageText}
           label={label}
           labelPosition="left"
           placeholder={placeholder}

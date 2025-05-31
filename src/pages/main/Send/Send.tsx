@@ -7,6 +7,7 @@ import {
   defaultReceiveState,
   defaultSendState,
   GREATER_EXPONENT_DEFAULT,
+  InputStatus,
   LOCAL_CHAIN_REGISTRY,
   NetworkLevel,
   ROUTES,
@@ -97,6 +98,8 @@ export const Send = () => {
     entries: { sendObject: any; isSuccess?: boolean }[];
   }>({ isSimulation: false, entries: [] });
   const [lastEditTime, setLastEditTime] = useState<number>(0);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendErrorStatus, setSendErrorStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
 
   const handleTransactionError = (errorMessage: string) => {
     const onPage = userIsOnPage();
@@ -505,6 +508,8 @@ export const Send = () => {
 
         updateSendAmount(newSendAmount);
         updateReceiveAmount(newReceiveAmount);
+        setSendError(`Amount exceeded available balance.`);
+        setSendErrorStatus(InputStatus.WARNING);
       } else {
         const newReceiveAmount = sendAmount * (exchangeRate || 1);
         updateReceiveAmount(newReceiveAmount);
@@ -536,6 +541,11 @@ export const Send = () => {
 
       if (verifiedSendAmount !== sendAmount) {
         updateSendAmount(verifiedSendAmount);
+
+        if (!isNaN(sendAmount) && !isNaN(verifiedSendAmount)) {
+          setSendError(`Amount exceeded available balance.`);
+          setSendErrorStatus(InputStatus.WARNING);
+        }
       }
 
       const applicableExchangeRate =
@@ -565,6 +575,8 @@ export const Send = () => {
 
         updateSendAmount(newSendAmount);
         updateReceiveAmount(adjustedReceiveAmount);
+        setSendError(`Amount exceeded available balance.`);
+        setSendErrorStatus(InputStatus.WARNING);
       } else {
         updateSendAmount(newSendAmount);
       }
@@ -701,12 +713,15 @@ export const Send = () => {
       const now = Date.now();
       const timeSinceLastEdit = now - lastEditTime;
 
-      if (timeSinceLastEdit >= 300) {
+      if (timeSinceLastEdit >= 400) {
         runSimulation();
       } else {
-        const timeout = setTimeout(() => {
-          runSimulation();
-        }, 300 - timeSinceLastEdit);
+        const timeout = setTimeout(
+          () => {
+            runSimulation();
+          },
+          Math.max(500 - timeSinceLastEdit, 100),
+        );
         return () => clearTimeout(timeout);
       }
     }
@@ -757,6 +772,18 @@ export const Send = () => {
   }, [recipientAddress]);
 
   useEffect(() => {
+    if (!sendError) return;
+    const timeout = setTimeout(() => {
+      if (sendError || sendErrorStatus !== InputStatus.NEUTRAL) {
+        setSendError(null);
+        setSendErrorStatus(InputStatus.NEUTRAL);
+      }
+    }, 2000);
+
+    return () => clearTimeout(timeout);
+  }, [sendError]);
+
+  useEffect(() => {
     setUserIsOnPage(true);
     setRecipientAddress(walletState.address);
     setAddressVerified(true);
@@ -801,6 +828,8 @@ export const Send = () => {
           <AssetInput
             placeholder={sendPlaceholder}
             variant="send"
+            status={sendErrorStatus}
+            messageText={sendError || ''}
             assetState={sendState.asset}
             amountState={sendState.amount}
             updateAsset={updateSendAsset}
