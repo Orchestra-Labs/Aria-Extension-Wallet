@@ -144,7 +144,7 @@ export const AssetScrollTile = ({
             </p>
             <p>
               <strong>Staking: </strong>
-              {isStakingEnabled ? 'Available' : 'Unavailable'}
+              {isStakingEnabled || isStablecoinStakingEnabled ? 'Available' : 'Unavailable'}
             </p>
             {/*
               TODO: include information such as...
