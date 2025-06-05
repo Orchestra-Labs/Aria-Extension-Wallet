@@ -155,3 +155,33 @@ export const stakeStablecoin = async ({
     throw error;
   }
 };
+
+export const unstakeStablecoin = async ({
+  body,
+  feeDenom,
+}: {
+  body: StablecoinStakeParams;
+  feeDenom: string;
+}): Promise<any> => {
+  const messages = [
+    {
+      typeUrl: CHAIN_ENDPOINTS.stablecoinUnstake,
+      value: body,
+    },
+  ];
+
+  try {
+    const response = await queryRpcNode({
+      endpoint: CHAIN_ENDPOINTS.stablecoinUnstake,
+      messages,
+      feeDenom,
+    });
+
+    console.log('Stable-Staking: unstake', response);
+
+    return response;
+  } catch (error) {
+    console.error('Error unstaking stablecoin:', error);
+    throw error;
+  }
+};
