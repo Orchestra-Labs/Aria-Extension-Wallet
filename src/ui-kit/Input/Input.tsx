@@ -24,6 +24,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   onMax?: () => void;
   onEndButtonClick?: () => void;
   endButtonTitle?: string;
+  endButtonClassName?: string;
   addClearMaxMargin?: boolean;
 }
 
@@ -51,6 +52,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onEndButtonClick,
       endButtonTitle = '',
       addClearMaxMargin = false,
+      endButtonClassName,
       ...props
     },
     ref,
@@ -163,7 +165,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               {showEndButton && (
                 <Button
                   size="sm"
-                  className="ml-2 px-2 py-1 rounded-md w-16"
+                  className={cn('ml-2 px-2 py-1 rounded-md w-16', endButtonClassName)}
                   disabled={disableButtons}
                   onClick={onEndButtonClick}
                 >

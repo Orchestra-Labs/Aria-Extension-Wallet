@@ -26,6 +26,7 @@ interface AssetInputProps {
   endButtonTitle?: string;
   className?: string;
   addClearMaxMargin?: boolean;
+  endButtonClassName?: string;
 }
 
 export const AssetInput: React.FC<AssetInputProps> = ({
@@ -48,6 +49,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   endButtonTitle = '',
   className,
   addClearMaxMargin = false,
+  endButtonClassName,
   ...props
 }) => {
   const [localInputValue, setLocalInputValue] = useState<string>('');
@@ -185,8 +187,14 @@ export const AssetInput: React.FC<AssetInputProps> = ({
           showClearAndMax={showClearAndMax}
           showEndButton={showEndButton}
           disableButtons={disableButtons}
-          onClear={onClear}
-          onMax={onMax}
+          onClear={() => {
+            inputRef.current?.focus();
+            !!onClear && onClear();
+          }}
+          onMax={() => {
+            inputRef.current?.focus();
+            !!onMax && onMax();
+          }}
           onEndButtonClick={onEndButtonClick}
           endButtonTitle={endButtonTitle}
           addClearMaxMargin={addClearMaxMargin}
@@ -196,6 +204,7 @@ export const AssetInput: React.FC<AssetInputProps> = ({
               ? 'text-white mx-1'
               : 'text-white border border-neutral-2 rounded-md w-full h-10',
           )}
+          endButtonClassName={endButtonClassName}
           {...props}
         />
       </div>
