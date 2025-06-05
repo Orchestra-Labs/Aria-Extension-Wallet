@@ -27,23 +27,20 @@ module.exports = {
     'simple-import-sort',
     'import',
     'react-refresh',
-    'unused-imports'
+    'unused-imports',
   ],
   ignorePatterns: ['dist'],
   rules: {
-    'react-refresh/only-export-components': [
+    'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    'no-unused-vars': 'off',
+    'unused-imports/no-unused-imports': 'error',
+    'unused-imports/no-unused-vars': [
       'warn',
-      { allowConstantExport: true },
-    ],
-    "no-unused-vars": "off",
-    "unused-imports/no-unused-imports": "error",
-    "unused-imports/no-unused-vars": [
-      "warn",
       {
-        "vars": "all",
-        "varsIgnorePattern": "^_",
-        "args": "after-used",
-        "argsIgnorePattern": "^_",
+        vars: 'all',
+        varsIgnorePattern: '^_',
+        args: 'after-used',
+        argsIgnorePattern: '^_',
       },
     ],
     'react-hooks/rules-of-hooks': 'error',
@@ -78,7 +75,7 @@ module.exports = {
   },
   settings: {
     react: {
-      version: 'detect'
+      version: 'detect',
     },
     'import/extensions': ['.js', '.jsx', '.ts', '.tsx'],
     'import/parsers': {
@@ -96,5 +93,5 @@ module.exports = {
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
       },
     },
-  }
-}
+  },
+};

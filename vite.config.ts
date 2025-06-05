@@ -55,6 +55,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/cogwheel-rest/, ''),
       },
+      '/testlocal-rpc': {
+        target: 'http://34.67.182.102:26657',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/testlocal-rpc/, ''),
+      },
+      '/testlocal-rest': {
+        target: 'http://34.67.182.102:1317',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/testlocal-rest/, ''),
+      },
     },
   },
 

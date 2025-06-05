@@ -88,21 +88,26 @@ export const DEFAULT_ASSET = LOCAL_ASSET_REGISTRY.note;
 export const CHAIN_NODES = {
   symphonytestnet: [
     {
-      rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
-      rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',
-      provider: 'Kleomedes',
+      rpc: `${DEV_PROXY}/testlocal-rpc`,
+      rest: `${DEV_PROXY}/testlocal-rest`,
+      provider: 'localtest',
     },
-    /*nodeshub has tx indexing disabled, this is a good way to test errors, but not for production
-    {
-      rpc: isDev ? `${DEV_PROXY}/nodeshub-rpc` : 'https://symphony.test.rpc.nodeshub.online',
-      rest: isDev ? `${DEV_PROXY}/nodeshub-rest` : 'https://symphony.test.api.nodeshub.online',
-      provider: 'Nodes Hub',
-    },*/
-    {
-      rpc: isDev ? `${DEV_PROXY}/cogwheel-rpc` : 'https://symphony-testnet-rpc.cogwheel.zone',
-      rest: isDev ? `${DEV_PROXY}/cogwheel-rest` : 'https://symphony-testnet-api.cogwheel.zone',
-      provider: 'Cogwheel',
-    },
+    // {
+    //   rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
+    //   rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',
+    //   provider: 'Kleomedes',
+    // },
+    // /*nodeshub has tx indexing disabled, this is a good way to test errors, but not for production
+    // {
+    //   rpc: isDev ? `${DEV_PROXY}/nodeshub-rpc` : 'https://symphony.test.rpc.nodeshub.online',
+    //   rest: isDev ? `${DEV_PROXY}/nodeshub-rest` : 'https://symphony.test.api.nodeshub.online',
+    //   provider: 'Nodes Hub',
+    // },*/
+    // {
+    //   rpc: isDev ? `${DEV_PROXY}/cogwheel-rpc` : 'https://symphony-testnet-rpc.cogwheel.zone',
+    //   rest: isDev ? `${DEV_PROXY}/cogwheel-rest` : 'https://symphony-testnet-api.cogwheel.zone',
+    //   provider: 'Cogwheel',
+    // },
   ],
 };
 
@@ -125,6 +130,15 @@ export const CHAIN_ENDPOINTS = {
   sendIbcMessage: '/cosmos/tx/v1beta1/txs',
   getModuleAccounts: '/cosmos/auth/v1beta1/module_accounts',
   getTobinTaxRate: '/symphony/treasury/v1beta1/tax_rate',
+  stablecoinStakingParams: '/symphony/stablestaking/v1beta1/params',
+  stablecoinStakingStablePool: '/symphony/stablestaking/v1beta1/stable_pool',
+  stablecoinStakingStablePools: '/symphony/stablestaking/v1beta1/stable_pools',
+  stablecoinStakingUserStake: '/symphony/stablestaking/v1beta1/user_stake',
+  stablecoinStakingUserTotalStake: '/symphony/stablestaking/v1beta1/user_total_stake',
+  stablecoinStakingUserTotalUnbounding: '/symphony/stablestaking/v1beta1/user_total_unbonding',
+  stablecoinStakingUserUnbounding: '/symphony/stablestaking/v1beta1/user_unbonding',
+  stablecoinStake: '/symphony/stablestaking/v1beta1/stake_tokens',
+  stablecoinUnstake: '/symphony/stablestaking/v1beta1/unstake_tokens',
 };
 
 type LocalChainRegistryType = {
