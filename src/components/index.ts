@@ -27,3 +27,4 @@ export * from './ValidatorSelectDialog';
 export * from './WalletSuccessScreen';
 export * from './WCProposalButtons';
 export * from './WCProposalMetadata';
+export * from './StablecoinStakeDialog';
