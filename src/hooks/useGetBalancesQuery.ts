@@ -14,7 +14,7 @@ export type RequestParams = {
 
 const getBalancesRequest = async ({ walletAddress }: RequestParams) => {
   // Use queryNode to try querying balances across nodes
-  const response = await queryRestNode({
+  const response = await queryRestNode<BalancesResponseDto>({
     endpoint: `${CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
   });
 

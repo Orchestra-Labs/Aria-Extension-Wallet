@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Asset } from '@/types';
+import { Asset, RESTResponse } from '@/types';
 import {
   LOCAL_ASSET_REGISTRY,
   DEFAULT_ASSET,
@@ -40,7 +40,7 @@ export const useExchangeAssets = () => {
       const defaultAsset = DEFAULT_ASSET;
       const sendAsset = sendState.asset;
 
-      const response = (await queryRestNode({
+      const response = (await queryRestNode<ExchangeRequirementResponse>({
         endpoint: `${CHAIN_ENDPOINTS.exchangeRequirements}`,
         queryType: 'GET',
       })) as unknown as ExchangeRequirementResponse;
@@ -65,7 +65,7 @@ export const useExchangeAssets = () => {
       let adjustmentRate = 1;
       // If sendAsset is different from DEFAULT_ASSET, get the exchange rate from sendAsset to DEFAULT_ASSET
       if (sendAsset.denom !== defaultAsset.denom) {
-        const exchangeRateResponse = await queryRestNode({
+        const exchangeRateResponse = await queryRestNode<RESTResponse>({
           endpoint: `${CHAIN_ENDPOINTS.swap}offerCoin=1000000${sendAsset.denom}&askDenom=${defaultAsset.denom}`,
           queryType: 'GET',
         });

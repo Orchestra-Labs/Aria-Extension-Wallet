@@ -8,7 +8,7 @@ type TobinTaxRateResponseDto = {
 };
 
 const getTobinTaxRateRequest = async () => {
-  const response = await queryRestNode({
+  const response = await queryRestNode<TobinTaxRateResponseDto>({
     endpoint: CHAIN_ENDPOINTS.getTobinTaxRate,
     queryType: 'GET',
   });

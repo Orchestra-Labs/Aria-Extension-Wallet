@@ -8,6 +8,7 @@ import {
   RPCResponse,
   SendObject,
   TransactionResult,
+  TransactionRPCResponse,
 } from '@/types';
 import { CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import { getIBCConnections, ibcConnectionsNeedRefresh, saveIBCConnections } from './dataHelpers';
@@ -164,7 +165,7 @@ export const isIBC = async ({
 export const fetchActiveIBCChannels = async (): Promise<IBCChannel[]> => {
   console.log('Fetching active IBC channels...');
   try {
-    const response = await queryRestNode({
+    const response = await queryRestNode<RPCResponse>({
       endpoint: CHAIN_ENDPOINTS.getIBCConnections,
     });
     console.log('Fetched IBC channels response:', response);
@@ -272,7 +273,7 @@ const sendIBCTransaction = async (
     const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.symphonyAssets);
     console.log('Determined fee denom:', feeDenom);
 
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<TransactionRPCResponse>({
       endpoint,
       messages,
       feeDenom,

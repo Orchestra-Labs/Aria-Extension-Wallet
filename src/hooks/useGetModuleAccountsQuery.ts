@@ -9,7 +9,7 @@ type ModuleAccountsResponseDto = {
 };
 
 const getModuleAccountsRequest = async () => {
-  const response = await queryRestNode({
+  const response = await queryRestNode<ModuleAccountsResponseDto>({
     endpoint: CHAIN_ENDPOINTS.getModuleAccounts,
     queryType: 'GET',
   });

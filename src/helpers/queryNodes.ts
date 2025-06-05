@@ -52,7 +52,7 @@ const performRestQuery = async (
   endpoint: string,
   queryMethod: string,
   queryType: 'POST' | 'GET',
-  params,
+  params?: BodyInit,
 ) => {
   console.log(
     `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
@@ -221,7 +221,7 @@ const queryWithRetry = async <T>({
             simulateOnly,
             fee,
           );
-          return result;
+          return result as T;
         } else {
           const result = await performRestQuery(endpoint, queryMethod, queryType, body);
           return result;
@@ -247,7 +247,7 @@ const queryWithRetry = async <T>({
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
       txHash: lastError?.txHash || 'unknown',
-    };
+    } as unknown as T;
   }
 
   console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);

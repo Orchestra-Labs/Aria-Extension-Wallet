@@ -25,7 +25,7 @@ export const GREATER_EXPONENT_DEFAULT = 6;
 export const MAX_NODES_PER_QUERY = 3;
 // Endpoints for different network operations
 
-const isDev = import.meta.env.DEV;
+// const isDev = import.meta.env.DEV;
 
 const DEV_PROXY = 'http://localhost:5173';
 

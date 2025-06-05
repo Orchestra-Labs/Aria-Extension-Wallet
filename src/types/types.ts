@@ -174,6 +174,12 @@ export interface TransactionSuccess {
   txHash?: string;
 }
 
+//TODO: Temporary REST interface for testing purpose, should be removed
+export interface RESTResponse {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
 export interface RPCResponse {
   code: number;
   txhash?: string;

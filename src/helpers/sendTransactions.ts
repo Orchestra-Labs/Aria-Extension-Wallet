@@ -42,7 +42,7 @@ export const sendTransaction = async (
     const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.symphonyAssets);
     console.log('Fee Denom:', feeDenom);
 
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint,
       messages,
       feeDenom,
@@ -102,7 +102,7 @@ export const multiSendTransaction = async (
   const feeDenom = getValidFeeDenom(sendObjects[0].denom, sendObjects[0].symphonyAssets);
 
   try {
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint,
       messages,
       feeDenom,

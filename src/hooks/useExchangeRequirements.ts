@@ -19,7 +19,7 @@ export const useExchangeRequirements = () => {
     setError(null);
 
     try {
-      const response = (await queryRestNode({
+      const response = (await queryRestNode<ExchangeRequirementsResponse>({
         endpoint: `${CHAIN_ENDPOINTS.exchangeRequirements}`,
         queryType: 'GET',
       })) as unknown as ExchangeRequirementsResponse;

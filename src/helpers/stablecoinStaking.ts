@@ -10,6 +10,7 @@ import {
   StablecoinStakingUserUnbonding,
   StablecoinStakeParams,
 } from '@/types/stablecoin-staking';
+import { RPCResponse } from '@/types';
 
 export const fetchStablecoinStakingParams = async () => {
   try {
@@ -136,7 +137,7 @@ export const stakeStablecoin = async ({
   ];
 
   try {
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint: CHAIN_ENDPOINTS.stablecoinStake,
       messages,
       feeDenom,
@@ -171,7 +172,7 @@ export const unstakeStablecoin = async ({
   ];
 
   try {
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint: CHAIN_ENDPOINTS.stablecoinUnstake,
       messages,
       feeDenom,
