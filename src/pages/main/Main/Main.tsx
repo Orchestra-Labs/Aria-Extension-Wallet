@@ -1,16 +1,19 @@
-import { Swiper, SwiperClass, SwiperSlide } from 'swiper/react';
 import 'swiper/swiper-bundle.css';
-import { BalanceCard, SearchBar, SortDialog, TileScroller } from '@/components';
-import {
-  swiperIndexState,
-  showCurrentValidatorsAtom,
-  showAllAssetsAtom,
-  searchTermAtom,
-} from '@/atoms';
-import { useEffect, useRef } from 'react';
+
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { Button } from '@/ui-kit';
+import { useEffect, useRef } from 'react';
+import { Swiper, SwiperClass, SwiperSlide } from 'swiper/react';
+
+import {
+  searchTermAtom,
+  showAllAssetsAtom,
+  showCurrentValidatorsAtom,
+  swiperIndexState,
+} from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { BalanceCard, SearchBar, SortDialog, TileScroller } from '@/components';
+import { Button } from '@/ui-kit';
+
 import { EditCoinListScreen } from '../EditCoinListScreen';
 import { SwapTutorial } from '../SwapTutorial';
 

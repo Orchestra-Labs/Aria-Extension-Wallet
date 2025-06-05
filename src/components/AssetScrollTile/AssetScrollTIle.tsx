@@ -13,7 +13,9 @@ import {
   selectedCoinListAtom,
   receiveStateAtom,
 } from '@/atoms/';
-import { formatBalanceDisplay } from '@/helpers';
+import { cn, formatBalanceDisplay } from '@/helpers';
+import { useStablecoinStaking } from '@/hooks/useStablecoinStaking.ts';
+import { StablecoinStakeDialog } from '@/components';
 
 interface AssetScrollTileProps {
   asset: Asset;
@@ -87,6 +89,12 @@ export const AssetScrollTile = ({
       ? asset.denom === currentState.asset.denom
       : asset.denom === dialogSelectedAsset.denom;
 
+  const { params } = useStablecoinStaking();
+
+  const isStablecoinStakingEnabled = params?.supported_tokens?.includes(asset.denom);
+
+  const isStakingEnabled = asset.denom === DEFAULT_ASSET.denom;
+
   return (
     <>
       {isSelectable ? (
@@ -134,29 +142,41 @@ export const AssetScrollTile = ({
               <strong>Sub-unit: </strong>
               {asset.denom}
             </p>
-            {/* 
+            <p>
+              <strong>Staking: </strong>
+              {isStakingEnabled ? 'Available' : 'Unavailable'}
+            </p>
+            {/*
               TODO: include information such as...
               is stakeable,
-              is IBC, 
-              is Token or native, 
-              native chain, 
-              current chain, 
-              native to which application, 
-              price, 
-              website, 
-              etc 
+              is IBC,
+              is Token or native,
+              native chain,
+              current chain,
+              native to which application,
+              price,
+              website,
+              etc
             */}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col items-center justify-center grid grid-cols-3 w-full gap-x-4 px-2">
+          <div
+            className={cn(
+              'items-center justify-center grid  w-full gap-x-4 px-2',
+              isStakingEnabled || isStablecoinStakingEnabled ? 'grid-cols-3' : 'grid-cols-2',
+            )}
+          >
             <Button size="medium" className={'w-full'} onClick={handleSendClick}>
               Send
             </Button>
             <ReceiveDialog buttonSize="medium" asset={asset} />
-            <Button size="medium" className={'w-full'} onClick={() => setActiveIndex(1)}>
-              Stake
-            </Button>
+            {isStablecoinStakingEnabled && <StablecoinStakeDialog asset={asset} />}
+            {isStakingEnabled && !isStablecoinStakingEnabled && (
+              <Button size="medium" className={'w-full'} onClick={() => setActiveIndex(1)}>
+                Stake
+              </Button>
+            )}
           </div>
         </SlideTray>
       )}

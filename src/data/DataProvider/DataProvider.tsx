@@ -12,6 +12,7 @@ import { getWalletByID } from '@/helpers/dataHelpers/account';
 import { useExchangeAssets } from '@/hooks';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
+import { useGetStableStakeParamsQuery } from '@/queries/stablecoin-staking/useGetStableStakeParams.query';
 
 export const DataProvider: React.FC<{}> = ({}) => {
   const [walletAssets] = useAtom(walletAssetsAtom);
@@ -26,6 +27,8 @@ export const DataProvider: React.FC<{}> = ({}) => {
   const setExchangeAssets = useSetAtom(symphonyAssetsAtom);
 
   const sendState = useAtomValue(sendStateAtom);
+
+  useGetStableStakeParamsQuery();
 
   useEffect(() => {
     if (isInitialDataLoad) {
