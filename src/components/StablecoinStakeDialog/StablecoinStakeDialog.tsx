@@ -4,30 +4,33 @@ import React, { useMemo, useState } from 'react';
 import { walletStateAtom } from '@/atoms';
 import { AssetInput } from '@/components';
 import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
-import { formatDuration } from '@/helpers';
+import { convertToGreaterUnit, formatBalanceDisplay, formatDuration } from '@/helpers';
 import { useStablecoinStaking } from '@/hooks/useStablecoinStaking';
 import { useGetStableStakeStablePoolQuery } from '@/queries';
 import { Asset } from '@/types';
 import { Button, SlideTray } from '@/ui-kit';
+import { useToast } from '@/hooks';
 
 interface StablecoinStakeDialog {
   asset: Asset;
 }
 
+const DEFAULT_AMOUNT = 0;
+
 export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }) => {
-  console.log('!@asset', asset);
   const { address, assets } = useAtomValue(walletStateAtom);
 
-  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake'>('stake');
-  const [amount, setAmount] = useState<number>(0);
+  const { toast } = useToast();
 
-  const { params, handleStake, handleUnstake, isLoading } = useStablecoinStaking();
+  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake'>('stake');
+  const [amount, setAmount] = useState<number>(DEFAULT_AMOUNT);
+
+  const { params, handleStake, handleUnstake, isLoading } = useStablecoinStaking(asset.denom);
   const { data: stablePoolInfo } = useGetStableStakeStablePoolQuery(asset.denom);
 
   const handleStablecoinStake = async () => {
     const adjustedAmount = (
-      parseFloat('1') *
-      Math.pow(10, LOCAL_ASSET_REGISTRY[asset.denom].exponent || GREATER_EXPONENT_DEFAULT)
+      amount * Math.pow(10, asset.exponent || GREATER_EXPONENT_DEFAULT)
     ).toFixed(0);
 
     await handleStake({
@@ -36,7 +39,15 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
         amount: adjustedAmount,
         denom: asset.denom,
       },
+    }).then(() => {
+      toast({
+        title: `Stablecoin stake success!`,
+        description: `You staked ${amount} ${asset.symbol}`,
+        duration: 5000,
+      });
     });
+
+    setAmount(DEFAULT_AMOUNT);
   };
 
   console.log('selectedAction', selectedAction);
@@ -52,7 +63,15 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
         amount: adjustedAmount,
         denom: asset.denom,
       },
+    }).then(() => {
+      toast({
+        title: `Stablecoin unstake success!`,
+        description: `You unstaked ${amount} ${asset.symbol}`,
+        duration: 5000,
+      });
     });
+
+    setAmount(DEFAULT_AMOUNT);
   };
 
   const onMaxAmountClick = () => {
@@ -71,6 +90,16 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
     return formatDuration(params?.unbonding_duration || '');
   }, [params]);
 
+  const totalStaked = useMemo(() => {
+    if (!stablePoolInfo?.pool?.total_staked) {
+      return `0 ${asset.symbol}`;
+    }
+    return formatBalanceDisplay(
+      convertToGreaterUnit(parseFloat(stablePoolInfo?.pool?.total_staked), 6).toFixed(6),
+      asset.symbol!,
+    );
+  }, [asset.symbol, stablePoolInfo?.pool?.total_staked]);
+
   return (
     <SlideTray
       triggerComponent={
@@ -85,9 +114,7 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
     >
       <div className="flex flex-col items-center">
         <p className="text-base text-neutral-1 my-1">Staked Balance</p>
-        <h2 className="text-h3 text-blue font-bold line-clamp-1">
-          {stablePoolInfo?.pool?.total_staked ?? 0} {asset.symbol}
-        </h2>
+        <h2 className="text-h3 text-blue font-bold line-clamp-1">{totalStaked}</h2>
         <span className="mt-1 text-grey-dark text-xs text-base">
           Unstaking period <span className="text-warning">{unstakingPeriod}</span>
         </span>
@@ -111,28 +138,26 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
             Unstake
           </Button>
         </div>
-        {!isLoading && (selectedAction === 'stake' || selectedAction === 'unstake') && (
-          <div className="mt-4 flex flex-col items-center w-full">
-            <AssetInput
-              placeholder={`Enter ${selectedAction} amount`}
-              variant="stake"
-              assetState={DEFAULT_ASSET}
-              amountState={amount}
-              updateAmount={newAmount => setAmount(newAmount)}
-              reducedHeight
-              showClearAndMax
-              showEndButton
-              disableButtons={isLoading}
-              onClear={() => setAmount(0)}
-              onMax={onMaxAmountClick}
-              endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
-              onEndButtonClick={() => {
-                selectedAction === 'stake' ? handleStablecoinStake() : handleStablecoinUnstake();
-              }}
-              endButtonClassName="min-h-8"
-            />
-          </div>
-        )}
+        <div className="mt-4 flex flex-col items-center w-full">
+          <AssetInput
+            placeholder={`Enter ${selectedAction} amount`}
+            variant="stake"
+            assetState={DEFAULT_ASSET}
+            amountState={amount}
+            updateAmount={newAmount => setAmount(newAmount)}
+            reducedHeight
+            showClearAndMax
+            showEndButton
+            disableButtons={isLoading}
+            onClear={() => setAmount(0)}
+            onMax={onMaxAmountClick}
+            endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+            onEndButtonClick={() => {
+              selectedAction === 'stake' ? handleStablecoinStake() : handleStablecoinUnstake();
+            }}
+            endButtonClassName="min-h-8"
+          />
+        </div>
       </div>
     </SlideTray>
   );

@@ -1,16 +1,16 @@
 import { CHAIN_ENDPOINTS } from '@/constants';
 import { queryRestNode, queryRpcNode } from '@/helpers/queryNodes';
+import { RPCResponse } from '@/types';
 import {
+  StablecoinStakeParams,
+  StablecoinStakingParams,
   StablecoinStakingStablePool,
   StablecoinStakingStablePools,
-  StablecoinStakingParams,
   StablecoinStakingUserStake,
   StablecoinStakingUserTotalStake,
   StablecoinStakingUserTotalUnbondings,
   StablecoinStakingUserUnbonding,
-  StablecoinStakeParams,
 } from '@/types/stablecoin-staking';
-import { RPCResponse } from '@/types';
 
 export const fetchStablecoinStakingParams = async () => {
   try {
@@ -56,13 +56,13 @@ export const fetchStablecoinStakingStablePools =
 
 export const fetchStablecoinStakingUserStake = async ({
   address,
-  token,
+  denom,
 }: {
   address: string;
-  token: string;
+  denom: string;
 }): Promise<StablecoinStakingUserStake> => {
   try {
-    const endpoint = `${CHAIN_ENDPOINTS.stablecoinStakingUserStake}?address=${address}&token=${token}`;
+    const endpoint = `${CHAIN_ENDPOINTS.stablecoinStakingUserStake}?address=${address}&denom=${denom}`;
     const response = await queryRestNode<StablecoinStakingUserStake>({ endpoint });
     console.log('Stable-Staking: user stake info', response);
 
@@ -128,26 +128,27 @@ export const stakeStablecoin = async ({
 }: {
   body: StablecoinStakeParams;
   feeDenom: string;
-}): Promise<any> => {
+}): Promise<RPCResponse> => {
+  const endpoint = CHAIN_ENDPOINTS.stablecoinStake;
+
   const messages = [
     {
-      typeUrl: CHAIN_ENDPOINTS.stablecoinStake,
-      value: body,
+      typeUrl: endpoint,
+      value: {
+        staker: body.staker,
+        amount: body.amount,
+      },
     },
   ];
 
   try {
     const response = await queryRpcNode<RPCResponse>({
-      endpoint: CHAIN_ENDPOINTS.stablecoinStake,
-      messages,
-      feeDenom,
+      endpoint,
+      messages: messages,
+      feeDenom: feeDenom,
+      simulateOnly: false,
     });
-    // const response = await queryRestNode({
-    //   endpoint: CHAIN_ENDPOINTS.stablecoinStake,
-    //   queryType: 'POST',
-    //   body: JSON.stringify(body),
-    //   feeDenom,
-    // });
+
     console.log('Stable-Staking: stake', response);
 
     return response;
@@ -163,7 +164,7 @@ export const unstakeStablecoin = async ({
 }: {
   body: StablecoinStakeParams;
   feeDenom: string;
-}): Promise<any> => {
+}): Promise<RPCResponse> => {
   const messages = [
     {
       typeUrl: CHAIN_ENDPOINTS.stablecoinUnstake,

@@ -1,44 +1,52 @@
+import { useQueryClient } from '@tanstack/react-query';
+
+import { LOCAL_ASSET_REGISTRY } from '@/constants';
+import { useRefreshData } from '@/hooks/useRefreshData';
+import { useStablecoinUnstakeMutation } from '@/queries';
 import { useGetStableStakeParamsQuery } from '@/queries/stablecoin-staking/useGetStableStakeParams.query';
-import { useAtomValue } from 'jotai';
-import { symphonyAssetsAtom, walletStateAtom } from '@/atoms';
-import { useGetStableStakeUserTotalStakeQuery, useStablecoinUnstakeMutation } from '@/queries';
 import { useStablecoinStakeMutation } from '@/queries/stablecoin-staking/useStablecoinStake.mutation';
 import { StablecoinStakeParams } from '@/types/stablecoin-staking';
-import { getValidFeeDenom } from '@/helpers/feeDenom';
 
-export const useStablecoinStaking = () => {
-  const { address } = useAtomValue(walletStateAtom);
-  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
+export const useStablecoinStaking = (denom = '') => {
+  const queryClient = useQueryClient();
+
+  const { refreshData } = useRefreshData();
 
   const { data: stakingParamsData } = useGetStableStakeParamsQuery();
-  const data = useGetStableStakeUserTotalStakeQuery(address);
 
-  const { mutateAsync: stakeStablecoin, isPending: isPendingStake } = useStablecoinStakeMutation();
+  const handleSuccessTransaction = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['stablecoin-staking-stable-pool', denom] });
+
+    await refreshData({ validator: false });
+  };
+
+  const { mutateAsync: stakeStablecoin, isPending: isPendingStake } = useStablecoinStakeMutation({
+    onSuccess: handleSuccessTransaction,
+  });
   const { mutateAsync: unstakeStablecoin, isPending: isPendingUnstake } =
-    useStablecoinUnstakeMutation();
-
-  console.log('Stable Staking: User Total Stake', data);
+    useStablecoinUnstakeMutation({
+      onSuccess: handleSuccessTransaction,
+    });
 
   const handleStake = async (body: StablecoinStakeParams) => {
     try {
-      const feeDenom = getValidFeeDenom(body.amount.denom, symphonyAssets);
-      console.log('Fee Denom:', feeDenom);
+      const feeDenom = LOCAL_ASSET_REGISTRY.note.denom;
 
       await stakeStablecoin({ body, feeDenom });
-      console.log('Stake successful');
     } catch (error) {
       console.error('Stake failed', error);
+      throw error;
     }
   };
 
   const handleUnstake = async (body: StablecoinStakeParams) => {
     try {
-      const feeDenom = getValidFeeDenom(body.amount.denom, symphonyAssets);
+      const feeDenom = LOCAL_ASSET_REGISTRY.note.denom;
 
       await unstakeStablecoin({ body, feeDenom });
-      console.log('Unstake successful');
     } catch (error) {
       console.error('Unstake failed', error);
+      throw error;
     }
   };
 
