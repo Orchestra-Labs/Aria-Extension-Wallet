@@ -142,6 +142,7 @@ export interface CombinedStakingInfo {
   validator: ValidatorInfo;
   rewards: ValidatorReward['rewards'];
   stakingParams?: StakingParams | null;
+  commission: string;
   estimatedReturn?: string;
   votingPower?: string;
   uptime?: string;
@@ -307,4 +308,20 @@ export interface ModuleAccount {
 
 export interface CustomQueryOptions {
   enabled?: boolean;
+}
+
+export interface Intent {
+  action: 'send' | 'receive' | 'stake' | 'unstake' | 'claim' | 'claimAndRestake' | 'swap';
+  amount: number | 'all';
+  coin: { name?: string; symbol?: string; denom?: string };
+  resultAmount?: number;
+  resultCoin?: string;
+  target?:
+    | string
+    | {
+        operator_address: string;
+        moniker: string;
+        commission: string;
+      };
+  unitReference?: 'coin' | 'denom';
 }

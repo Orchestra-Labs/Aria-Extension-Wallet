@@ -6,6 +6,7 @@ export * from './ConnectedServicesDialog';
 export * from './CreatePasswordForm';
 export * from './Header';
 export * from './Loader';
+export * from './MicrophoneButton';
 export * from './OptionsDialog';
 export * from './PairingTile';
 export * from './PoolStatusBlock';

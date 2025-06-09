@@ -435,20 +435,28 @@ export const ValidatorScrollTile = ({
       }
     }
 
-    const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
-    secondarySubtitle = `${votingPower || 0}%`;
-
     // if (uptime < 80) {
     //   subtitleStatus = TextFieldStatus.ERROR;
     // } else if (uptime < 90) {
     //   subtitleStatus = TextFieldStatus.WARN;
     // }
 
-    if (votingPower > 1.5) {
-      secondarySubtitleStatus = TextFieldStatus.ERROR;
-    } else if (votingPower > 1.25) {
+    const validatorCommission =
+      parseFloat(combinedStakingInfo.validator.commission.commission_rates.rate) * 100;
+    secondarySubtitle = `${validatorCommission.toFixed(2)}% Fee`;
+    if (validatorCommission > 5 && validatorCommission <= 7.5) {
       secondarySubtitleStatus = TextFieldStatus.WARN;
+    } else if (validatorCommission > 7.5) {
+      secondarySubtitleStatus = TextFieldStatus.ERROR;
     }
+
+    // const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
+    // secondarySubtitle = `${votingPower || 0}%`;
+    // if (votingPower > 1.5) {
+    //   secondarySubtitleStatus = TextFieldStatus.ERROR;
+    // } else if (votingPower > 1.25) {
+    //   secondarySubtitleStatus = TextFieldStatus.WARN;
+    // }
   }
 
   useEffect(() => {

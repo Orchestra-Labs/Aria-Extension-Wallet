@@ -30,7 +30,7 @@ export enum ValidatorSortType {
   DELEGATION = 'delegation',
   REWARDS = 'rewards',
   APY = 'apy',
-  VOTING_POWER = 'votingPower',
+  COMMISSION = 'commission',
 }
 
 export enum IBCConnectionState {

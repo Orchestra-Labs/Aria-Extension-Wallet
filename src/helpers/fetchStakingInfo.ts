@@ -329,6 +329,7 @@ export const fetchValidatorData = async (
         },
         rewards: rewardInfo?.rewards || [],
         stakingParams,
+        commission: (commissionRate * 100).toFixed(2),
         estimatedReturn: estimatedReturn.toFixed(2),
         votingPower: votingPower,
         // uptime: uptime,

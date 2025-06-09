@@ -1,6 +1,6 @@
 import { Swiper, SwiperClass, SwiperSlide } from 'swiper/react';
 import 'swiper/swiper-bundle.css';
-import { BalanceCard, SearchBar, SortDialog, TileScroller } from '@/components';
+import { BalanceCard, MicrophoneButton, SearchBar, SortDialog, TileScroller } from '@/components';
 import {
   swiperIndexState,
   showCurrentValidatorsAtom,
@@ -169,6 +169,8 @@ export const Main = () => {
         <TileScroller activeIndex={activeIndex} />
 
         <SearchBar />
+
+        <MicrophoneButton />
       </div>
     </div>
   );

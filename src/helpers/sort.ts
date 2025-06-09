@@ -121,10 +121,15 @@ export function filterAndSortValidators(
         valueB = parseFloat(b.estimatedReturn ?? '0');
         break;
 
-      case ValidatorSortType.VOTING_POWER:
-        valueA = parseFloat(a.votingPower ?? '0');
-        valueB = parseFloat(b.votingPower ?? '0');
+      case ValidatorSortType.COMMISSION:
+        valueA = parseFloat(a.commission ?? '0');
+        valueB = parseFloat(b.commission ?? '0');
         break;
+
+      // case ValidatorSortType.VOTING_POWER:
+      //   valueA = parseFloat(a.votingPower ?? '0');
+      //   valueB = parseFloat(b.votingPower ?? '0');
+      //   break;
     }
 
     return sortOrder === 'Asc' ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
