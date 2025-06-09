@@ -5,14 +5,14 @@ import { StablecoinStakingUserStake } from '@/types/stablecoin-staking';
 
 export const useGetStableStakeUserStakeQuery = ({
   address,
-  token,
+  denom,
 }: {
   address: string;
-  token: string;
+  denom: string;
 }) => {
   return useQuery<StablecoinStakingUserStake, Error>({
-    queryKey: ['stablecoin-staking-user-stake', address, token],
-    queryFn: () => fetchStablecoinStakingUserStake({ address, token }),
+    queryKey: ['stablecoin-staking-user-stake', address, denom],
+    queryFn: () => fetchStablecoinStakingUserStake({ address, denom }),
     staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
     gcTime: 1000 * 60 * 30, // Keep data in cache for 30 minutes
   });
