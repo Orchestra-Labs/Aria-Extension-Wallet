@@ -137,8 +137,8 @@ export const CHAIN_ENDPOINTS = {
   stablecoinStakingUserTotalStake: '/symphony/stablestaking/v1beta1/user_total_stake',
   stablecoinStakingUserTotalUnbounding: '/symphony/stablestaking/v1beta1/user_total_unbonding',
   stablecoinStakingUserUnbounding: '/symphony/stablestaking/v1beta1/user_unbonding',
-  stablecoinStake: '/symphony/stablestaking/v1beta1/stake_tokens',
-  stablecoinUnstake: '/symphony/stablestaking/v1beta1/unstake_tokens',
+  stablecoinStake: '/symphony.stablestaking.v1beta1.MsgStakeTokens',
+  stablecoinUnstake: '/symphony.stablestaking.v1beta1.MsgUnstakeTokens',
 };
 
 type LocalChainRegistryType = {

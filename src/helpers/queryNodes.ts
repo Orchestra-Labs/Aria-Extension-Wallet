@@ -1,4 +1,5 @@
 import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
+import { getSigningSymphonyClientOptions } from 'symphonyjs-local/symphony/client';
 
 import {
   CHAIN_NODES,
@@ -211,8 +212,14 @@ const queryWithRetry = async <T>({
           const mnemonic = sessionToken.mnemonic;
           const address = await getAddress(mnemonic);
           const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
-          console.log('%%%%%%%%%%%%%%%');
+
+          const { registry, aminoTypes } = getSigningSymphonyClientOptions();
+
+          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner, {
+            registry,
+            aminoTypes,
+          });
+
           const result = await performRpcQuery(
             client,
             address,
@@ -221,6 +228,7 @@ const queryWithRetry = async <T>({
             simulateOnly,
             fee,
           );
+
           return result as T;
         } else {
           const result = await performRestQuery(endpoint, queryMethod, queryType, body);

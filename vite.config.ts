@@ -8,10 +8,19 @@ export default defineConfig({
   define: {
     global: 'window',
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      // Node.js global to browser globalThis
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       buffer: 'buffer/',
+      'symphonyjs-local': path.resolve(__dirname, './symphonyjs-local/esm'),
     },
   },
   plugins: [react(), viteTsconfigPaths()],
