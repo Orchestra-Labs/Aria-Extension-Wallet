@@ -156,11 +156,10 @@ export const Main = () => {
           ) : (
             <>
               <span className="w-[3.5rem]">Logo</span>
-              {/* <span>{showCurrentValidators ? 'Delegations' : 'Uptime'}</span> */}
-              <span>Delegations</span>
+              <span>{showCurrentValidators ? 'Title / Status' : 'Title / Uptime'}</span>
               <span className="flex-1"></span>
               <span className="flex-1 text-right">
-                {showCurrentValidators ? 'Rewards' : 'APY / Vote %'}
+                {showCurrentValidators ? 'Rewards' : 'APR / Vote %'}
               </span>
             </>
           )}

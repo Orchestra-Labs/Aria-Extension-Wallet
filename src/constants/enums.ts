@@ -29,8 +29,9 @@ export enum ValidatorSortType {
   NAME = 'name',
   DELEGATION = 'delegation',
   REWARDS = 'rewards',
-  APY = 'apy',
-  COMMISSION = 'commission',
+  APR = 'apr',
+  VOTING_POWER = 'votingPower',
+  UPTIME = 'uptime',
 }
 
 export enum IBCConnectionState {

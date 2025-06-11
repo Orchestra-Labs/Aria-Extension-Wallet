@@ -9,6 +9,7 @@ interface ScrollTileProps {
   value: string;
   icon?: React.ReactNode;
   status?: TextFieldStatus;
+  valueStatus?: TextFieldStatus;
   selected?: boolean;
   subtitleStatus?: TextFieldStatus;
   secondarySubtitleStatus?: TextFieldStatus;
@@ -22,6 +23,7 @@ export const ScrollTile = ({
   value,
   icon,
   status = TextFieldStatus.GOOD,
+  valueStatus = TextFieldStatus.GOOD,
   selected = false,
   subtitleStatus = TextFieldStatus.GOOD,
   secondarySubtitleStatus = TextFieldStatus.GOOD,
@@ -29,6 +31,7 @@ export const ScrollTile = ({
 }: ScrollTileProps) => {
   const formattedTitle = truncateString(title, 10);
   const textColor = selectTextColorByStatus(status);
+  const valueColor = selectTextColorByStatus(valueStatus);
   const subtitleColor = selectTextColorByStatus(subtitleStatus, 'text-neutral-1');
   const secondarySubtitleColor = selectTextColorByStatus(secondarySubtitleStatus, 'text-neutral-1');
 
@@ -55,11 +58,11 @@ export const ScrollTile = ({
       </div>
       <div className="flex-1" />
       {!secondarySubtitle && (
-        <div className="text-white text-h6 line-clamp-1 select-none">{value}</div>
+        <div className={`${valueColor} text-h6 line-clamp-1 select-none`}>{value}</div>
       )}
       {secondarySubtitle && (
         <div className="flex flex-col ml-3 select-none">
-          <h6 className={`text-base ${textColor} text-right line-clamp-1 select-none`}>{value}</h6>
+          <h6 className={`text-base ${valueColor} text-right line-clamp-1 select-none`}>{value}</h6>
           <div className={`text-xs ${secondarySubtitleColor} text-right line-clamp-1 select-none`}>
             {secondarySubtitle}
           </div>
