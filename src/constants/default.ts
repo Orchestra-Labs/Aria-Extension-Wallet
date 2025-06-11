@@ -27,7 +27,7 @@ export const MAX_NODES_PER_QUERY = 3;
 
 // const isDev = import.meta.env.DEV;
 
-const DEV_PROXY = 'http://localhost:5173';
+// const DEV_PROXY = 'http://localhost:5173';
 
 // Define the shape of the local asset registry
 type AssetRegistry = {
@@ -87,27 +87,32 @@ export const DEFAULT_ASSET = LOCAL_ASSET_REGISTRY.note;
 
 export const CHAIN_NODES = {
   symphonytestnet: [
+    {
+      rpc: 'https://symphony-rpc.kleomedes.network',
+      rest: 'https://symphony-api.kleomedes.network',
+      provider: 'Kleomedes',
+    },
     // {
     //   rpc: `${DEV_PROXY}/testlocal-rpc`,
     //   rest: `${DEV_PROXY}/testlocal-rest`,
     //   provider: 'localtest',
     // },
-    {
-      rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
-      rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',
-      provider: 'Kleomedes',
-    },
+    // {
+    //   rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
+    //   rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',
+    //   provider: 'Kleomedes',
+    // },
     /*nodeshub has tx indexing disabled, this is a good way to test errors, but not for production
     {
       rpc: isDev ? `${DEV_PROXY}/nodeshub-rpc` : 'https://symphony.test.rpc.nodeshub.online',
       rest: isDev ? `${DEV_PROXY}/nodeshub-rest` : 'https://symphony.test.api.nodeshub.online',
       provider: 'Nodes Hub',
     },*/
-    {
-      rpc: isDev ? `${DEV_PROXY}/cogwheel-rpc` : 'https://symphony-testnet-rpc.cogwheel.zone',
-      rest: isDev ? `${DEV_PROXY}/cogwheel-rest` : 'https://symphony-testnet-api.cogwheel.zone',
-      provider: 'Cogwheel',
-    },
+    // {
+    //   rpc: isDev ? `${DEV_PROXY}/cogwheel-rpc` : 'https://symphony-testnet-rpc.cogwheel.zone',
+    //   rest: isDev ? `${DEV_PROXY}/cogwheel-rest` : 'https://symphony-testnet-api.cogwheel.zone',
+    //   provider: 'Cogwheel',
+    // },
   ],
 };
 

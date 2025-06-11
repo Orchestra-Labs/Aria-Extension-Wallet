@@ -5,7 +5,7 @@ import {
   LOCAL_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRpcNode } from './queryNodes';
-import { DelegationResponse, RPCResponse, TransactionResult } from '@/types';
+import { DelegationResponse, TransactionResult } from '@/types';
 import { fetchRewards } from './fetchStakingInfo';
 
 const MAX_MESSAGES_PER_BATCH = 15;
@@ -75,7 +75,7 @@ export const claimRewards = async (
   });
 
   try {
-    const response = await queryRpcNode<RPCResponse>({
+    const response = await queryRpcNode({
       endpoint,
       messages,
       simulateOnly,
@@ -238,7 +238,7 @@ export const stakeToValidator = async (
   });
 
   try {
-    const response = await queryRpcNode<RPCResponse>({
+    const response = await queryRpcNode({
       endpoint,
       messages,
       simulateOnly,
@@ -303,7 +303,7 @@ export const claimAndUnstake = async ({
       });
 
   // Simulate first
-  const simulationResult = await queryRpcNode<RPCResponse>({
+  const simulationResult = await queryRpcNode({
     endpoint,
     messages,
     simulateOnly: true,
@@ -329,7 +329,7 @@ export const claimAndUnstake = async ({
   }
 
   // Execute transaction
-  const executionResult = await queryRpcNode<RPCResponse>({
+  const executionResult = await queryRpcNode({
     endpoint,
     messages,
     simulateOnly: false,

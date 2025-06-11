@@ -1,17 +1,14 @@
-import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
-import { getSigningSymphonyClientOptions } from 'symphonyjs-local/symphony/client';
-
 import {
   CHAIN_NODES,
   DELAY_BETWEEN_NODE_ATTEMPTS,
   LOCAL_ASSET_REGISTRY,
   MAX_NODES_PER_QUERY,
 } from '@/constants';
-import { RPCResponse } from '@/types';
-
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
+import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
+import { RPCResponse } from '@/types';
+import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 
@@ -53,7 +50,6 @@ const performRestQuery = async (
   endpoint: string,
   queryMethod: string,
   queryType: 'POST' | 'GET',
-  params?: BodyInit,
 ) => {
   console.log(
     `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
@@ -61,7 +57,7 @@ const performRestQuery = async (
 
   const response = await fetch(`${queryMethod}${endpoint}`, {
     method: queryType,
-    body: queryType === 'POST' ? params : null,
+    body: null,
     headers: { 'Content-Type': 'application/json' },
   });
 
@@ -162,7 +158,7 @@ export const performRpcQuery = async (
   }
 };
 
-const queryWithRetry = async <T>({
+const queryWithRetry = async ({
   endpoint,
   useRPC = false,
   queryType = 'GET',
@@ -170,7 +166,6 @@ const queryWithRetry = async <T>({
   feeDenom,
   simulateOnly = false,
   fee,
-  body,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -182,8 +177,7 @@ const queryWithRetry = async <T>({
     amount: { denom: string; amount: string }[];
     gas: string;
   };
-  body?: BodyInit;
-}): Promise<T> => {
+}): Promise<RPCResponse> => {
   console.log('Querying with retry...');
   console.log('Endpoint:', endpoint);
   console.log('Use RPC:', useRPC);
@@ -212,13 +206,7 @@ const queryWithRetry = async <T>({
           const mnemonic = sessionToken.mnemonic;
           const address = await getAddress(mnemonic);
           const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-
-          const { registry, aminoTypes } = getSigningSymphonyClientOptions();
-
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner, {
-            registry,
-            aminoTypes,
-          });
+          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
 
           const result = await performRpcQuery(
             client,
@@ -228,10 +216,9 @@ const queryWithRetry = async <T>({
             simulateOnly,
             fee,
           );
-
-          return result as T;
+          return result;
         } else {
-          const result = await performRestQuery(endpoint, queryMethod, queryType, body);
+          const result = await performRestQuery(endpoint, queryMethod, queryType);
           return result;
         }
       } catch (error) {
@@ -255,7 +242,7 @@ const queryWithRetry = async <T>({
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
       txHash: lastError?.txHash || 'unknown',
-    } as unknown as T;
+    };
   }
 
   console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);
@@ -264,26 +251,23 @@ const queryWithRetry = async <T>({
   );
 };
 
-export const queryRestNode = async <T>({
+export const queryRestNode = async ({
   endpoint,
   queryType = 'GET',
   feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
-  body,
 }: {
   endpoint: string;
   queryType?: 'GET' | 'POST';
   feeDenom?: string;
-  body?: BodyInit;
 }) =>
-  queryWithRetry<T>({
+  queryWithRetry({
     endpoint,
     useRPC: false,
     queryType,
     feeDenom,
-    body,
   });
 
-export const queryRpcNode = async <T>({
+export const queryRpcNode = async ({
   endpoint,
   messages,
   feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
@@ -299,7 +283,7 @@ export const queryRpcNode = async <T>({
     gas: string;
   };
 }) =>
-  queryWithRetry<T>({
+  queryWithRetry({
     endpoint,
     useRPC: true,
     messages,
