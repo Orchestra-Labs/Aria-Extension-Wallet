@@ -1,26 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { usePermission } from 'react-use';
 import { Button } from '@/ui-kit';
-import { MicIcon, SquareIcon, PlayIcon } from 'lucide-react';
+import { MicIcon, SquareIcon } from 'lucide-react';
 import { openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
 import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom } from '@/atoms';
+import { useRefreshData } from '@/hooks';
 
 export const MicrophoneButton: React.FC = () => {
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const { refreshData } = useRefreshData();
+
   const [micStatus, setMicStatus] = useState<'neutral' | 'granted' | 'denied'>('neutral');
   const [isRecording, setIsRecording] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [intent, setIntent] = useState<Intent | null>(null);
+  const [, setAudioUrl] = useState<string | null>(null);
+  const [, setTranscript] = useState<string | null>(null);
+  const [, setIntent] = useState<Intent | null>(null);
 
   const wallet = useAtomValue(walletStateAtom);
   const validators = useAtomValue(validatorDataAtom);
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
-
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const permissionState = usePermission({ name: 'microphone' });
   const micGranted = permissionState === 'granted';
@@ -60,12 +62,16 @@ export const MicrophoneButton: React.FC = () => {
 
         if (data.parsedIntent) {
           setIntent(data.parsedIntent);
-          void handleIntent(data.parsedIntent as Intent, {
+          const result = await handleIntent(data.parsedIntent as Intent, {
             address: wallet?.address || '',
             walletAssets: wallet?.assets || [],
             validators: validators || [],
             symphonyAssets: symphonyAssets || [],
           });
+
+          if (result) {
+            await refreshData({ address: wallet?.address });
+          }
         } else {
           setIntent(null);
         }
@@ -144,7 +150,7 @@ export const MicrophoneButton: React.FC = () => {
         )}
       </Button>
 
-      {audioUrl && (
+      {/* {audioUrl && (
         <div className="flex flex-col items-center space-y-1">
           <audio controls src={audioUrl} className="mt-2" />
           <Button size="tiny" variant="ghost" onClick={() => new Audio(audioUrl).play()}>
@@ -163,7 +169,7 @@ export const MicrophoneButton: React.FC = () => {
         <pre className="text-xs text-blue-400 max-w-xs whitespace-pre-wrap break-words text-left">
           <strong>Intent:</strong> {JSON.stringify(intent, null, 2)}
         </pre>
-      )}
+      )} */}
 
       {micStatus === 'granted' && (
         <span className="text-xs text-green-500">Microphone enabled</span>
