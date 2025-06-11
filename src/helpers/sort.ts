@@ -116,14 +116,19 @@ export function filterAndSortValidators(
         valueB = b.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
         break;
 
-      case ValidatorSortType.APY:
-        valueA = parseFloat(a.estimatedReturn ?? '0');
-        valueB = parseFloat(b.estimatedReturn ?? '0');
+      case ValidatorSortType.APR:
+        valueA = parseFloat(a.theoreticalApr ?? '0');
+        valueB = parseFloat(b.theoreticalApr ?? '0');
         break;
 
       case ValidatorSortType.VOTING_POWER:
         valueA = parseFloat(a.votingPower ?? '0');
         valueB = parseFloat(b.votingPower ?? '0');
+        break;
+
+      case ValidatorSortType.UPTIME:
+        valueA = parseFloat(a.uptime ?? '0');
+        valueB = parseFloat(b.uptime ?? '0');
         break;
     }
 

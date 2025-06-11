@@ -8,8 +8,10 @@ import { queryRpcNode } from './queryNodes';
 import { DelegationResponse, TransactionResult } from '@/types';
 import { fetchRewards } from './fetchStakingInfo';
 
+const MAX_MESSAGES_PER_BATCH = 15;
+
 // TODO: verify multiple messages add fees from queryNodes properly.  shouldn't need magic number below
-export const buildClaimMessage = ({
+export const buildStakingMessage = ({
   endpoint,
   delegatorAddress,
   validatorAddress,
@@ -66,7 +68,7 @@ export const claimRewards = async (
   const validatorAddressesArray = Array.isArray(validatorAddress)
     ? validatorAddress
     : [validatorAddress];
-  const messages = buildClaimMessage({
+  const messages = buildStakingMessage({
     endpoint,
     delegatorAddress,
     validatorAddress: validatorAddressesArray,
@@ -83,37 +85,27 @@ export const claimRewards = async (
       return {
         success: false,
         message: 'No response received from transaction',
-        data: {
-          code: 1,
-        },
+        data: { code: 1 },
       };
     }
 
     if (simulateOnly) {
-      return {
-        success: true,
-        message: 'Simulation successful',
-        data: response,
-      };
+      return { success: true, message: 'Simulation successful', data: response };
     }
 
-    return {
-      success: true,
-      message: 'Transaction successful',
-      data: response,
-    };
+    return { success: true, message: 'Transaction successful', data: response };
   } catch (error) {
     console.error('Error claiming rewards:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error occurred',
-      data: {
-        code: 1,
-      },
+      data: { code: 1 },
     };
   }
 };
 
+// TOOD: this properly handles mass messages.  expand the solution to the others
+// TODO: ensure this sends back a sum of all batches when simulating
 export const claimAndRestake = async (
   delegations: DelegationResponse | DelegationResponse[],
   rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[],
@@ -125,7 +117,6 @@ export const claimAndRestake = async (
   const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
 
   try {
-    // Fetch rewards if not provided
     const validatorRewards =
       rewards ||
       (await fetchRewards(
@@ -133,84 +124,87 @@ export const claimAndRestake = async (
         validatorAddresses.map(addr => ({ validator_address: addr })),
       ));
 
-    const hasRewards = validatorRewards.some(
-      reward => parseFloat(reward.rewards[0]?.amount || '0') > 0,
-    );
-
-    if (!hasRewards) {
-      return { success: false, message: 'No rewards to claim', data: { code: 1 } };
-    }
-
-    // Use buildClaimMessage to create claim messages
-    const claimMessages = buildClaimMessage({
+    const claimMessages = buildStakingMessage({
       endpoint: CHAIN_ENDPOINTS.claimRewards,
       delegatorAddress,
       validatorAddress: validatorAddresses,
     });
 
-    // Use buildClaimMessage for delegate messages as well
-    const delegateMessages = validatorRewards.flatMap(reward =>
-      buildClaimMessage({
+    const delegateMessages = validatorRewards.flatMap(reward => {
+      const [firstReward] = reward.rewards || [];
+      if (!firstReward || !firstReward.amount || !firstReward.denom) return [];
+
+      return buildStakingMessage({
         endpoint: delegateEndpoint,
         delegatorAddress,
         validatorAddress: reward.validator,
-        amount: reward.rewards[0].amount.split('.')[0],
-        denom: reward.rewards[0].denom,
-      }),
-    );
+        amount: firstReward.amount.split('.')[0],
+        denom: firstReward.denom,
+      });
+    });
 
-    // Combine messages for a single transaction
     const batchedMessages = [...claimMessages, ...delegateMessages];
 
-    // First simulate to get the gas estimation
-    const simulationResult = await queryRpcNode({
-      endpoint: delegateEndpoint,
-      messages: batchedMessages,
-      simulateOnly: true,
-    });
-
-    if (!simulationResult || simulationResult.code !== 0) {
-      return {
-        success: false,
-        message: 'Simulation failed or insufficient gas estimation',
-        data: simulationResult,
-      };
+    const messageChunks = [];
+    for (let i = 0; i < batchedMessages.length; i += MAX_MESSAGES_PER_BATCH) {
+      messageChunks.push(batchedMessages.slice(i, i + MAX_MESSAGES_PER_BATCH));
     }
-
-    const estimatedGas = parseFloat(simulationResult.gasWanted || '0') * 1.1;
-    const feeAmount = Math.ceil(estimatedGas * 0.025);
 
     if (simulateOnly) {
+      const simulation = await queryRpcNode({
+        endpoint: delegateEndpoint,
+        messages: messageChunks[0],
+        simulateOnly: true,
+      });
+
       return {
-        success: true,
-        message: 'Simulation successful',
-        data: simulationResult,
+        success: !!simulation && simulation.code === 0,
+        message: simulation?.code === 0 ? 'Simulation successful' : 'Simulation failed',
+        data: simulation,
       };
     }
 
-    // Execute the transaction with estimated gas and fee from simulation
-    const executionResult = await queryRpcNode({
-      endpoint: delegateEndpoint,
-      messages: batchedMessages,
-      simulateOnly: false,
-      fee: {
-        amount: [{ denom: DEFAULT_ASSET.denom, amount: feeAmount.toFixed(0) }],
-        gas: estimatedGas.toFixed(0),
-      },
-    });
+    for (const messages of messageChunks) {
+      const simulation = await queryRpcNode({
+        endpoint: delegateEndpoint,
+        messages,
+        simulateOnly: true,
+      });
 
-    if (!executionResult || executionResult.code !== 0) {
-      return {
-        success: false,
-        message: 'Transaction failed',
-        data: executionResult,
-      };
+      if (!simulation || simulation.code !== 0) {
+        return {
+          success: false,
+          message: 'Simulation failed or insufficient gas estimation',
+          data: simulation,
+        };
+      }
+
+      const estimatedGas = parseFloat(simulation.gasWanted || '0') * 1.1;
+      const feeAmount = Math.ceil(estimatedGas * 0.025);
+
+      const result = await queryRpcNode({
+        endpoint: delegateEndpoint,
+        messages,
+        simulateOnly: false,
+        fee: {
+          amount: [{ denom: DEFAULT_ASSET.denom, amount: feeAmount.toFixed(0) }],
+          gas: estimatedGas.toFixed(0),
+        },
+      });
+
+      if (!result || result.code !== 0) {
+        return {
+          success: false,
+          message: 'Transaction failed',
+          data: result,
+        };
+      }
     }
 
     return {
       success: true,
       message: 'Transaction successful',
-      data: executionResult,
+      data: { code: 0 },
     };
   } catch (error) {
     console.error('Error during claim and restake:', error);
@@ -235,7 +229,7 @@ export const stakeToValidator = async (
     Math.pow(10, LOCAL_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
   ).toFixed(0);
 
-  const messages = buildClaimMessage({
+  const messages = buildStakingMessage({
     endpoint,
     delegatorAddress: walletAddress,
     validatorAddress,
@@ -272,6 +266,7 @@ export const stakeToValidator = async (
   }
 };
 
+// NOTE: Cosmos unstaking automatically claims rewards
 export const claimAndUnstake = async ({
   delegations,
   amount,
@@ -286,16 +281,9 @@ export const claimAndUnstake = async ({
   const delegatorAddress = delegationsArray[0].delegation.delegator_address;
   const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
 
-  // Build claim reward messages
-  const claimMessages = buildClaimMessage({
-    endpoint: CHAIN_ENDPOINTS.claimRewards,
-    delegatorAddress,
-    validatorAddress: validatorAddresses,
-  });
-
   // Build undelegate messages
-  const unstakeMessages = amount
-    ? buildClaimMessage({
+  const messages = amount
+    ? buildStakingMessage({
         endpoint,
         delegatorAddress,
         validatorAddress: validatorAddresses[0],
@@ -309,12 +297,10 @@ export const claimAndUnstake = async ({
         ).toFixed(0),
         denom: delegationsArray[0].balance.denom,
       })
-    : buildClaimMessage({
+    : buildStakingMessage({
         endpoint,
         delegations: delegationsArray,
       });
-
-  const messages = [...claimMessages, ...unstakeMessages];
 
   // Simulate first
   const simulationResult = await queryRpcNode({

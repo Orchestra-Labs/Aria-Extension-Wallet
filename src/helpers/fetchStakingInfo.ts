@@ -1,13 +1,54 @@
 import {
   CombinedStakingInfo,
   DelegationResponse,
+  MintModuleParams,
+  SigningInfo,
+  SlashingParams,
   StakingParams,
   UnbondingDelegationResponse,
   ValidatorInfo,
 } from '@/types';
 import { queryRestNode } from './queryNodes';
 import { BondStatus, CHAIN_ENDPOINTS } from '@/constants';
-// import { fromBase64, toBech32 } from '@cosmjs/encoding';
+import { fromBase64, toBech32 } from '@cosmjs/encoding';
+import { sha256 } from '@cosmjs/crypto';
+
+const defaultValidatorInfo: ValidatorInfo = {
+  operator_address: '',
+  consensus_pubkey: { '@type': '', key: '' },
+  jailed: false,
+  status: BondStatus.UNBONDED,
+  tokens: '0',
+  delegator_shares: '0',
+  description: {
+    moniker: '',
+    website: '',
+    details: '',
+  },
+  commission: {
+    commission_rates: {
+      rate: '0',
+      max_rate: '0',
+      max_change_rate: '0',
+    },
+  },
+};
+
+const defaultDelegation = {
+  delegator_address: '',
+  validator_address: '',
+  shares: '',
+};
+
+const defaultBalance = {
+  denom: '',
+  amount: '0',
+};
+
+const defaultUnbonding = {
+  balance: '',
+  completion_time: '',
+};
 
 export const fetchUnbondingDelegations = async (
   delegatorAddress: string,
@@ -84,27 +125,6 @@ export const fetchDelegations = async (
     console.error(`Error fetching delegations for ${delegatorAddress}:`, error);
     throw error;
   }
-};
-
-const defaultValidatorInfo: ValidatorInfo = {
-  operator_address: '',
-  consensus_pubkey: { '@type': '', key: '' },
-  jailed: false,
-  status: BondStatus.UNBONDED,
-  tokens: '0',
-  delegator_shares: '0',
-  description: {
-    moniker: '',
-    website: '',
-    details: '',
-  },
-  commission: {
-    commission_rates: {
-      rate: '0',
-      max_rate: '0',
-      max_change_rate: '0',
-    },
-  },
 };
 
 export const fetchAllValidators = async (bondStatus?: BondStatus): Promise<ValidatorInfo[]> => {
@@ -226,132 +246,174 @@ export const fetchStakingParams = async (): Promise<StakingParams | null> => {
   }
 };
 
-// const fetchUptimeForValidator = async (validatorAddress: string): Promise<number> => {
-//   try {
-//     const endpoint = `${CHAIN_ENDPOINTS.getUptime}${validatorAddress}`;
-//     console.log('querying for uptime from:', endpoint);
+const fetchAllSigningInfos = async (): Promise<SigningInfo[]> => {
+  let allInfos: SigningInfo[] = [];
+  let nextKey: string | null = null;
 
-//     const response = await queryRestNode({ endpoint });
+  do {
+    const endpoint = `${CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
+    const response = await queryRestNode({ endpoint });
 
-//     console.log('Uptime Response:', response);
+    const infos = response?.info ?? [];
+    allInfos = allInfos.concat(infos);
+    console.log('Fetched signing infos:', infos.length, 'Total accumulated:', allInfos.length);
 
-//     const missedBlocks = parseInt(response.val_signing_info.missed_blocks_counter, 10);
-//     const totalBlocks = parseInt(response.val_signing_info.index_offset, 10);
+    nextKey = response.pagination?.next_key ?? null;
+  } while (nextKey !== null && nextKey !== '0');
 
-//     if (isNaN(missedBlocks) || isNaN(totalBlocks) || totalBlocks === 0) {
-//       console.error(`Invalid data for validator ${validatorAddress}. Setting uptime to 0%`);
-//       return 0;
-//     }
+  return allInfos;
+};
 
-//     const uptime = ((totalBlocks - missedBlocks) / totalBlocks) * 100;
-//     return uptime;
-//   } catch (error) {
-//     console.error(`Error fetching uptime for validator ${validatorAddress}:`, error);
-//     return 0;
-//   }
-// };
+const fetchInflation = async (): Promise<number> => {
+  try {
+    const [epochRes, paramsRes, poolRes] = await Promise.all([
+      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintEpochProvisions }),
+      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintParams }),
+      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool }),
+    ]);
 
-// // TODO: move to utils
-// const convertPubKeyToValConsAddress = (pubKey: string, prefix: string = 'symphonyvalcons') => {
-//   const decodedPubKey = fromBase64(pubKey);
-//   const valConsAddress = toBech32(prefix, decodedPubKey);
-//   return valConsAddress;
-// };
+    const mintParams = paramsRes.params as unknown as MintModuleParams;
+
+    const epochProvisions = parseFloat(epochRes.epoch_provisions || '0');
+    const stakingProportion = parseFloat(mintParams.distribution_proportions.staking || '0');
+    const bondedTokens = parseFloat(poolRes.pool?.bonded_tokens || '1');
+
+    const yearlyStakingProvisions = epochProvisions * 52 * stakingProportion;
+    const inflation = yearlyStakingProvisions / bondedTokens;
+
+    return inflation;
+  } catch (error) {
+    console.error('Error calculating inflation from Symphony mint module:', error);
+    return 0;
+  }
+};
+
+const fetchCommunityTax = async (): Promise<number> => {
+  const res: any = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getDistributionParams });
+  const tax = parseFloat(res.params?.community_tax || '0');
+  return tax;
+};
+
+const fetchBondedRatio = async (): Promise<number> => {
+  const res = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool });
+
+  const bonded = parseFloat(res.pool?.bonded_tokens || '0');
+  const notBonded = parseFloat(res.pool?.not_bonded_tokens || '0');
+  const ratio = bonded / (bonded + notBonded);
+
+  return ratio;
+};
+
+const convertPubKeyToValConsAddress = (pubKey: string, prefix = 'symphonyvalcons') => {
+  const decoded = fromBase64(pubKey);
+  const hashed = sha256(decoded).slice(0, 20);
+  return toBech32(prefix, hashed);
+};
+
+const calculateAPR = (inflation: number, tax: number, ratio: number, commission: number) =>
+  ((inflation * (1 - tax)) / ratio) * (1 - commission) * 100;
+
+const buildUptimeMap = (
+  validators: ValidatorInfo[],
+  signingInfos: SigningInfo[],
+  signedBlocksWindow: number,
+): Record<string, string> => {
+  const signingInfoMap = signingInfos.reduce<Record<string, number>>((acc, info) => {
+    acc[info.address] = parseInt(info.missed_blocks_counter || '0');
+    return acc;
+  }, {});
+
+  return validators.reduce<Record<string, string>>((acc, validator) => {
+    const pubKey = validator.consensus_pubkey?.key;
+    if (!pubKey || validator.jailed) {
+      acc[validator.operator_address] = '0.00';
+      return acc;
+    }
+
+    const valcons = convertPubKeyToValConsAddress(pubKey);
+    const missed = signingInfoMap[valcons] ?? signedBlocksWindow;
+    const uptime = ((signedBlocksWindow - missed) / signedBlocksWindow) * 100;
+
+    acc[validator.operator_address] = uptime.toFixed(2);
+    return acc;
+  }, {});
+};
 
 export const fetchValidatorData = async (
   delegatorAddress: string,
 ): Promise<CombinedStakingInfo[]> => {
   try {
-    const [validatorResponse, delegationResponse, rewards, stakingParams, unbondingResponse] =
-      await Promise.all([
-        fetchValidators(),
-        fetchDelegations(delegatorAddress),
-        fetchRewards(delegatorAddress),
-        fetchStakingParams(),
-        fetchUnbondingDelegations(delegatorAddress),
-      ]);
+    const [
+      { validators },
+      { delegations },
+      rewards,
+      stakingParams,
+      { delegations: unbondingDelegations },
+      inflation,
+      communityTax,
+      bondedRatio,
+      signingInfos,
+      slashingData,
+    ] = await Promise.all([
+      fetchValidators(),
+      fetchDelegations(delegatorAddress),
+      fetchRewards(delegatorAddress),
+      fetchStakingParams(),
+      fetchUnbondingDelegations(delegatorAddress),
+      fetchInflation(),
+      fetchCommunityTax(),
+      fetchBondedRatio(),
+      fetchAllSigningInfos(),
+      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getSlashingParams }),
+    ]);
 
-    const validators = validatorResponse.validators;
-    const delegations = delegationResponse.delegations;
-    const unbondingDelegations = unbondingResponse.delegations;
     const totalTokens = validators.reduce((sum, v) => sum + parseFloat(v.tokens), 0);
+    const signedBlocksWindow = parseInt(
+      (slashingData.params as unknown as SlashingParams).signed_blocks_window || '10000',
+    );
 
-    // TODO: fix this.  currently not creating correct signer address
-    // const uptimePromises = [validators[0]].map(validator => {
-    //   const signingAddress = convertPubKeyToValConsAddress(
-    //     validator.consensus_pubkey.key,
-    //     'symphonyvalcons',
-    //   );
-    //   console.log(`Validator: ${validator.description.moniker}`);
-    //   console.log(`Key: ${validator.consensus_pubkey.key}`);
-    //   console.log(`Signing Address: ${signingAddress}`);
-    //   return validator.status === BondStatus.BONDED ? fetchUptimeForValidator(signingAddress) : 0;
-    // });
-    // const uptimeResults = await Promise.all(uptimePromises);
-    // const uptimeMap = validators.reduce<Record<string, string>>((acc, validator, index) => {
-    //   acc[validator.operator_address] = uptimeResults[index].toFixed(2);
-    //   return acc;
-    // }, {});
+    const uptimeMap = buildUptimeMap(validators, signingInfos, signedBlocksWindow);
 
-    const combinedData: CombinedStakingInfo[] = validators.map(validator => {
-      const delegationInfo = delegations.find(
-        delegation => delegation.delegation.validator_address === validator.operator_address,
-      );
-      const rewardInfo = rewards.find(reward => reward.validator === validator.operator_address);
+    return validators.map(validator => {
+      const validatorAddress = validator.operator_address;
 
-      const unbondingInfo = unbondingDelegations.find(
-        unbonding =>
-          unbonding.delegator_address === delegatorAddress &&
-          unbonding.validator_address === validator.operator_address,
+      const delegation = delegations.find(d => d.delegation.validator_address === validatorAddress);
+      const rewardInfo = rewards.find(r => r.validator === validatorAddress);
+      const unbonding = unbondingDelegations.find(
+        u => u.validator_address === validatorAddress && u.delegator_address === delegatorAddress,
       );
 
       const commissionRate = parseFloat(validator.commission.commission_rates.rate);
-      const estimatedReturn = (1 - commissionRate) * 100;
-      const validatorTokens = parseFloat(validator.tokens);
+      const theoreticalApr = calculateAPR(inflation, communityTax, bondedRatio, commissionRate);
 
+      const tokens = parseFloat(validator.tokens);
       const votingPower =
-        validator.status === BondStatus.BONDED
-          ? ((validatorTokens / totalTokens) * 100).toFixed(2)
-          : '0';
+        validator.status === BondStatus.BONDED ? ((tokens / totalTokens) * 100).toFixed(2) : '0';
 
-      // const uptime = uptimeMap[validator.operator_address] || '0.00';
+      const unbondingBalance = unbonding
+        ? {
+            balance: unbonding.entries
+              .reduce((sum, e) => sum + parseFloat(e.balance), 0)
+              .toString(),
+            completion_time: new Date(
+              Math.max(...unbonding.entries.map(e => +new Date(e.completion_time))),
+            ).toISOString(),
+          }
+        : defaultUnbonding;
 
-      const combinedInfo: CombinedStakingInfo = {
+      return {
         validator,
-        delegation: delegationInfo?.delegation || {
-          delegator_address: '',
-          validator_address: '',
-          shares: '',
-        },
-        balance: delegationInfo?.balance || {
-          denom: '',
-          amount: '0',
-        },
+        delegation: delegation?.delegation || defaultDelegation,
+        balance: delegation?.balance || defaultBalance,
         rewards: rewardInfo?.rewards || [],
         stakingParams,
-        estimatedReturn: estimatedReturn.toFixed(2),
-        votingPower: votingPower,
-        // uptime: uptime,
-        unbondingBalance: unbondingInfo
-          ? {
-              balance: unbondingInfo.entries
-                .reduce((total, entry) => total + parseFloat(entry.balance), 0)
-                .toString(),
-              completion_time: unbondingInfo.entries
-                .map(entry => new Date(entry.completion_time))
-                .reduce((latest, current) => (current > latest ? current : latest), new Date(0))
-                .toISOString(),
-            }
-          : {
-              balance: '',
-              completion_time: '',
-            },
+        commission: (commissionRate * 100).toFixed(2),
+        theoreticalApr: theoreticalApr.toFixed(2),
+        votingPower,
+        uptime: uptimeMap[validatorAddress] || '0.00',
+        unbondingBalance,
       };
-
-      return combinedInfo;
     });
-
-    return combinedData;
   } catch (error) {
     console.error('Error fetching validator data:', error);
     throw error;
