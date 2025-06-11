@@ -18,7 +18,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   const [walletAssets] = useAtom(walletAssetsAtom);
   const [isInitialDataLoad, setIsInitialDataLoad] = useAtom(isInitialDataLoadAtom);
   const isFetchingWalletData = useAtomValue(isFetchingWalletDataAtom);
-  const validatorState = useAtomValue(validatorDataAtom);
+  const validatorData = useAtomValue(validatorDataAtom);
   const isFetchingValidatorData = useAtomValue(isFetchingWalletDataAtom);
   const userAccount = useAtomValue(userAccountAtom);
   const setUserWallet = useSetAtom(userWalletAtom);
@@ -35,7 +35,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
       const initialLoadHasCompleted =
         !isFetchingWalletData &&
         !isFetchingValidatorData &&
-        (walletAssets.length > 0 || validatorState.length > 0);
+        (walletAssets.length > 0 || validatorData.length > 0);
 
       if (initialLoadHasCompleted) {
         setIsInitialDataLoad(false);
@@ -46,7 +46,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
     isFetchingWalletData,
     isFetchingValidatorData,
     walletAssets,
-    validatorState,
+    validatorData,
   ]);
 
   useEffect(() => {

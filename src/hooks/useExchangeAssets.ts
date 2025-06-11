@@ -120,10 +120,17 @@ export const useExchangeAssets = () => {
 
       const mergedAssets = [
         ...exchangeAssets,
-        ...additionalAssets.map(walletAsset => ({
-          ...walletAsset,
-          exchangeRate: walletAsset.denom === sendAsset.denom ? '1' : '-',
-        })),
+        ...additionalAssets.map(walletAsset => {
+          const exchangeData = exchangeAssets.find(e => e.denom === walletAsset.denom);
+          return {
+            ...walletAsset,
+            exchangeRate: walletAsset.denom === sendAsset.denom ? '1' : '-',
+            symbol: exchangeData?.symbol ?? walletAsset.symbol,
+            logo: exchangeData?.logo ?? walletAsset.logo,
+            exponent: exchangeData?.exponent ?? walletAsset.exponent,
+            isIbc: exchangeData?.isIbc ?? walletAsset.isIbc,
+          };
+        }),
       ];
 
       console.log('merged assets', mergedAssets);

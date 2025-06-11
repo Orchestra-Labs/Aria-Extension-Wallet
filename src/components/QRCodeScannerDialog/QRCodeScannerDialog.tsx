@@ -1,11 +1,11 @@
-import { BrowserQRCodeReader } from '@zxing/browser';
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
 import { useAtomValue, useSetAtom } from 'jotai';
-import React, { useRef, useState } from 'react';
-import BarcodeScannerComponent from 'react-qr-barcode-scanner';
 import { usePermission } from 'react-use';
+import { bech32 } from 'bech32';
 
 import { QRCode } from '@/assets/icons';
-import { filteredAssetsAtom, recipientAddressAtom } from '@/atoms';
+import { recipientAddressAtom, symphonyAssetsAtom } from '@/atoms';
 import { cn, openMediaOnboardingTab } from '@/helpers';
 import { Asset } from '@/types';
 import { Button, SlideTray } from '@/ui-kit';
@@ -14,97 +14,164 @@ interface QRCodeScannerDialogProps {
   updateReceiveAsset: (asset: Asset, propagateChanges: boolean) => void;
 }
 
+interface AriaQRCode {
+  address: string;
+  denom?: string;
+  amount?: number;
+}
+
 export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ updateReceiveAsset }) => {
   const slideTrayRef = useRef<{ isOpen: () => void; closeWithAnimation: () => void }>(null);
+  const cameraContainerRef = useRef<HTMLDivElement>(null);
+  const html5QrRef = useRef<Html5Qrcode | null>(null);
 
   const setAddress = useSetAtom(recipientAddressAtom);
-  const filteredAssets = useAtomValue(filteredAssetsAtom);
+  const allAssets = useAtomValue(symphonyAssetsAtom);
 
-  const [permissionDenied, setPermissionDenied] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-
-  const cameraPermissionState = usePermission({ name: 'camera' });
-
-  const cameraPermissionGranted = cameraPermissionState === 'granted';
-
-  const qrCodeReader = new BrowserQRCodeReader();
   const [slideTrayIsOpen, setSlideTrayIsOpen] = useState(false);
+  const [scanStatus, setScanStatus] = useState<'neutral' | 'success' | 'error'>('neutral');
+
+  const permissionState = usePermission({ name: 'camera' });
+  const cameraPermissionGranted = permissionState === 'granted';
+
+  const isAriaQrCode = (data: any): data is AriaQRCode => {
+    return (
+      typeof data === 'object' &&
+      typeof data.address === 'string' &&
+      (data.denom === undefined || typeof data.denom === 'string') &&
+      (data.amount === undefined || typeof data.amount === 'number')
+    );
+  };
+
+  const isValidQrData = (text: string): boolean => {
+    try {
+      const parsed = JSON.parse(text);
+      return isAriaQrCode(parsed);
+    } catch {
+      try {
+        bech32.decode(text);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
 
   const handleScan = (result: string | null) => {
-    if (result) {
+    if (!result) {
+      setScanStatus('error');
+      return;
+    }
+
+    if (!isValidQrData(result)) {
+      setScanStatus('error');
+      return;
+    }
+
+    setScanStatus('success');
+
+    try {
+      const parsed = JSON.parse(result);
+      const preferredAsset = allAssets.find(asset => asset.denom === parsed.denom);
+      setAddress(parsed.address);
+      if (preferredAsset) updateReceiveAsset(preferredAsset, true);
+    } catch {
+      setAddress(result);
+    }
+  };
+
+  const decodeImageWithHtml5Qrcode = async (file: File): Promise<string> => {
+    const html5Qr = new Html5Qrcode('temp-html5-file');
+    try {
+      const result = await html5Qr.scanFile(file, true);
+      return result;
+    } finally {
       try {
-        const parsedResult = JSON.parse(result);
-        if (parsedResult.address && parsedResult.denomPreference) {
-          const preferredAsset = filteredAssets.find(
-            asset => asset.denom === parsedResult.denomPreference,
-          );
-
-          setAddress(parsedResult.address);
-          updateReceiveAsset(preferredAsset as Asset, true);
-        } else {
-          setAddress(result);
-        }
-      } catch (err) {
-        setAddress(result);
-      }
-
-      slideTrayRef.current?.closeWithAnimation();
+        await html5Qr.clear();
+      } catch {}
     }
   };
-
-  const handleError = (error: any) => {
-    console.error('QR Scanner Error:', error);
-    if (error.name === 'NotAllowedError') {
-      setPermissionDenied(true);
-    }
-  };
-
-  const onRequestCameraPermission = openMediaOnboardingTab;
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      try {
-        const url = URL.createObjectURL(file);
-        const result = await qrCodeReader.decodeFromImageUrl(url);
-        handleScan(result.getText());
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error scanning file:', error);
-      }
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const resultText = await decodeImageWithHtml5Qrcode(file);
+      handleScan(resultText);
+    } catch (error) {
+      console.error('Error scanning file:', error);
+      setScanStatus('error');
     }
   };
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragOver(false);
-    if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-      const file = event.dataTransfer.files[0];
-      const url = URL.createObjectURL(file);
-      try {
-        const result = await qrCodeReader.decodeFromImageUrl(url);
-        handleScan(result.getText());
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error scanning file:', error);
-      }
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    try {
+      const resultText = await decodeImageWithHtml5Qrcode(file);
+      handleScan(resultText);
+    } catch (error) {
+      console.error('Error scanning file:', error);
+      setScanStatus('error');
     }
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragOver(true);
-  };
+  useEffect(() => {
+    if (!slideTrayIsOpen || !cameraPermissionGranted || !cameraContainerRef.current) return;
 
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
+    const html5Qr = new Html5Qrcode(cameraContainerRef.current.id);
+    html5QrRef.current = html5Qr;
+
+    html5Qr
+      .start({ facingMode: 'environment' }, { fps: 10, qrbox: 200 }, handleScan, () => {})
+      .catch(err => {
+        console.error('Failed to start camera', err);
+      });
+
+    return () => {
+      try {
+        html5Qr.stop();
+        html5Qr.clear();
+      } catch (err) {
+        console.error('Failed to stop/clear scanner:', err);
+      }
+      html5QrRef.current = null;
+    };
+  }, [slideTrayIsOpen, cameraPermissionGranted]);
+
+  useEffect(() => {
+    if (!slideTrayIsOpen) {
+      setScanStatus('neutral');
+    }
+  }, [slideTrayIsOpen]);
+
+  useEffect(() => {
+    if (scanStatus === 'success' || scanStatus === 'error') {
+      const timeout = setTimeout(() => {
+        if (scanStatus === 'success') slideTrayRef.current?.closeWithAnimation();
+        setScanStatus('neutral');
+      }, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [scanStatus]);
 
   const borderColor = isDragOver
-    ? 'border-blue-pressed'
-    : slideTrayIsOpen && !permissionDenied
-      ? 'border-blue'
-      : 'border-neutral-3';
+    ? 'border-blue'
+    : scanStatus === 'success'
+      ? 'border-success'
+      : scanStatus === 'error'
+        ? 'border-error'
+        : 'border-neutral-3';
+
+  const animationClass =
+    scanStatus === 'success'
+      ? 'animate-flash-success'
+      : scanStatus === 'error'
+        ? 'animate-flash-error'
+        : '';
 
   return (
     <SlideTray
@@ -120,52 +187,62 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
       onOpenChange={setSlideTrayIsOpen}
     >
       <div className="flex flex-col items-center space-yt-4 yb-2">
-        {/* Camera View & Drag/Drop Area */}
         <div
-          className={`relative flex justify-center items-center bg-background-black rounded-lg w-[255px] h-[255px]`}
+          className="relative flex justify-center items-center bg-background-black rounded-lg w-[255px] h-[255px]"
           onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
+          onDragOver={e => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
         >
-          {/* Decorative Borders */}
+          {/* Camera container */}
+          <div
+            id="qr-html5-camera"
+            ref={cameraContainerRef}
+            className="w-full h-full overflow-hidden rounded-lg bg-background-black"
+          />
+
+          {/* Corner borders */}
           <div
             className={cn(
-              `absolute top-[-0px] left-[-0px] w-[75px] h-[75px] border-t-4 border-l-4 ${borderColor} rounded-tl-[8px]`,
+              'absolute z-10 top-0 left-0 w-[75px] h-[75px] border-t-4 border-l-4 rounded-tl-[8px]',
+              animationClass,
+              borderColor,
             )}
           />
           <div
             className={cn(
-              `absolute top-[-0px] right-[-0px] w-[75px] h-[75px] border-t-4 border-r-4 ${borderColor} rounded-tr-[8px]`,
+              'absolute z-10 top-0 right-0 w-[75px] h-[75px] border-t-4 border-r-4 rounded-tr-[8px]',
+              animationClass,
+              borderColor,
             )}
           />
           <div
             className={cn(
-              `absolute bottom-[-0px] left-[-0px] w-[75px] h-[75px] border-b-4 border-l-4 ${borderColor} rounded-bl-[8px]`,
+              'absolute z-10 bottom-0 left-0 w-[75px] h-[75px] border-b-4 border-l-4 rounded-bl-[8px]',
+              animationClass,
+              borderColor,
             )}
           />
           <div
             className={cn(
-              `absolute bottom-[-0px] right-[-0px] w-[75px] h-[75px] border-b-4 border-r-4 ${borderColor} rounded-br-[8px]`,
+              'absolute z-10 bottom-0 right-0 w-[75px] h-[75px] border-b-4 border-r-4 rounded-br-[8px]',
+              animationClass,
+              borderColor,
             )}
           />
 
-          {cameraPermissionGranted && (
-            <BarcodeScannerComponent
-              onUpdate={(error, result) => {
-                const textResult = (result as { getText: () => string })?.getText();
-                if (textResult) handleScan(textResult);
-                if (error) handleError(error);
-              }}
-              stopStream={!slideTrayIsOpen}
-            />
-          )}
+          {/* Fallback UI */}
           {!cameraPermissionGranted && (
-            <button className="text-gray-dark text-center" onClick={onRequestCameraPermission}>
-              <span className="text-blue">Enable camera</span> or add file
-            </button>
+            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-auto">
+              <button className="text-gray-dark text-center" onClick={openMediaOnboardingTab}>
+                <span className="text-blue">Enable camera</span> or add file
+              </button>
+            </div>
           )}
         </div>
-        {/* File Explorer Button */}
+
         <Button
           variant="secondary"
           size="small"
@@ -178,7 +255,6 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
           Use File
         </Button>
 
-        {/* Hidden File Input */}
         <input
           id="qr-file-input"
           type="file"
@@ -186,6 +262,8 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
           style={{ display: 'none' }}
           onChange={handleFileSelect}
         />
+
+        <div id="temp-html5-file" style={{ display: 'none' }} />
       </div>
     </SlideTray>
   );
