@@ -50,6 +50,7 @@ const performRestQuery = async (
   endpoint: string,
   queryMethod: string,
   queryType: 'POST' | 'GET',
+  params?: BodyInit,
 ) => {
   console.log(
     `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
@@ -57,7 +58,7 @@ const performRestQuery = async (
 
   const response = await fetch(`${queryMethod}${endpoint}`, {
     method: queryType,
-    body: null,
+    body: queryType === 'POST' ? params : null,
     headers: { 'Content-Type': 'application/json' },
   });
 
@@ -158,7 +159,7 @@ export const performRpcQuery = async (
   }
 };
 
-const queryWithRetry = async ({
+const queryWithRetry = async <T>({
   endpoint,
   useRPC = false,
   queryType = 'GET',
@@ -166,6 +167,7 @@ const queryWithRetry = async ({
   feeDenom,
   simulateOnly = false,
   fee,
+  body,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -177,7 +179,8 @@ const queryWithRetry = async ({
     amount: { denom: string; amount: string }[];
     gas: string;
   };
-}): Promise<RPCResponse> => {
+  body?: BodyInit;
+}): Promise<T> => {
   console.log('Querying with retry...');
   console.log('Endpoint:', endpoint);
   console.log('Use RPC:', useRPC);
@@ -216,9 +219,9 @@ const queryWithRetry = async ({
             simulateOnly,
             fee,
           );
-          return result;
+          return result as T;
         } else {
-          const result = await performRestQuery(endpoint, queryMethod, queryType);
+          const result = await performRestQuery(endpoint, queryMethod, queryType, body);
           return result;
         }
       } catch (error) {
@@ -242,7 +245,7 @@ const queryWithRetry = async ({
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
       txHash: lastError?.txHash || 'unknown',
-    };
+    } as unknown as T;
   }
 
   console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);
@@ -251,23 +254,26 @@ const queryWithRetry = async ({
   );
 };
 
-export const queryRestNode = async ({
+export const queryRestNode = async <T>({
   endpoint,
   queryType = 'GET',
   feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
+  body,
 }: {
   endpoint: string;
   queryType?: 'GET' | 'POST';
   feeDenom?: string;
+  body?: BodyInit;
 }) =>
-  queryWithRetry({
+  queryWithRetry<T>({
     endpoint,
     useRPC: false,
     queryType,
     feeDenom,
+    body,
   });
 
-export const queryRpcNode = async ({
+export const queryRpcNode = async <T>({
   endpoint,
   messages,
   feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
@@ -283,7 +289,7 @@ export const queryRpcNode = async ({
     gas: string;
   };
 }) =>
-  queryWithRetry({
+  queryWithRetry<T>({
     endpoint,
     useRPC: true,
     messages,

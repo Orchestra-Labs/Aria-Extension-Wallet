@@ -7,11 +7,15 @@ type Params = {
   feeDenom: string;
 };
 
+const wrappedUnstakeStablecoin = async (params: Params): Promise<void> => {
+  await unstakeStablecoin(params);
+};
+
 export const useStablecoinUnstakeMutation = (
   options?: UseMutationOptions<void, Error, Params, unknown>,
 ) => {
   return useMutation({
-    mutationFn: unstakeStablecoin,
+    mutationFn: wrappedUnstakeStablecoin,
     ...options,
   });
 };

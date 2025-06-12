@@ -1,6 +1,7 @@
 import {
   CombinedStakingInfo,
   DelegationResponse,
+  RESTResponse,
   MintModuleParams,
   SigningInfo,
   SlashingParams,
@@ -9,7 +10,6 @@ import {
   ValidatorInfo,
 } from '@/types';
 import { queryRestNode } from './queryNodes';
-// import { fromBase64, toBech32 } from '@cosmjs/encoding';
 import { BondStatus, CHAIN_ENDPOINTS } from '@/constants';
 import { fromBase64, toBech32 } from '@cosmjs/encoding';
 import { sha256 } from '@cosmjs/crypto';
@@ -66,7 +66,7 @@ export const fetchUnbondingDelegations = async (
       endpoint += `?pagination.key=${encodeURIComponent(paginationKey)}`;
     }
 
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode<RESTResponse>({ endpoint });
 
     return {
       delegations: (response.unbonding_responses ?? []).map((item: any) => {
@@ -111,7 +111,7 @@ export const fetchDelegations = async (
       endpoint = `${CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/delegations/${validatorAddress}`;
     }
 
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode<RESTResponse>({ endpoint });
 
     return {
       delegations: (response.delegation_responses ?? []).map((item: any) => {
@@ -139,7 +139,7 @@ export const fetchAllValidators = async (bondStatus?: BondStatus): Promise<Valid
         endpoint += `&status=${bondStatus}`;
       }
 
-      const response = await queryRestNode({ endpoint });
+      const response = await queryRestNode<RESTResponse>({ endpoint });
 
       allValidators = allValidators.concat(response.validators ?? []);
 
@@ -160,7 +160,7 @@ export const fetchValidators = async (
   try {
     if (validatorAddress) {
       const endpoint = `${CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
-      const response = await queryRestNode({ endpoint });
+      const response = await queryRestNode<RESTResponse>({ endpoint });
 
       // Filter single validator by bond status if provided
       if (bondStatus && response?.validator?.status !== bondStatus) {
@@ -197,8 +197,8 @@ export const fetchRewards = async (
     // If specific delegations (validators) are provided, query rewards for each validator separately
     if (delegations && delegations.length > 0) {
       const rewardsPromises = delegations.map(async delegation => {
-        const specificEndpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
-        const response = await queryRestNode({ endpoint: specificEndpoint });
+        const endpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
+        const response = await queryRestNode<RESTResponse>({ endpoint });
         return {
           validator: delegation.validator_address,
           rewards: response.rewards || [],
@@ -210,7 +210,7 @@ export const fetchRewards = async (
     }
 
     // Fetch all rewards for the delegator
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode<RESTResponse>({ endpoint });
 
     // Process the response and map rewards for each validator
     return (response.rewards ?? []).map((reward: any) => ({
@@ -226,7 +226,7 @@ export const fetchRewards = async (
 export const fetchStakingParams = async (): Promise<StakingParams | null> => {
   try {
     const endpoint = `${CHAIN_ENDPOINTS.getStakingParams}`;
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode<RESTResponse>({ endpoint });
 
     if (response && 'params' in response) {
       // Convert unbonding_time to days
@@ -252,8 +252,8 @@ const fetchAllSigningInfos = async (): Promise<SigningInfo[]> => {
   let nextKey: string | null = null;
 
   do {
-    const endpoint = `${CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
-    const response = await queryRestNode({ endpoint });
+    const endpoint: string = `${CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
+    const response = await queryRestNode<RESTResponse>({ endpoint });
 
     const infos = response?.info ?? [];
     allInfos = allInfos.concat(infos);
@@ -268,9 +268,9 @@ const fetchAllSigningInfos = async (): Promise<SigningInfo[]> => {
 const fetchInflation = async (): Promise<number> => {
   try {
     const [epochRes, paramsRes, poolRes] = await Promise.all([
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintEpochProvisions }),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintParams }),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool }),
+      queryRestNode<RESTResponse>({ endpoint: CHAIN_ENDPOINTS.getMintEpochProvisions }),
+      queryRestNode<RESTResponse>({ endpoint: CHAIN_ENDPOINTS.getMintParams }),
+      queryRestNode<RESTResponse>({ endpoint: CHAIN_ENDPOINTS.getStakingPool }),
     ]);
 
     const mintParams = paramsRes.params as unknown as MintModuleParams;
@@ -290,13 +290,15 @@ const fetchInflation = async (): Promise<number> => {
 };
 
 const fetchCommunityTax = async (): Promise<number> => {
-  const res: any = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getDistributionParams });
+  const res: any = await queryRestNode<RESTResponse>({
+    endpoint: CHAIN_ENDPOINTS.getDistributionParams,
+  });
   const tax = parseFloat(res.params?.community_tax || '0');
   return tax;
 };
 
 const fetchBondedRatio = async (): Promise<number> => {
-  const res = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool });
+  const res = await queryRestNode<RESTResponse>({ endpoint: CHAIN_ENDPOINTS.getStakingPool });
 
   const bonded = parseFloat(res.pool?.bonded_tokens || '0');
   const notBonded = parseFloat(res.pool?.not_bonded_tokens || '0');
@@ -365,7 +367,7 @@ export const fetchValidatorData = async (
       fetchCommunityTax(),
       fetchBondedRatio(),
       fetchAllSigningInfos(),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getSlashingParams }),
+      queryRestNode<RESTResponse>({ endpoint: CHAIN_ENDPOINTS.getSlashingParams }),
     ]);
 
     const totalTokens = validators.reduce((sum, v) => sum + parseFloat(v.tokens), 0);

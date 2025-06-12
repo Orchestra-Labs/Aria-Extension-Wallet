@@ -5,7 +5,7 @@ import {
   LOCAL_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRpcNode } from './queryNodes';
-import { DelegationResponse, TransactionResult } from '@/types';
+import { DelegationResponse, RPCResponse, TransactionResult } from '@/types';
 import { fetchRewards } from './fetchStakingInfo';
 
 const MAX_MESSAGES_PER_BATCH = 15;
@@ -75,7 +75,7 @@ export const claimRewards = async (
   });
 
   try {
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint,
       messages,
       simulateOnly,
@@ -151,7 +151,7 @@ export const claimAndRestake = async (
     }
 
     if (simulateOnly) {
-      const simulation = await queryRpcNode({
+      const simulation = await queryRpcNode<RPCResponse>({
         endpoint: delegateEndpoint,
         messages: messageChunks[0],
         simulateOnly: true,
@@ -165,7 +165,7 @@ export const claimAndRestake = async (
     }
 
     for (const messages of messageChunks) {
-      const simulation = await queryRpcNode({
+      const simulation = await queryRpcNode<RPCResponse>({
         endpoint: delegateEndpoint,
         messages,
         simulateOnly: true,
@@ -182,7 +182,7 @@ export const claimAndRestake = async (
       const estimatedGas = parseFloat(simulation.gasWanted || '0') * 1.1;
       const feeAmount = Math.ceil(estimatedGas * 0.025);
 
-      const result = await queryRpcNode({
+      const result = await queryRpcNode<RPCResponse>({
         endpoint: delegateEndpoint,
         messages,
         simulateOnly: false,
@@ -238,7 +238,7 @@ export const stakeToValidator = async (
   });
 
   try {
-    const response = await queryRpcNode({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint,
       messages,
       simulateOnly,
@@ -303,7 +303,7 @@ export const claimAndUnstake = async ({
       });
 
   // Simulate first
-  const simulationResult = await queryRpcNode({
+  const simulationResult = await queryRpcNode<RPCResponse>({
     endpoint,
     messages,
     simulateOnly: true,
@@ -329,7 +329,7 @@ export const claimAndUnstake = async ({
   }
 
   // Execute transaction
-  const executionResult = await queryRpcNode({
+  const executionResult = await queryRpcNode<RPCResponse>({
     endpoint,
     messages,
     simulateOnly: false,
