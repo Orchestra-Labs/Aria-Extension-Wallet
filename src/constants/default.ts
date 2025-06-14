@@ -88,10 +88,15 @@ export const DEFAULT_ASSET = LOCAL_ASSET_REGISTRY.note;
 export const CHAIN_NODES = {
   symphonytestnet: [
     {
-      rpc: 'https://symphony-rpc.kleomedes.network',
-      rest: 'https://symphony-api.kleomedes.network',
-      provider: 'Kleomedes',
+      rpc: `http://34.67.182.102:26657`,
+      rest: `http://34.67.182.102:1317`,
+      provider: 'localtest',
     },
+    // {
+    //   rpc: 'https://symphony-rpc.kleomedes.network',
+    //   rest: 'https://symphony-api.kleomedes.network',
+    //   provider: 'Kleomedes',
+    // },
     // {
     //   rpc: `${DEV_PROXY}/testlocal-rpc`,
     //   rest: `${DEV_PROXY}/testlocal-rest`,
