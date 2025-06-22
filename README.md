@@ -20,23 +20,36 @@
 
 ## Setup:
 
+```
 git clone https://github.com/your-org/aria-wallet.git
-
 cd aria-wallet
-
 yarn install
+```
 
 ## Load the Extension in Chrome:
 
-Run yarn build
+1. Run `yarn build`
+2. Open `chrome://extensions`
+3. Enable **Developer mode**
+4. Click **Load unpacked**
+5. Select the `dist/` folder
 
-Open chrome://extensions
+## Publishing to Chrome Web Store
 
-Enable Developer mode
+1. Run `yarn prepare-zip`  
+   This generates `aria-wallet.zip` inside the project root.
+2. Go to the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
+3. Click **“Add a New Item”** or select an existing item to update
+4. Upload the `aria-wallet.zip` file
+5. Fill out the required listing details:
+   - Description
+   - Screenshots
+   - Category
+   - Permissions
+6. Submit for review
+7. Monitor review status in the dashboard. Approval usually takes a few days.
 
-Click Load unpacked
-
-Select the dist/ folder
+> **Note:** Make sure the `manifest.json` includes all required permissions and matches Chrome Web Store policy. Run the extension locally first to verify no runtime errors.
 
 ## Scripts:
 
