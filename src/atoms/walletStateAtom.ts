@@ -40,21 +40,24 @@ export const subscribedAssetsAtom = atom(get => {
 
       const hasCoinSubscriptions = subscription.coinDenoms.length > 0;
 
+      const addVisibleAsset = (denom: string) => {
+        const baseAsset = networkAssets[denom];
+        const walletAsset = walletState.assets.find(wAsset => wAsset.denom === denom);
+
+        if (baseAsset) {
+          visibleAssets.push({
+            ...baseAsset, // includes exchangeRate, symbol, etc.
+            ...(walletAsset ? { amount: walletAsset.amount } : { amount: '0' }),
+          });
+        } else {
+          console.warn(`Asset with denom ${denom} not found in network assets for ${networkID}`);
+        }
+      };
+
       if (hasCoinSubscriptions) {
-        subscription.coinDenoms.forEach(denom => {
-          const asset = networkAssets[denom];
-          if (asset) {
-            const walletAsset = walletState.assets.find(wAsset => wAsset.denom === denom);
-            visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
-          } else {
-            console.warn(`Asset with denom ${denom} not found in network assets for ${networkID}`);
-          }
-        });
+        subscription.coinDenoms.forEach(addVisibleAsset);
       } else {
-        Object.values(symphonyAssets).forEach(asset => {
-          const walletAsset = walletState.assets.find(wAsset => wAsset.denom === asset.denom);
-          visibleAssets.push(walletAsset ? walletAsset : { ...asset, amount: '0' });
-        });
+        symphonyAssets.forEach(asset => addVisibleAsset(asset.denom));
       }
     });
   } else {

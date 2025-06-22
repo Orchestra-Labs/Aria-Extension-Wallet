@@ -30,6 +30,7 @@ import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
 import { useRefreshData, useToast } from '@/hooks';
 import { TransactionResultsTile } from '../TransactionResultsTile';
+import { AlertCircleIcon } from 'lucide-react';
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 interface ValidatorScrollTileProps {
@@ -70,7 +71,8 @@ export const ValidatorScrollTile = ({
     textClass: 'text-error' | 'text-warn' | 'text-blue';
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
 
-  const { validator, delegation, balance, rewards, unbondingBalance } = combinedStakingInfo;
+  const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
+    combinedStakingInfo;
   const delegationResponse = { delegation, balance };
 
   const symbol = LOCAL_ASSET_REGISTRY.note.symbol || DEFAULT_ASSET.symbol || 'MLD';
@@ -89,7 +91,7 @@ export const ValidatorScrollTile = ({
     parseFloat(delegation.shares || '0'),
     GREATER_EXPONENT_DEFAULT,
   );
-  const userIsUnbonding = userHasUnbonding && delegatedAmount === 0;
+  const userIsFullyUnstaking = userHasUnbonding && delegatedAmount === 0;
 
   const title = validator.description.moniker || 'Unknown Validator';
   const commission = `${parseFloat(validator.commission.commission_rates.rate) * 100}%`;
@@ -99,18 +101,31 @@ export const ValidatorScrollTile = ({
 
   const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
 
-  let subTitle: string;
-  if (validator.jailed) {
-    subTitle = 'Jailed';
-  } else if (validator.status === BondStatus.UNBONDED) {
-    subTitle = 'Inactive';
-  } else if (userIsUnbonding) {
-    subTitle = 'Unstaking';
-  } else if (delegatedAmount === 0) {
-    subTitle = 'No delegation';
+  let scrollTileValue = `${theoreticalApr || '0.00'}% p.a.`;
+  let scrollTileSubtitle: string;
+  let scrollTileSecondarySubtitle = null;
+  let secondarySubtitleStatus = TextFieldStatus.GOOD;
+  let statusLabel = '';
+  let statusColor = TextFieldStatus.GOOD;
+
+  if (showCurrentValidators) {
+    if (delegatedAmount > 0) {
+      scrollTileSubtitle = `${formatBalanceDisplay(`${delegatedAmount}`, symbol)} Staked`;
+    } else {
+      scrollTileSubtitle = 'Unstaking';
+    }
   } else {
-    const formattedDelegatedAmount = formatBalanceDisplay(`${delegatedAmount}`, symbol);
-    subTitle = `${formattedDelegatedAmount}`;
+    if (validator.jailed) {
+      scrollTileSubtitle = 'Jailed';
+    } else if (validator.status === BondStatus.UNBONDED) {
+      scrollTileSubtitle = 'Inactive';
+    } else if (userIsFullyUnstaking) {
+      scrollTileSubtitle = 'Unstaking';
+    } else if (delegatedAmount === 0) {
+      scrollTileSubtitle = 'No delegation';
+    } else {
+      scrollTileSubtitle = `${formatBalanceDisplay(`${delegatedAmount}`, symbol)}`;
+    }
   }
 
   const dialogSubTitle = formatBalanceDisplay(
@@ -121,8 +136,6 @@ export const ValidatorScrollTile = ({
   const unbondingDays = `${combinedStakingInfo.stakingParams?.unbonding_time} days`;
   const unstakingTime = `${calculateRemainingTime(combinedStakingInfo.unbondingBalance?.completion_time || '')}`;
 
-  let statusLabel = '';
-  let statusColor = TextFieldStatus.GOOD;
   if (validator.jailed) {
     statusLabel = 'Jailed';
     statusColor = TextFieldStatus.ERROR;
@@ -142,6 +155,66 @@ export const ValidatorScrollTile = ({
   // Validator website validation
   const website = validator.description.website;
   const isWebsiteValid = isValidUrl(website);
+
+  // let showingCurrentValidators = isSelectable && showCurrentValidators;
+  let value = formattedRewardAmount;
+  let subtitleStatus = TextFieldStatus.GOOD;
+  let amountUnstaking = formatBalanceDisplay(
+    convertToGreaterUnit(
+      parseFloat(unbondingBalance?.balance || '0'),
+      GREATER_EXPONENT_DEFAULT,
+    ).toFixed(GREATER_EXPONENT_DEFAULT),
+    'MLD',
+  );
+
+  if (showCurrentValidators) {
+    value = formattedRewardAmount;
+  } else {
+    const uptime = parseFloat(combinedStakingInfo.uptime || '0');
+    scrollTileSubtitle = `${uptime.toFixed(2)}% uptime`;
+
+    if (uptime < 90) {
+      subtitleStatus = TextFieldStatus.ERROR;
+    } else if (uptime < 98) {
+      subtitleStatus = TextFieldStatus.WARN;
+    } else {
+      subtitleStatus = TextFieldStatus.GOOD;
+    }
+
+    value = `${combinedStakingInfo.theoreticalApr || 0}% p.a.`;
+  }
+
+  if (userIsFullyUnstaking) {
+    statusColor = TextFieldStatus.WARN;
+    scrollTileSecondarySubtitle = 'Unstaking...';
+  }
+
+  if (!showCurrentValidators) {
+    const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
+    scrollTileSecondarySubtitle = `${votingPower.toFixed(2)}%`;
+
+    const numValidators = selectedValidators.length || 1;
+    const evenSplit = 100 / numValidators;
+    const warnThreshold = evenSplit * 1.5;
+    const errorThreshold = evenSplit * 2;
+
+    if (votingPower === 0) {
+      secondarySubtitleStatus = TextFieldStatus.ERROR;
+    } else if (votingPower > errorThreshold) {
+      secondarySubtitleStatus = TextFieldStatus.ERROR;
+    } else if (votingPower > warnThreshold) {
+      secondarySubtitleStatus = TextFieldStatus.WARN;
+    } else {
+      secondarySubtitleStatus = TextFieldStatus.GOOD;
+    }
+  }
+
+  const validatorIcon =
+    validator.jailed || validator.status === BondStatus.UNBONDED ? (
+      <AlertCircleIcon className="text-error h-8 w-8" />
+    ) : (
+      <LogoIcon />
+    );
 
   const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
     const walletAssets = walletState?.assets || [];
@@ -391,66 +464,6 @@ export const ValidatorScrollTile = ({
     setSelectedAction(null);
   };
 
-  // let showingCurrentValidators = isSelectable && showCurrentValidators;
-  let value = formattedRewardAmount;
-  let secondarySubtitle = null;
-  let subtitleStatus = TextFieldStatus.GOOD;
-  let secondarySubtitleStatus = TextFieldStatus.GOOD;
-  let amountUnstaking = formattedRewardAmount;
-  if (showCurrentValidators) {
-    if (userHasUnbonding) {
-      value = formatBalanceDisplay(
-        convertToGreaterUnit(
-          parseFloat(unbondingBalance?.balance || '0'),
-          GREATER_EXPONENT_DEFAULT,
-        ).toFixed(GREATER_EXPONENT_DEFAULT),
-        'MLD',
-      );
-
-      if (userIsUnbonding) {
-        statusColor = TextFieldStatus.WARN;
-        amountUnstaking = value;
-        secondarySubtitle = 'Unstaking...';
-      }
-    }
-  } else {
-    // TODO: uncomment when uptime is fixed
-    // const uptime = parseFloat(combinedStakingInfo.uptime || '0');
-    // subTitle = `${uptime}% uptime`;
-
-    value = `${combinedStakingInfo.estimatedReturn || 0}%`;
-    if (userHasUnbonding) {
-      amountUnstaking = formatBalanceDisplay(
-        convertToGreaterUnit(
-          parseFloat(unbondingBalance?.balance || '0'),
-          GREATER_EXPONENT_DEFAULT,
-        ).toFixed(GREATER_EXPONENT_DEFAULT),
-        'MLD',
-      );
-
-      if (userIsUnbonding) {
-        statusColor = TextFieldStatus.WARN;
-        amountUnstaking = value;
-        secondarySubtitle = 'Unstaking...';
-      }
-    }
-
-    const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
-    secondarySubtitle = `${votingPower || 0}%`;
-
-    // if (uptime < 80) {
-    //   subtitleStatus = TextFieldStatus.ERROR;
-    // } else if (uptime < 90) {
-    //   subtitleStatus = TextFieldStatus.WARN;
-    // }
-
-    if (votingPower > 1.5) {
-      secondarySubtitleStatus = TextFieldStatus.ERROR;
-    } else if (votingPower > 1.25) {
-      secondarySubtitleStatus = TextFieldStatus.WARN;
-    }
-  }
-
   useEffect(() => {
     const exponent = DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT;
     const symbol = feeState.asset;
@@ -482,9 +495,9 @@ export const ValidatorScrollTile = ({
       {isSelectable ? (
         <ScrollTile
           title={title}
-          subtitle={subTitle}
-          value={formattedRewardAmount}
-          icon={<LogoIcon />}
+          subtitle={scrollTileSubtitle}
+          value={scrollTileValue}
+          icon={validatorIcon}
           status={statusColor}
           selected={isSelected}
           onClick={handleClick}
@@ -498,11 +511,11 @@ export const ValidatorScrollTile = ({
               <ScrollTile
                 title={title}
                 status={statusColor}
-                subtitle={subTitle}
+                subtitle={scrollTileSubtitle}
                 subtitleStatus={subtitleStatus}
                 value={value}
-                icon={<LogoIcon />}
-                secondarySubtitle={secondarySubtitle}
+                icon={validatorIcon}
+                secondarySubtitle={scrollTileSecondarySubtitle}
                 secondarySubtitleStatus={secondarySubtitleStatus}
               />
             </div>

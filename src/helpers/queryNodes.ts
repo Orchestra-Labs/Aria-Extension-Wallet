@@ -1,17 +1,14 @@
-import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
-import { getSigningSymphonyClientOptions } from 'symphonyjs-local/symphony/client';
-
 import {
   CHAIN_NODES,
   DELAY_BETWEEN_NODE_ATTEMPTS,
   LOCAL_ASSET_REGISTRY,
   MAX_NODES_PER_QUERY,
 } from '@/constants';
-import { RPCResponse } from '@/types';
-
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
+import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
+import { RPCResponse } from '@/types';
+import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 
@@ -212,13 +209,7 @@ const queryWithRetry = async <T>({
           const mnemonic = sessionToken.mnemonic;
           const address = await getAddress(mnemonic);
           const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-
-          const { registry, aminoTypes } = getSigningSymphonyClientOptions();
-
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner, {
-            registry,
-            aminoTypes,
-          });
+          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
 
           const result = await performRpcQuery(
             client,
@@ -228,7 +219,6 @@ const queryWithRetry = async <T>({
             simulateOnly,
             fee,
           );
-
           return result as T;
         } else {
           const result = await performRestQuery(endpoint, queryMethod, queryType, body);

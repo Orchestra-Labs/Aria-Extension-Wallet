@@ -92,6 +92,7 @@ export const AssetScrollTile = ({
   const { params } = useStablecoinStaking();
 
   const isStablecoinStakingEnabled = params?.supported_tokens?.includes(asset.denom);
+  console.log('Supported tokens:', params?.supported_tokens);
 
   const isStakingEnabled = asset.denom === DEFAULT_ASSET.denom;
 

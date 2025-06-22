@@ -7,11 +7,15 @@ type Params = {
   feeDenom: string;
 };
 
+const wrappedStakeStablecoin = async (params: Params): Promise<void> => {
+  await stakeStablecoin(params);
+};
+
 export const useStablecoinStakeMutation = (
   options?: UseMutationOptions<void, Error, Params, unknown>,
 ) => {
   return useMutation({
-    mutationFn: stakeStablecoin,
+    mutationFn: wrappedStakeStablecoin,
     ...options,
   });
 };

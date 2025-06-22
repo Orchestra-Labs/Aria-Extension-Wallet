@@ -1,12 +1,14 @@
 import { useAtomValue } from 'jotai';
-import React, { ChangeEvent, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 
 import { walletStateAtom } from '@/atoms';
 import { WALLET_PREFIX } from '@/constants';
 import { truncateWalletAddress } from '@/helpers';
 import { useDebounce } from '@/hooks';
 import { Asset } from '@/types';
-import { Button, CopyTextField, Input, SlideTray } from '@/ui-kit';
+import { Button, CopyTextField, SlideTray } from '@/ui-kit';
+import { AssetInput } from '@/components';
 
 import { QRCodeContainer } from '../QRCodeContainer';
 
@@ -17,12 +19,10 @@ interface ReceiveDialogProps {
 
 export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
   const walletState = useAtomValue(walletStateAtom);
-  const [amount, setAmount] = useState<number>();
-  const [includeCoinPreference, setIncludeCoinPreference] = useState(false);
+  const [amount, setAmount] = useState<number>(0);
+  const [showPreferenceInput, setShowPreferenceInput] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset>(asset);
   const debouncedAmount = useDebounce(amount);
-
-  const handleChangeAmount = (e: ChangeEvent<HTMLInputElement>) =>
-    setAmount(Number(e.target.value) || undefined);
 
   const walletDisplayAddress = useMemo(
     () => truncateWalletAddress(WALLET_PREFIX, walletState.address),
@@ -31,15 +31,23 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
 
   const qrData = useMemo<string>(
     () =>
-      includeCoinPreference
+      showPreferenceInput
         ? JSON.stringify({
             address: walletState.address,
-            denomPreference: asset.denom,
+            denom: selectedAsset.denom,
             amount: debouncedAmount || 0,
           })
         : walletState.address,
-    [asset.denom, debouncedAmount, includeCoinPreference, walletState.address],
+    [selectedAsset.denom, debouncedAmount, showPreferenceInput, walletState.address],
   );
+
+  // reset asset and amount when dialog closes
+  useEffect(() => {
+    if (!showPreferenceInput) {
+      setAmount(0);
+      setSelectedAsset(asset); // reset to prop
+    }
+  }, [showPreferenceInput]);
 
   return (
     <SlideTray
@@ -53,40 +61,65 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
       reducedTopMargin
     >
       <div className="flex flex-col items-center">
-        <div className="mb-3">
-          <Button
-            variant={!includeCoinPreference ? 'unselectedEnabled' : 'selectedEnabled'}
-            size="small"
-            onClick={() => setIncludeCoinPreference(!includeCoinPreference)}
-            className="ml-1 px-2 rounded-md text-xs"
-          >
-            {includeCoinPreference ? 'Remove Data' : 'Include data (Aria Only)'}
-          </Button>
+        <div className={`${showPreferenceInput ? '' : 'mb-1'} transition-all duration-300`}>
+          {!showPreferenceInput ? (
+            <Button
+              variant="link"
+              size="small"
+              onClick={() => setShowPreferenceInput(true)}
+              className="text-xs"
+            >
+              Add data? (Aria Only)
+            </Button>
+          ) : (
+            <Button
+              variant="link"
+              size="small"
+              onClick={() => setShowPreferenceInput(false)}
+              className="text-xs"
+            >
+              Return to default
+            </Button>
+          )}
         </div>
 
-        {includeCoinPreference && (
-          <div className="flex justify-center mb-3">
-            <Input
-              variant="primary"
-              type="number"
-              label="Amount:"
-              labelPosition="left"
-              placeholder="Enter the amount to receive"
-              reducedHeight
-              defaultValue={0}
-              onChange={handleChangeAmount}
-            />
-          </div>
-        )}
+        {/* Animated AssetInput */}
+        <div
+          className={clsx(
+            'overflow-hidden transition-all duration-300 ease-in-out w-full transform-gpu',
+            showPreferenceInput
+              ? 'max-h-32 mb-1.5 opacity-100 translate-y-0'
+              : 'max-h-0 opacity-0 -translate-y-4',
+          )}
+        >
+          <AssetInput
+            placeholder="Enter the amount to receive"
+            variant="receive"
+            assetState={selectedAsset}
+            amountState={amount}
+            updateAsset={setSelectedAsset}
+            updateAmount={setAmount}
+            reducedHeight
+            includeBottomMargin={false}
+          />
+        </div>
 
         <QRCodeContainer qrCodeValue={qrData} />
 
-        <CopyTextField
-          variant="transparent"
-          displayText={walletDisplayAddress}
-          copyText={walletState.address}
-          iconHeight={16}
-        />
+        {/* Animated Copy Field */}
+        <div
+          className={clsx(
+            'overflow-hidden transition-all duration-300 ease-in-out flex justify-center',
+            showPreferenceInput ? 'max-h-0 opacity-0' : 'max-h-20 opacity-100',
+          )}
+        >
+          <CopyTextField
+            variant="transparent"
+            displayText={walletDisplayAddress}
+            copyText={walletState.address}
+            iconHeight={16}
+          />
+        </div>
       </div>
     </SlideTray>
   );

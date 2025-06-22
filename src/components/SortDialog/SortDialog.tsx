@@ -12,6 +12,7 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
   validatorStatusFilterAtom,
+  swiperIndexState,
 } from '@/atoms';
 import { ValidatorSortType, ValidatorStatusFilter } from '@/constants';
 import { userAccountAtom } from '@/atoms/accountAtom';
@@ -27,6 +28,7 @@ export const SortDialog: React.FC<SortDialogProps> = ({
 }) => {
   const userAccount = useAtomValue(userAccountAtom);
   const [validatorStatusFilter, setValidatorStatusFilter] = useAtom(validatorStatusFilterAtom);
+  const activeIndex = useAtomValue(swiperIndexState);
 
   const [assetSortOrder, setAssetSortOrder] = useAtom(
     isDialog ? assetDialogSortOrderAtom : assetSortOrderAtom,
@@ -61,7 +63,8 @@ export const SortDialog: React.FC<SortDialogProps> = ({
   const sortType = isValidatorSort ? validatorSortType : assetSortType;
 
   const viewValidatorsByStatus = userAccount?.settings.viewValidatorsByStatus;
-  const trayHeight = isValidatorSort && viewValidatorsByStatus ? '50%' : '45%';
+  const trayHeight =
+    isValidatorSort && viewValidatorsByStatus ? '50%' : activeIndex === 0 ? '45%' : '48%';
 
   return (
     <SlideTray
@@ -104,11 +107,12 @@ export const SortDialog: React.FC<SortDialogProps> = ({
           </div>
 
           {/* Sort Type Selection */}
-          <div className="flex justify-between items-center p-2">
-            <div className="flex-1 text-sm">Sort by:</div>
-            <div className="flex items-center">
-              {sortOptions.map(option => (
-                <React.Fragment key={option}>
+          <div className="flex justify-between items-start p-2">
+            <div className="text-sm pt-[2px] flex-none">Sort by:</div>
+            <div className="flex flex-wrap justify-center gap-y-1">
+              {sortOptions.map((option, index) => (
+                <div key={option} className="flex items-center">
+                  {index > 0 && <span className="text-sm px-0.5">/</span>}
                   <Button
                     variant={sortType === option ? 'selected' : 'unselected'}
                     size="xsmall"
@@ -117,10 +121,7 @@ export const SortDialog: React.FC<SortDialogProps> = ({
                   >
                     {option.charAt(0).toUpperCase() + option.slice(1)}
                   </Button>
-                  {option !== sortOptions[sortOptions.length - 1] && (
-                    <p className="text-sm px-1">/</p>
-                  )}
-                </React.Fragment>
+                </div>
               ))}
             </div>
           </div>

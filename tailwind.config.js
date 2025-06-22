@@ -75,6 +75,8 @@ export default {
         'slide-in-from-bottom': 'slideInFromBottom 0.3s ease-in-out',
         press: 'press 1.2s infinite',
         'press-effect': 'ripple 1.2s ease-out infinite',
+        'flash-success': 'flash-border-success 300ms ease-in-out',
+        'flash-error': 'flash-border-error 300ms ease-in-out',
       },
       keyframes: {
         scaleUp: {
@@ -92,6 +94,16 @@ export default {
         ripple: {
           '0%': { transform: 'scale(1)', opacity: 0.5 },
           '100%': { transform: 'scale(2.5)', opacity: 0 },
+        },
+        'flash-border-success': {
+          '0%': { borderColor: '#3FDBA8' }, // success.DEFAULT
+          '50%': { borderColor: '#048A4E' }, // success.dark
+          '100%': { borderColor: '#3FDBA8' },
+        },
+        'flash-border-error': {
+          '0%': { borderColor: '#F75363' }, // error.DEFAULT
+          '50%': { borderColor: '#9C0A36' }, // error.dark
+          '100%': { borderColor: '#F75363' },
         },
       },
       height: {
