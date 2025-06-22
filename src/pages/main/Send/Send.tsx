@@ -44,6 +44,7 @@ import {
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
 import { AddressInput } from './AddressInput';
+import { useGetTobinTaxRateQuery } from '@/hooks/useGetTobinTaxRateQuery';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -63,6 +64,7 @@ export const Send = () => {
   const { exchangeRate } = useExchangeRate();
   const { toast } = useToast();
   const location = useLocation();
+  const { data: tobinTaxData } = useGetTobinTaxRateQuery();
 
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   const [sendState, setSendState] = useAtom(sendStateAtom);
@@ -656,8 +658,15 @@ export const Send = () => {
       const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
       const defaultGasPrice = 0.025;
       const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
-      const feeAmount = gasWanted * defaultGasPrice;
-      const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+
+      const gasFee = gasWanted * defaultGasPrice;
+      const tobinRate = parseFloat(tobinTaxData?.tax_rate || '0');
+      const isSwap = transactionType.isSwap;
+
+      const tobinTax = isSwap ? sendState.amount * tobinRate : 0;
+
+      const totalFee = gasFee + tobinTax;
+      const feeInGreaterUnit = totalFee / Math.pow(10, exponent);
 
       // Update fee state
       setFeeState(prevState => ({
@@ -667,7 +676,7 @@ export const Send = () => {
       }));
 
       // Recalculate max available based on new fee
-      const maxAvailable = calculateMaxAvailable(sendState.asset, feeAmount);
+      const maxAvailable = calculateMaxAvailable(sendState.asset, totalFee);
 
       console.log('Max available after fee:', maxAvailable);
 
