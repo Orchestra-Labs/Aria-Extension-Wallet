@@ -75,3 +75,34 @@ Builds the app and creates a aria-wallet.zip file for distribution.
 ### `yarn reset`
 
 Deletes node_modules and yarn.lock and reinstalls dependencies.
+
+### `yarn set-version <version>`
+
+Updates both `package.json` and `manifest.json` to the specified version number.
+
+#### Usage:
+
+- **Patch version** (e.g. bump `1.3.2` → `1.3.3`)
+
+  ```bash
+  yarn set-version 1.3.3
+  ```
+
+- **Minor version** (e.g. `1.3.2` → `1.4.0`)
+
+  ```bash
+  yarn set-version 1.4.0
+  ```
+
+- **Major version** (e.g. `1.3.2` → `2.0.0`)
+
+  ```bash
+  yarn set-version 2.0.0
+  ```
+
+- **Specific version**
+  ```bash
+  yarn set-version 2.1.5
+  ```
+
+> ⚠️ This does not auto-increment. You must specify the full version explicitly.
