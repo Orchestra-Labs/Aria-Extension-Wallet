@@ -37,35 +37,38 @@ export const AssetScrollTile = ({
   const selectedCoins = useAtomValue(selectedCoinListAtom);
 
   const navigate = useNavigate();
-  const location = useLocation(); // Get the current route to check if it's the SEND page
+  const pathname = useLocation().pathname;
+
+  const isEditPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
+  const isReceivePage = pathname === ROUTES.APP.RECEIVE;
+  const isSendPage = pathname === ROUTES.APP.SEND;
 
   const symbol = asset.symbol || DEFAULT_ASSET.symbol || 'MLD';
-  const title = asset.symbol || 'Unknown Asset';
-  const logo = asset.logo ? asset.logo : LOCAL_ASSET_REGISTRY.note.logo;
+  const denom = asset.denom || 'Unknown Denom';
+  const logo = asset.logo || LOCAL_ASSET_REGISTRY.note.logo;
 
-  const valueAmount = isReceiveDialog
-    ? asset.exchangeRate === '0'
-      ? '-'
-      : asset.exchangeRate || '1'
-    : asset.amount;
+  const subtitle = isEditPage ? denom : 'Symphony';
 
   let value = '';
-  if (isReceiveDialog) {
+  if (isEditPage) {
+    value = asset.networkName || 'Unknown Network';
+  } else if (isReceivePage) {
     const sendState = useAtomValue(sendStateAtom);
-
-    if (isNaN(parseFloat(valueAmount))) {
-      value = '-';
-    } else {
-      const unitSymbol = sendState.asset.symbol || 'MLD';
-      value = formatBalanceDisplay(valueAmount, unitSymbol);
-    }
+    const unitSymbol = sendState.asset.symbol || 'MLD';
+    value = isNaN(parseFloat(asset.exchangeRate || '0'))
+      ? '-'
+      : formatBalanceDisplay(asset.exchangeRate || '1', unitSymbol);
   } else {
-    const unitSymbol = symbol;
-    value = formatBalanceDisplay(valueAmount, unitSymbol);
+    value = formatBalanceDisplay(asset.amount, symbol);
   }
 
+  const isSelected = multiSelectEnabled
+    ? selectedCoins.some(selected => selected.denom === asset.denom)
+    : isSendPage
+      ? asset.denom === currentState.asset.denom
+      : asset.denom === dialogSelectedAsset.denom;
+
   const handleSendClick = () => {
-    // Set the selected asset in the send state
     setSelectedAsset(asset);
     navigate(ROUTES.APP.SEND);
   };
@@ -77,89 +80,50 @@ export const AssetScrollTile = ({
     }
   };
 
-  // Check if the current page is the SEND page
-  const isOnSendPage = location.pathname === ROUTES.APP.SEND;
+  const scrollTile = (
+    <ScrollTile
+      title={symbol}
+      subtitle={subtitle}
+      value={value}
+      icon={<img src={logo} alt={symbol} />}
+      selected={isSelectable ? isSelected : undefined}
+      onClick={isSelectable ? handleClick : undefined}
+    />
+  );
 
-  // Determine if the asset is selected, based on current state or multi-select mode
-  const isSelected = multiSelectEnabled
-    ? selectedCoins.some(selectedCoin => selectedCoin.denom === asset.denom)
-    : isOnSendPage
-      ? asset.denom === currentState.asset.denom
-      : asset.denom === dialogSelectedAsset.denom;
+  return isSelectable ? (
+    scrollTile
+  ) : (
+    <SlideTray triggerComponent={<div>{scrollTile}</div>} title={symbol} showBottomBorder>
+      <div className="text-center mb-2">
+        <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
+          Amount: <span className="text-blue">{value}</span>
+        </div>
+        <span className="text-grey-dark text-xs text-base">
+          Current Chain: <span className="text-blue">{asset.networkName}</span>
+        </span>
+      </div>
 
-  return (
-    <>
-      {isSelectable ? (
-        <ScrollTile
-          title={title}
-          subtitle="Symphony"
-          value={value}
-          icon={<img src={logo} alt={title} />}
-          selected={isSelected}
-          onClick={handleClick}
-        />
-      ) : (
-        <SlideTray
-          triggerComponent={
-            <div>
-              <ScrollTile
-                title={title}
-                subtitle="Symphony"
-                value={value}
-                icon={<img src={logo} alt={title} />}
-              />
-            </div>
-          }
-          title={title}
-          showBottomBorder
-        >
-          <>
-            <div className="text-center mb-2">
-              <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
-                Amount: <span className="text-blue">{value}</span>
-              </div>
-              <span className="text-grey-dark text-xs text-base">
-                Current Chain: <span className="text-blue">Symphony</span>
-              </span>
-            </div>
-          </>
+      <div className="mb-4 min-h-[7.5rem] max-h-[7.5rem] overflow-hidden shadow-md bg-black p-2">
+        <p>
+          <strong>Ticker: </strong>
+          {asset.symbol}
+        </p>
+        <p>
+          <strong>Sub-unit: </strong>
+          {asset.denom}
+        </p>
+      </div>
 
-          {/* Asset Information */}
-          <div className="mb-4 min-h-[7.5rem] max-h-[7.5rem] overflow-hidden shadow-md bg-black p-2">
-            <p>
-              <strong>Ticker: </strong>
-              {asset.symbol}
-            </p>
-            <p>
-              <strong>Sub-unit: </strong>
-              {asset.denom}
-            </p>
-            {/* 
-              TODO: include information such as...
-              is stakeable,
-              is IBC, 
-              is Token or native, 
-              native chain, 
-              current chain, 
-              native to which application, 
-              price, 
-              website, 
-              etc 
-            */}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-col items-center justify-center grid grid-cols-3 w-full gap-x-4 px-2">
-            <Button size="medium" className={'w-full'} onClick={handleSendClick}>
-              Send
-            </Button>
-            <ReceiveDialog buttonSize="medium" asset={asset} />
-            <Button size="medium" className={'w-full'} onClick={() => setActiveIndex(1)}>
-              Stake
-            </Button>
-          </div>
-        </SlideTray>
-      )}
-    </>
+      <div className="flex flex-col items-center justify-center grid grid-cols-3 w-full gap-x-4 px-2">
+        <Button size="medium" className="w-full" onClick={handleSendClick}>
+          Send
+        </Button>
+        <ReceiveDialog buttonSize="medium" asset={asset} />
+        <Button size="medium" className="w-full" onClick={() => setActiveIndex(1)}>
+          Stake
+        </Button>
+      </div>
+    </SlideTray>
   );
 };
