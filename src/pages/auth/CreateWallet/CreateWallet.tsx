@@ -123,7 +123,6 @@ export const CreateWallet = () => {
 
   // TODO: make toasts copy-on-click
   // TODO: make toast animate in, animate out, and swipe-away
-  // TODO: add auth support for dApps
 
   // TODO: show donut chart with assets rather than singular value (requires connections to exchanges)
 

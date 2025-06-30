@@ -3,12 +3,18 @@ import {
   isFetchingWalletDataAtom,
   isInitialDataLoadAtom,
   sendStateAtom,
+  userAccountAtom,
   userWalletAtom,
   validatorDataAtom,
   walletAssetsAtom,
 } from '@/atoms';
-import { userAccountAtom } from '@/atoms/accountAtom';
-import { getWalletByID } from '@/helpers/dataHelpers/account';
+import {
+  getWalletByID,
+  checkChainRegistryUpdate,
+  shouldUpdateChainRegistry,
+  fetchAndStoreChainRegistry,
+  ensureChainRegistryExists,
+} from '@/helpers';
 import { useExchangeAssets } from '@/hooks';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
@@ -69,6 +75,23 @@ export const DataProvider: React.FC<{}> = ({}) => {
 
     fetchExchangeAssets();
   }, [userAccount, sendState, walletAssets]);
+
+  useEffect(() => {
+    const maybeUpdateChainRegistry = async () => {
+      if (shouldUpdateChainRegistry()) {
+        const updated = await checkChainRegistryUpdate();
+
+        if (updated) {
+          console.log('[ChainRegistry] Update detected, fetching new registry...');
+          await fetchAndStoreChainRegistry();
+        } else {
+          await ensureChainRegistryExists();
+        }
+      }
+    };
+
+    maybeUpdateChainRegistry();
+  }, []);
 
   return null;
 };

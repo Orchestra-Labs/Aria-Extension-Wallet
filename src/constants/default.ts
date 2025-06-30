@@ -34,6 +34,7 @@ type AssetRegistry = {
   [key: string]: Asset;
 };
 
+// TODO: add to LOCAL_CHAIN_REGISTRY per chain?
 // Asset registry for the Symphony network
 export const LOCAL_ASSET_REGISTRY: AssetRegistry = {
   uusd: {
@@ -148,6 +149,7 @@ type LocalChainRegistryType = {
   };
 };
 
+// TODO: pull in from cosmosChains information in local storage
 export const LOCAL_CHAIN_REGISTRY: LocalChainRegistryType = {
   [DEFAULT_CHAIN_ID]: {
     chainName: 'Symphony',
