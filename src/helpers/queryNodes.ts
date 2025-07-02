@@ -1,14 +1,9 @@
-import {
-  CHAIN_NODES,
-  DELAY_BETWEEN_NODE_ATTEMPTS,
-  LOCAL_ASSET_REGISTRY,
-  MAX_NODES_PER_QUERY,
-} from '@/constants';
+import { DEFAULT_ASSET, MAX_RETRIES_PER_QUERY, QueryType } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
-import { RPCResponse } from '@/types';
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
+import { RPCResponse, Uri } from '@/types';
+import { getSessionToken } from './dataHelpers';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 
@@ -19,43 +14,12 @@ const isIndexerError = (error: any): boolean => {
   );
 };
 
-// Select and prioritize node providers based on their error counts
-export const selectNodeProviders = () => {
-  const errorCounts = getNodeErrorCounts();
-  console.log('Fetching node error counts:', errorCounts);
-
-  const providers = CHAIN_NODES.symphonytestnet.map(provider => ({
-    ...provider,
-    failCount: errorCounts[provider.rpc] || 0,
-  }));
-
-  console.log('Providers with fail counts:', providers);
-
-  return providers.sort((a, b) => a.failCount - b.failCount);
-};
-
-// Increment the error count for a specific provider
-export const incrementErrorCount = (nodeProvider: string): void => {
-  const errorCounts = getNodeErrorCounts();
-  console.log(`Incrementing error count for provider: ${nodeProvider}`);
-
-  errorCounts[nodeProvider] = (errorCounts[nodeProvider] || 0) + 1;
-  storeNodeErrorCounts(errorCounts);
-
-  console.log(`Updated error counts for ${nodeProvider}:`, errorCounts[nodeProvider]);
-};
-
 // Helper: Perform a REST API query to a selected node
-const performRestQuery = async (
-  endpoint: string,
-  queryMethod: string,
-  queryType: 'POST' | 'GET',
-) => {
-  console.log(
-    `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
-  );
+const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
+  const uriEndpoint = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
+  console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
-  const response = await fetch(`${queryMethod}${endpoint}`, {
+  const response = await fetch(`${uriEndpoint}`, {
     method: queryType,
     body: null,
     headers: { 'Content-Type': 'application/json' },
@@ -99,6 +63,7 @@ export const performRpcQuery = async (
 
     if (!fee || !calculatedFee) {
       console.log('Calculating fee...');
+      // TODO: change hardcoded value to default from registry
       const defaultGasPrice = GasPrice.fromString(`0.025${feeDenom}`);
       let gasEstimation = await client.simulate(walletAddress, messages, '');
       console.log('Gas Estimation:', gasEstimation);
@@ -166,6 +131,7 @@ const queryWithRetry = async ({
   feeDenom,
   simulateOnly = false,
   fee,
+  uris,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -177,67 +143,62 @@ const queryWithRetry = async ({
     amount: { denom: string; amount: string }[];
     gas: string;
   };
+  uris: Uri[];
 }): Promise<RPCResponse> => {
-  console.log('Querying with retry...');
-  console.log('Endpoint:', endpoint);
-  console.log('Use RPC:', useRPC);
-  console.log('Query Type:', queryType);
-  console.log('Messages:', messages);
-  console.log('Fee Denom:', feeDenom);
-  console.log('Simulate Only:', simulateOnly);
-
-  const providers = selectNodeProviders();
-  console.log('Providers selected for retry:', providers);
-
-  let numberAttempts = 0;
+  let attemptCount = 0;
   let lastError: any = null;
 
-  while (numberAttempts < MAX_NODES_PER_QUERY) {
-    for (const provider of providers) {
-      try {
-        const queryMethod = useRPC ? provider.rpc : provider.rest;
-        console.log('Using query method:', queryMethod);
+  const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
 
-        if (useRPC) {
-          const sessionToken = getSessionToken();
-          if (!sessionToken) {
-            throw new Error("Session token doesn't exist");
-          }
-          const mnemonic = sessionToken.mnemonic;
-          const address = await getAddress(mnemonic);
-          const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
+  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= shuffledUris.length - 1) {
+    const uriIndex = attemptCount;
+    const uri = shuffledUris[uriIndex];
 
-          const result = await performRpcQuery(
-            client,
-            address,
-            messages,
-            feeDenom,
-            simulateOnly,
-            fee,
-          );
-          return result;
-        } else {
-          const result = await performRestQuery(endpoint, queryMethod, queryType);
-          return result;
-        }
-      } catch (error) {
-        lastError = error;
-        console.error('Error querying node:', error);
+    console.log(`[queryNodes] URIs in list: ${JSON.stringify(uris)}`);
+    console.log(
+      `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, start of loop`,
+    );
+    console.log(
+      `[queryNodes] Attempt count ${attemptCount}, shuffled Uris length ${shuffledUris.length - 1}, max retries ${MAX_RETRIES_PER_QUERY}`,
+    );
 
-        if (!isIndexerError(error)) {
-          incrementErrorCount(provider.rpc);
-        }
+    try {
+      if (useRPC) {
+        const sessionToken = getSessionToken();
+        if (!sessionToken) throw new Error("Session token doesn't exist");
+
+        const mnemonic = sessionToken.mnemonic;
+        const address = await getAddress(mnemonic);
+        const signer = await createOfflineSignerFromMnemonic(mnemonic);
+
+        const client = await SigningStargateClient.connectWithSigner(uri.address, signer);
+
+        const result = await performRpcQuery(
+          client,
+          address,
+          messages,
+          feeDenom,
+          simulateOnly,
+          fee,
+        );
+        return result;
+      } else {
+        const result = await performRestQuery(uri.address, endpoint, queryType);
+        return result;
       }
+    } catch (error) {
+      attemptCount++;
 
-      numberAttempts++;
-      if (numberAttempts >= MAX_NODES_PER_QUERY) break;
-      await delay(DELAY_BETWEEN_NODE_ATTEMPTS);
+      lastError = error;
+      const backoff = Math.min(2 ** attemptCount * 500, 5000);
+      console.log(
+        `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
+      );
+      await delay(backoff);
     }
   }
 
   if (isIndexerError(lastError)) {
-    console.log('Indexer error detected during retries.');
     return {
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
@@ -245,36 +206,38 @@ const queryWithRetry = async ({
     };
   }
 
-  console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);
-  throw new Error(
-    `All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts. ${lastError?.message || ''}`,
-  );
+  throw new Error(`All ${MAX_RETRIES_PER_QUERY} attempts failed. ${lastError?.message || ''}`);
 };
 
 export const queryRestNode = async ({
   endpoint,
-  queryType = 'GET',
-  feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
+  queryType = QueryType.GET,
+  feeDenom = DEFAULT_ASSET.denom,
+  restUris,
 }: {
   endpoint: string;
-  queryType?: 'GET' | 'POST';
+  queryType?: QueryType;
   feeDenom?: string;
+  restUris: Uri[];
 }) =>
   queryWithRetry({
     endpoint,
     useRPC: false,
     queryType,
     feeDenom,
+    uris: restUris,
   });
 
 export const queryRpcNode = async ({
   endpoint,
   messages,
-  feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
+  feeDenom = DEFAULT_ASSET.denom,
   simulateOnly = false,
   fee,
+  rpcUris,
 }: {
   endpoint: string;
+  rpcUris: Uri[];
   messages?: any[];
   feeDenom?: string;
   simulateOnly?: boolean;
@@ -290,4 +253,5 @@ export const queryRpcNode = async ({
     feeDenom,
     simulateOnly,
     fee,
+    uris: rpcUris,
   });

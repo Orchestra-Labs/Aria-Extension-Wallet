@@ -7,19 +7,23 @@ import {
   userWalletAtom,
   validatorDataAtom,
   walletAssetsAtom,
+  chainRegistryAtom,
 } from '@/atoms';
+import { LOCAL_CHAIN_REGISTRY } from '@/constants';
 import {
   getWalletByID,
   checkChainRegistryUpdate,
   shouldUpdateChainRegistry,
   fetchAndStoreChainRegistry,
   ensureChainRegistryExists,
+  getStoredChainRegistry,
+  filterChainRegistryToSubscriptions,
 } from '@/helpers';
 import { useExchangeAssets } from '@/hooks';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
-export const DataProvider: React.FC<{}> = ({}) => {
+export const DataProvider: React.FC = () => {
   const [walletAssets] = useAtom(walletAssetsAtom);
   const [isInitialDataLoad, setIsInitialDataLoad] = useAtom(isInitialDataLoadAtom);
   const isFetchingWalletData = useAtomValue(isFetchingWalletDataAtom);
@@ -27,6 +31,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   const isFetchingValidatorData = useAtomValue(isFetchingWalletDataAtom);
   const userAccount = useAtomValue(userAccountAtom);
   const setUserWallet = useSetAtom(userWalletAtom);
+  const setChainRegistry = useSetAtom(chainRegistryAtom);
 
   const { availableAssets, refetch } = useExchangeAssets();
   const setExchangeAssets = useSetAtom(symphonyAssetsAtom);
@@ -60,7 +65,7 @@ export const DataProvider: React.FC<{}> = ({}) => {
   }, [userAccount]);
 
   useEffect(() => {
-    console.log('available assets / symphony assets set to:', availableAssets);
+    console.log('[DataProvider] available assets / symphony assets set to:', availableAssets);
     setExchangeAssets(availableAssets);
   }, [availableAssets]);
 
@@ -80,14 +85,33 @@ export const DataProvider: React.FC<{}> = ({}) => {
     const maybeUpdateChainRegistry = async () => {
       if (shouldUpdateChainRegistry()) {
         const updated = await checkChainRegistryUpdate();
-
         if (updated) {
-          console.log('[ChainRegistry] Update detected, fetching new registry...');
+          console.log('[DataProvider] Update detected, fetching new registry...');
           await fetchAndStoreChainRegistry();
         } else {
           await ensureChainRegistryExists();
         }
       }
+
+      // TODO: check through both mainnet and testnet chains
+      const stored = getStoredChainRegistry();
+      const registry =
+        userAccount && stored?.data
+          ? (() => {
+              const filteredChains = filterChainRegistryToSubscriptions(stored.data, userAccount);
+              return Object.keys(filteredChains).length > 0 ? filteredChains : LOCAL_CHAIN_REGISTRY;
+            })()
+          : LOCAL_CHAIN_REGISTRY;
+
+      console.log('[DataProvider] stored data set to:', stored?.data);
+      console.log(`[DataProvider] local registry data set to: ${JSON.stringify(registry)}`);
+      console.log(
+        '[DataProvider] Setting saved chains to:',
+        Object.keys(registry).length,
+        'chains',
+      );
+
+      setChainRegistry(registry);
     };
 
     maybeUpdateChainRegistry();

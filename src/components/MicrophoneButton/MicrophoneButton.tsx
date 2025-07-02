@@ -6,23 +6,25 @@ import { openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
-import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom } from '@/atoms';
+import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom, chainRegistryAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
+import { DEFAULT_CHAIN_ID } from '@/constants';
 
 export const MicrophoneButton: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { refreshData } = useRefreshData();
 
+  const wallet = useAtomValue(walletStateAtom);
+  const validators = useAtomValue(validatorDataAtom);
+  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
+
   const [micStatus, setMicStatus] = useState<'neutral' | 'granted' | 'denied'>('neutral');
   const [isRecording, setIsRecording] = useState(false);
   const [, setAudioUrl] = useState<string | null>(null);
   const [, setTranscript] = useState<string | null>(null);
   const [, setIntent] = useState<Intent | null>(null);
-
-  const wallet = useAtomValue(walletStateAtom);
-  const validators = useAtomValue(validatorDataAtom);
-  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
 
   const permissionState = usePermission({ name: 'microphone' });
   const micGranted = permissionState === 'granted';
@@ -41,6 +43,10 @@ export const MicrophoneButton: React.FC = () => {
 
   const sendToIntentParser = async (audioBlob: Blob) => {
     console.log('Sending audio to intent-parser', audioBlob);
+
+    // TODO: get chain ID from asset sending, from audio, or from managed state
+    const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+    const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
 
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.webm');
@@ -67,6 +73,8 @@ export const MicrophoneButton: React.FC = () => {
             walletAssets: wallet?.assets || [],
             validators: validators || [],
             symphonyAssets: symphonyAssets || [],
+            restUris: restUris,
+            rpcUris,
           });
 
           if (result) {

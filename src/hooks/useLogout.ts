@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { removeSessionData, resetNodeErrorCounts } from '@/helpers';
+import { removeSessionData } from '@/helpers';
 import { ROUTES } from '@/constants';
 import { useSetAtom } from 'jotai';
 import { isLoggedInAtom } from '@/atoms';
@@ -10,7 +10,6 @@ export const useLogout = () => {
 
   const logout = () => {
     // Clear necessary data
-    resetNodeErrorCounts();
     removeSessionData();
 
     // Update login status to trigger re-renders

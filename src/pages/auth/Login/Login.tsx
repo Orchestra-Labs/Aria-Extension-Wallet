@@ -3,7 +3,7 @@ import { useNavigate, NavLink } from 'react-router-dom';
 import { EyeOpen, EyeClose } from '@/assets/icons';
 import { InputStatus, ROUTES } from '@/constants';
 import { Button, Input } from '@/ui-kit';
-import { resetNodeErrorCounts, tryAuthorizeAccess } from '@/helpers';
+import { tryAuthorizeAccess } from '@/helpers';
 import { useSetAtom } from 'jotai';
 import { isLoggedInAtom } from '@/atoms';
 
@@ -45,7 +45,6 @@ export const Login: React.FC = () => {
     const authStatus = await tryAuthorizeAccess(password);
 
     if (authStatus === 'success') {
-      resetNodeErrorCounts();
       setIsLoggedIn(true);
       navigate(ROUTES.APP.ROOT);
     } else if (authStatus === 'no_wallet') {

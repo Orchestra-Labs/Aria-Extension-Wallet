@@ -1,15 +1,22 @@
 import {
   CombinedStakingInfo,
   DelegationResponse,
+  LocalChainRegistry,
   MintModuleParams,
   SigningInfo,
   SlashingParams,
   StakingParams,
   UnbondingDelegationResponse,
+  Uri,
   ValidatorInfo,
 } from '@/types';
 import { queryRestNode } from './queryNodes';
-import { BondStatus, CHAIN_ENDPOINTS } from '@/constants';
+import {
+  BondStatus,
+  COSMOS_CHAIN_ENDPOINTS,
+  DEFAULT_CHAIN_ID,
+  SYMPHONY_ENDPOINTS,
+} from '@/constants';
 import { fromBase64, toBech32 } from '@cosmjs/encoding';
 import { sha256 } from '@cosmjs/crypto';
 
@@ -51,12 +58,13 @@ const defaultUnbonding = {
 };
 
 export const fetchUnbondingDelegations = async (
+  restUris: Uri[],
   delegatorAddress: string,
   validatorAddress?: string,
   paginationKey?: string,
 ): Promise<{ delegations: UnbondingDelegationResponse[]; pagination: any }> => {
   try {
-    let endpoint = `${CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/unbonding_delegations`;
+    let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/unbonding_delegations`;
     if (validatorAddress) {
       endpoint += `/${validatorAddress}`;
     }
@@ -65,7 +73,7 @@ export const fetchUnbondingDelegations = async (
       endpoint += `?pagination.key=${encodeURIComponent(paginationKey)}`;
     }
 
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode({ endpoint, restUris });
 
     return {
       delegations: (response.unbonding_responses ?? []).map((item: any) => {
@@ -99,18 +107,19 @@ export const fetchUnbondingDelegations = async (
 };
 
 export const fetchDelegations = async (
+  restUris: Uri[],
   delegatorAddress: string,
   validatorAddress?: string,
 ): Promise<{ delegations: DelegationResponse[]; pagination: any }> => {
   try {
-    let endpoint = `${CHAIN_ENDPOINTS.getDelegations}${delegatorAddress}`;
+    let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getDelegations}${delegatorAddress}`;
 
     // If a validatorAddress is provided, modify the endpoint to fetch delegation for that specific validator
     if (validatorAddress) {
-      endpoint = `${CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/delegations/${validatorAddress}`;
+      endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/delegations/${validatorAddress}`;
     }
 
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode({ endpoint, restUris });
 
     return {
       delegations: (response.delegation_responses ?? []).map((item: any) => {
@@ -127,18 +136,21 @@ export const fetchDelegations = async (
   }
 };
 
-export const fetchAllValidators = async (bondStatus?: BondStatus): Promise<ValidatorInfo[]> => {
+export const fetchAllValidators = async (
+  restUris: Uri[],
+  bondStatus?: BondStatus,
+): Promise<ValidatorInfo[]> => {
   let allValidators: ValidatorInfo[] = [];
   let nextKey: string | null = null;
 
   do {
     try {
-      let endpoint = `${CHAIN_ENDPOINTS.getValidators}?pagination.key=${encodeURIComponent(nextKey || '')}`;
+      let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getValidators}?pagination.key=${encodeURIComponent(nextKey || '')}`;
       if (bondStatus) {
         endpoint += `&status=${bondStatus}`;
       }
 
-      const response = await queryRestNode({ endpoint });
+      const response = await queryRestNode({ endpoint, restUris });
 
       allValidators = allValidators.concat(response.validators ?? []);
 
@@ -153,13 +165,14 @@ export const fetchAllValidators = async (bondStatus?: BondStatus): Promise<Valid
 };
 
 export const fetchValidators = async (
+  restUris: Uri[],
   validatorAddress?: string,
   bondStatus?: BondStatus,
 ): Promise<{ validators: ValidatorInfo[]; pagination: any }> => {
   try {
     if (validatorAddress) {
-      let endpoint = `${CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
-      const response = await queryRestNode({ endpoint });
+      let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
+      const response = await queryRestNode({ endpoint, restUris });
 
       // Filter single validator by bond status if provided
       if (bondStatus && response?.validator?.status !== bondStatus) {
@@ -171,7 +184,7 @@ export const fetchValidators = async (
         pagination: null,
       };
     } else {
-      const allValidators = await fetchAllValidators(bondStatus);
+      const allValidators = await fetchAllValidators(restUris, bondStatus);
       return {
         validators: allValidators,
         pagination: null, // We're returning all matching validators, so pagination is not applicable
@@ -187,17 +200,18 @@ export const fetchValidators = async (
 };
 
 export const fetchRewards = async (
+  restUris: Uri[],
   delegatorAddress: string,
   delegations?: { validator_address: string }[],
 ): Promise<{ validator: string; rewards: any[] }[]> => {
   try {
-    let endpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards`;
+    let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards`;
 
     // If specific delegations (validators) are provided, query rewards for each validator separately
     if (delegations && delegations.length > 0) {
       const rewardsPromises = delegations.map(async delegation => {
-        const specificEndpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
-        const response = await queryRestNode({ endpoint: specificEndpoint });
+        const specificEndpoint = `${COSMOS_CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
+        const response = await queryRestNode({ endpoint: specificEndpoint, restUris });
         return {
           validator: delegation.validator_address,
           rewards: response.rewards || [],
@@ -209,7 +223,7 @@ export const fetchRewards = async (
     }
 
     // Fetch all rewards for the delegator
-    const response = await queryRestNode({ endpoint });
+    const response = await queryRestNode({ endpoint, restUris });
 
     // Process the response and map rewards for each validator
     return (response.rewards ?? []).map((reward: any) => ({
@@ -222,10 +236,10 @@ export const fetchRewards = async (
   }
 };
 
-export const fetchStakingParams = async (): Promise<StakingParams | null> => {
+export const fetchStakingParams = async (restUris: Uri[]): Promise<StakingParams | null> => {
   try {
-    const endpoint = `${CHAIN_ENDPOINTS.getStakingParams}`;
-    const response = await queryRestNode({ endpoint });
+    const endpoint = `${COSMOS_CHAIN_ENDPOINTS.getStakingParams}`;
+    const response = await queryRestNode({ endpoint, restUris });
 
     if (response && 'params' in response) {
       // Convert unbonding_time to days
@@ -246,13 +260,13 @@ export const fetchStakingParams = async (): Promise<StakingParams | null> => {
   }
 };
 
-const fetchAllSigningInfos = async (): Promise<SigningInfo[]> => {
+const fetchAllSigningInfos = async (restUris: Uri[]): Promise<SigningInfo[]> => {
   let allInfos: SigningInfo[] = [];
   let nextKey: string | null = null;
 
   do {
-    const endpoint = `${CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
-    const response = await queryRestNode({ endpoint });
+    const endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
+    const response = await queryRestNode({ endpoint, restUris });
 
     const infos = response?.info ?? [];
     allInfos = allInfos.concat(infos);
@@ -264,12 +278,12 @@ const fetchAllSigningInfos = async (): Promise<SigningInfo[]> => {
   return allInfos;
 };
 
-const fetchInflation = async (): Promise<number> => {
+const fetchSymphonyInflation = async (restUris: Uri[]): Promise<number> => {
   try {
     const [epochRes, paramsRes, poolRes] = await Promise.all([
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintEpochProvisions }),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getMintParams }),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool }),
+      queryRestNode({ restUris, endpoint: SYMPHONY_ENDPOINTS.getMintEpochProvisions }),
+      queryRestNode({ restUris, endpoint: SYMPHONY_ENDPOINTS.getMintParams }),
+      queryRestNode({ restUris, endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool }),
     ]);
 
     const mintParams = paramsRes.params as unknown as MintModuleParams;
@@ -288,20 +302,40 @@ const fetchInflation = async (): Promise<number> => {
   }
 };
 
-const fetchCommunityTax = async (): Promise<number> => {
-  const res: any = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getDistributionParams });
+const fetchCommunityTax = async (restUris: Uri[]): Promise<number> => {
+  const res: any = await queryRestNode({
+    endpoint: COSMOS_CHAIN_ENDPOINTS.getDistributionParams,
+    restUris,
+  });
   const tax = parseFloat(res.params?.community_tax || '0');
   return tax;
 };
 
-const fetchBondedRatio = async (): Promise<number> => {
-  const res = await queryRestNode({ endpoint: CHAIN_ENDPOINTS.getStakingPool });
+const fetchBondedRatio = async (restUris: Uri[]): Promise<number> => {
+  const res = await queryRestNode({ endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool, restUris });
 
   const bonded = parseFloat(res.pool?.bonded_tokens || '0');
   const notBonded = parseFloat(res.pool?.not_bonded_tokens || '0');
   const ratio = bonded / (bonded + notBonded);
 
   return ratio;
+};
+
+const fetchSignedBlocksWindow = async (restUris: Uri[]): Promise<number> => {
+  try {
+    const slashingData: any = await queryRestNode({
+      restUris,
+      endpoint: COSMOS_CHAIN_ENDPOINTS.getSlashingParams,
+    });
+    const signedBlocksWindow = parseInt(
+      (slashingData.params as unknown as SlashingParams).signed_blocks_window || '10000',
+    );
+
+    return signedBlocksWindow;
+  } catch (error) {
+    console.error('Error calculating inflation from Symphony mint module:', error);
+    return 0;
+  }
 };
 
 const convertPubKeyToValConsAddress = (pubKey: string, prefix = 'symphonyvalcons') => {
@@ -340,9 +374,18 @@ const buildUptimeMap = (
 };
 
 export const fetchValidatorData = async (
+  chainRegistry: LocalChainRegistry,
+  chainID: string,
   delegatorAddress: string,
 ): Promise<CombinedStakingInfo[]> => {
   try {
+    const restUris = chainRegistry[chainID].rest_uris;
+    const symphonyRestUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+
+    if (!restUris || restUris.length === 0) {
+      console.error('[fetchStakingInfo] Missing rest_uris for chain ID:', chainID);
+    }
+
     const [
       { validators },
       { delegations },
@@ -353,25 +396,22 @@ export const fetchValidatorData = async (
       communityTax,
       bondedRatio,
       signingInfos,
-      slashingData,
+      signedBlocksWindow,
     ] = await Promise.all([
-      fetchValidators(),
-      fetchDelegations(delegatorAddress),
-      fetchRewards(delegatorAddress),
-      fetchStakingParams(),
-      fetchUnbondingDelegations(delegatorAddress),
-      fetchInflation(),
-      fetchCommunityTax(),
-      fetchBondedRatio(),
-      fetchAllSigningInfos(),
-      queryRestNode({ endpoint: CHAIN_ENDPOINTS.getSlashingParams }),
+      fetchValidators(restUris),
+      fetchDelegations(restUris, delegatorAddress),
+      fetchRewards(restUris, delegatorAddress),
+      fetchStakingParams(restUris),
+      fetchUnbondingDelegations(restUris, delegatorAddress),
+      // TODO: check inflation vs symphony inflation depending on which chain
+      fetchSymphonyInflation(symphonyRestUris),
+      fetchCommunityTax(restUris),
+      fetchBondedRatio(restUris),
+      fetchAllSigningInfos(restUris),
+      fetchSignedBlocksWindow(restUris),
     ]);
 
     const totalTokens = validators.reduce((sum, v) => sum + parseFloat(v.tokens), 0);
-    const signedBlocksWindow = parseInt(
-      (slashingData.params as unknown as SlashingParams).signed_blocks_window || '10000',
-    );
-
     const uptimeMap = buildUptimeMap(validators, signingInfos, signedBlocksWindow);
 
     return validators.map(validator => {

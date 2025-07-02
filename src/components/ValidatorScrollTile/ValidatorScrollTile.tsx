@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Asset, CombinedStakingInfo, TransactionResult } from '@/types';
+import { Asset, CombinedStakingInfo, TransactionResult, Uri } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { LogoIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
@@ -18,6 +18,7 @@ import {
 import {
   BondStatus,
   DEFAULT_ASSET,
+  DEFAULT_CHAIN_ID,
   defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
   LOCAL_ASSET_REGISTRY,
@@ -25,7 +26,12 @@ import {
   TransactionType,
 } from '@/constants';
 import { useAtomValue } from 'jotai';
-import { filteredValidatorsAtom, showCurrentValidatorsAtom, walletStateAtom } from '@/atoms';
+import {
+  chainRegistryAtom,
+  filteredValidatorsAtom,
+  showCurrentValidatorsAtom,
+  walletStateAtom,
+} from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
 import { useRefreshData, useToast } from '@/hooks';
@@ -51,6 +57,7 @@ export const ValidatorScrollTile = ({
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
   const walletState = useAtomValue(walletStateAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const [amount, setAmount] = useState(0);
   const [feeState, setFeeState] = useState(defaultFeeState);
@@ -70,6 +77,10 @@ export const ValidatorScrollTile = ({
     fee: string;
     textClass: 'text-error' | 'text-warn' | 'text-blue';
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
+
+  // TODO: need to be able to change chain to stake to other chains
+  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+  const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
 
   const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
     combinedStakingInfo;
@@ -285,7 +296,7 @@ export const ValidatorScrollTile = ({
     }
   };
 
-  const handleStake = async (amount: string, isSimulation: boolean = false) => {
+  const handleStake = async (amount: string, rpcUris: Uri[], isSimulation: boolean = false) => {
     if (!isSimulation) setIsLoading(true);
 
     const txType = TransactionType.STAKE;
@@ -297,6 +308,7 @@ export const ValidatorScrollTile = ({
         LOCAL_ASSET_REGISTRY.note.denom,
         walletState.address,
         validator.operator_address,
+        rpcUris,
         isSimulation,
       );
 
@@ -318,12 +330,13 @@ export const ValidatorScrollTile = ({
     }
   };
 
-  const handleUnstake = async (amount: string, isSimulation: boolean = false) => {
+  const handleUnstake = async (amount: string, rpcUris: Uri[], isSimulation: boolean = false) => {
     if (!isSimulation) setIsLoading(true);
 
     const txType = TransactionType.UNSTAKE;
     try {
       const result = await claimAndUnstake({
+        rpcUris,
         amount,
         delegations: delegationResponse,
         simulateOnly: isSimulation,
@@ -347,7 +360,7 @@ export const ValidatorScrollTile = ({
     }
   };
 
-  const handleClaimToWallet = async (isSimulation: boolean = false) => {
+  const handleClaimToWallet = async (rpcUris: Uri[], isSimulation: boolean = false) => {
     if (!isSimulation) setIsLoading(true);
 
     const txType = TransactionType.CLAIM_TO_WALLET;
@@ -355,6 +368,7 @@ export const ValidatorScrollTile = ({
       const result = await claimRewards(
         walletState.address,
         validator.operator_address,
+        rpcUris,
         isSimulation,
       );
 
@@ -376,12 +390,18 @@ export const ValidatorScrollTile = ({
     }
   };
 
-  const handleClaimAndRestake = async (isSimulation: boolean = true) => {
+  const handleClaimAndRestake = async (
+    restUris: Uri[],
+    rpcUris: Uri[],
+    isSimulation: boolean = true,
+  ) => {
     if (!isSimulation) setIsLoading(true);
 
     const txType = TransactionType.CLAIM_TO_RESTAKE;
     try {
       const result = await claimAndRestake(
+        restUris,
+        rpcUris,
         delegationResponse,
         [
           {
@@ -425,7 +445,7 @@ export const ValidatorScrollTile = ({
   const updateFee = async () => {
     if (selectedAction !== 'claim' && (amount === 0 || isNaN(amount))) {
       if (selectedAction === 'stake') {
-        handleStake('0', true);
+        handleStake('0', rpcUris, true);
       }
       formatFee(0);
     } else {
@@ -433,12 +453,14 @@ export const ValidatorScrollTile = ({
 
       if (selectedAction === 'claim') {
         result = (
-          isClaimToRestake ? await handleClaimAndRestake(true) : await handleClaimToWallet(true)
+          isClaimToRestake
+            ? await handleClaimAndRestake(restUris, rpcUris, true)
+            : await handleClaimToWallet(rpcUris, true)
         ) as TransactionResult;
       } else if (selectedAction === 'stake') {
-        result = (await handleStake(amount.toString(), true)) as TransactionResult;
+        result = (await handleStake(amount.toString(), rpcUris, true)) as TransactionResult;
       } else if (selectedAction === 'unstake') {
-        result = (await handleUnstake(amount.toString(), true)) as TransactionResult;
+        result = (await handleUnstake(amount.toString(), rpcUris, true)) as TransactionResult;
       }
 
       formatFee(parseFloat(result.data?.gasWanted || '0'));
@@ -657,8 +679,8 @@ export const ValidatorScrollTile = ({
                     endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
                     onEndButtonClick={() => {
                       selectedAction === 'stake'
-                        ? handleStake(amount.toString())
-                        : handleUnstake(amount.toString());
+                        ? handleStake(amount.toString(), rpcUris)
+                        : handleUnstake(amount.toString(), rpcUris);
                     }}
                   />
                 </div>
@@ -698,7 +720,9 @@ export const ValidatorScrollTile = ({
                       className="w-full"
                       disabled={isLoading}
                       onClick={() =>
-                        isClaimToRestake ? handleClaimAndRestake(false) : handleClaimToWallet(false)
+                        isClaimToRestake
+                          ? handleClaimAndRestake(restUris, rpcUris, false)
+                          : handleClaimToWallet(rpcUris, false)
                       }
                     >
                       {`Claim ${isClaimToRestake ? 'to Restake' : 'to Wallet'}`}

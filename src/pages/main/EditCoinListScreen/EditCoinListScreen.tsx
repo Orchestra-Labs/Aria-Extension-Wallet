@@ -87,7 +87,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   // TODO: with multi-coin support, change to select specific coin and chain by sorted category and selection
   const confirmSelection = () => {
     if (userAccount) {
-      const updatedSubscriptions: { [networkID: string]: SubscriptionRecord } = {};
+      const updatedSubscriptions: SubscriptionRecord = {};
 
       // TODO: change page's save structure to reflect subscription/registry structure to prevent excess looping here
       const networkID = DEFAULT_CHAIN_ID;
@@ -95,12 +95,11 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       const selectedNetworkCoins = selectedCoins.map(coin => coin.denom);
 
       console.log('saving selected coins', selectedNetworkCoins);
+      // TODO: elect Symphony (and Melody) as default if nothing is selected
       if (selectedNetworkCoins.length === networkCoinDenoms.length) {
-        // All coins in the network are selected, so save as an empty array
-        updatedSubscriptions[networkID] = { coinDenoms: [] };
+        updatedSubscriptions[networkID] = [];
       } else if (selectedNetworkCoins.length > 0) {
-        // Partial selection, save the selected denoms
-        updatedSubscriptions[networkID] = { coinDenoms: selectedNetworkCoins };
+        updatedSubscriptions[networkID] = selectedNetworkCoins;
       }
 
       const updatedUserAccount = {

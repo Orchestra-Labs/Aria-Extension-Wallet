@@ -4,6 +4,7 @@ export * from './useExchangePoolBalance';
 export * from './useExchangeRate';
 export * from './useExchangeRequirements';
 export * from './useGetModuleAccountsQuery';
+export * from './useGetTobinTaxRateQuery';
 export * from './useInactivityCheck';
 export * from './useInitializeWalletConnect';
 export * from './useLogout';

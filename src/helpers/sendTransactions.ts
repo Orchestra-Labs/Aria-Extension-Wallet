@@ -1,6 +1,6 @@
-import { CHAIN_ENDPOINTS } from '@/constants';
+import { COSMOS_CHAIN_ENDPOINTS } from '@/constants';
 import { queryRpcNode } from './queryNodes';
-import { SendObject, TransactionResult, RPCResponse, Asset } from '@/types';
+import { SendObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
 import { getValidFeeDenom } from './feeDenom';
 
 export const isValidSend = ({
@@ -18,8 +18,9 @@ export const sendTransaction = async (
   fromAddress: string,
   sendObject: SendObject,
   simulateOnly: boolean = false,
+  rpcUris: Uri[],
 ): Promise<TransactionResult> => {
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
     {
@@ -44,6 +45,7 @@ export const sendTransaction = async (
 
     const response = await queryRpcNode({
       endpoint,
+      rpcUris,
       messages,
       feeDenom,
       simulateOnly,
@@ -87,8 +89,9 @@ export const multiSendTransaction = async (
   fromAddress: string,
   sendObjects: SendObject[],
   simulateOnly: boolean = false,
+  rpcUris: Uri[],
 ): Promise<TransactionResult> => {
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = sendObjects.map(sendObject => ({
     typeUrl: endpoint,
@@ -104,6 +107,7 @@ export const multiSendTransaction = async (
   try {
     const response = await queryRpcNode({
       endpoint,
+      rpcUris,
       messages,
       feeDenom,
       simulateOnly,

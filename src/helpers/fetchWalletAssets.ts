@@ -1,11 +1,5 @@
-import {
-  IBC_PREFIX,
-  LOCAL_ASSET_REGISTRY,
-  GREATER_EXPONENT_DEFAULT,
-  CHAIN_ENDPOINTS,
-  LOCAL_CHAIN_REGISTRY,
-} from '@/constants';
-import { Asset, SubscriptionRecord } from '@/types';
+import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS } from '@/constants';
+import { Uri, Asset, SimplifiedChainInfo } from '@/types';
 import { queryRestNode } from './queryNodes';
 
 const adjustAmountByExponent = (amount: string, exponent: number): string => {
@@ -15,12 +9,17 @@ const adjustAmountByExponent = (amount: string, exponent: number): string => {
 
 const resolveIbcDenom = async (
   ibcDenom: string,
+  chainAssets: Record<string, any> | undefined,
+  restUris: Uri[],
 ): Promise<{ denom: string; symbol: string; logo?: string; exponent: number }> => {
   try {
     const denomHash = ibcDenom.slice(4); // Remove the "ibc/" prefix
-    const getIBCInfoEndpoint = CHAIN_ENDPOINTS.getIBCInfo;
+    const getIBCInfoEndpoint = COSMOS_CHAIN_ENDPOINTS.getIBCInfo;
 
-    const response = await queryRestNode({ endpoint: `${getIBCInfoEndpoint}${denomHash}` });
+    const response = await queryRestNode({
+      endpoint: `${getIBCInfoEndpoint}${denomHash}`,
+      restUris,
+    });
     const baseDenom = response.denom_trace?.base_denom;
 
     if (!baseDenom) {
@@ -28,34 +27,29 @@ const resolveIbcDenom = async (
       throw new Error(`Failed to resolve IBC denom: ${ibcDenom}`);
     }
 
-    // TODO: use exchange assets for base denom information
-    const registryAsset = LOCAL_ASSET_REGISTRY[baseDenom] || null;
-    let symbol: string;
-    let logo: string | undefined;
-    let exponent: number;
+    const registryAsset = chainAssets?.[baseDenom];
+    if (!registryAsset) return Promise.reject(null);
 
-    if (registryAsset) {
-      symbol = registryAsset.symbol ?? baseDenom;
-      logo = registryAsset.logo;
-      exponent = registryAsset.exponent ?? GREATER_EXPONENT_DEFAULT;
-    } else {
-      symbol = baseDenom;
-      logo = undefined;
-      exponent = GREATER_EXPONENT_DEFAULT;
-    }
-
-    return { denom: baseDenom, symbol, logo, exponent };
+    return {
+      denom: baseDenom,
+      symbol: registryAsset.symbol,
+      logo: registryAsset.logo,
+      exponent: registryAsset.exponent,
+    };
   } catch (error) {
     console.error(`Error resolving IBC denom ${ibcDenom}:`, error);
     throw error;
   }
 };
 
-const getBalances = async (walletAddress: string): Promise<Asset[]> => {
-  const getBalanceEndpoint = CHAIN_ENDPOINTS.getBalance;
+const getBalances = async (walletAddress: string, restUris: Uri[]): Promise<Asset[]> => {
+  const getBalanceEndpoint = COSMOS_CHAIN_ENDPOINTS.getBalance;
 
   // Use queryNode to try querying balances across nodes
-  const response = await queryRestNode({ endpoint: `${getBalanceEndpoint}${walletAddress}` });
+  const response = await queryRestNode({
+    endpoint: `${getBalanceEndpoint}${walletAddress}`,
+    restUris,
+  });
 
   if (!response.balances) {
     // TODO: show error to user
@@ -68,18 +62,28 @@ const getBalances = async (walletAddress: string): Promise<Asset[]> => {
 export async function fetchWalletAssets(
   walletAddress: string,
   networkID: string,
-  subscription: SubscriptionRecord,
+  coinDenoms: string[],
+  chainRegistry: Record<string, SimplifiedChainInfo>,
 ): Promise<Asset[]> {
-  if (!walletAddress) {
-    console.error('No wallet address available in walletState!');
-    return [];
-  }
+  if (!walletAddress) return [];
 
   try {
-    const coins: Asset[] = await getBalances(walletAddress);
+    const chainInfo = chainRegistry[networkID];
+    if (!chainInfo) return [];
 
-    const coinDenoms: string[] = subscription.coinDenoms || [];
-    const networkName = LOCAL_CHAIN_REGISTRY[networkID]?.chainName || 'Unknown Network';
+    const restUris = chainInfo.rest_uris;
+    console.log(
+      `[fetchWalletAssets] rest uris for ${networkID} from chain registry are: ${JSON.stringify(restUris)}`,
+    );
+    if (!restUris) {
+      console.warn(`No REST endpoint found for ${networkID}`);
+      return [];
+    }
+
+    const coins: Asset[] = await getBalances(walletAddress, restUris);
+
+    const networkName = chainInfo.pretty_name || chainInfo.chain_name || networkID;
+    const chainAssets = chainInfo.assets;
 
     // Filter assets if coinDenoms is not empty, otherwise include all
     const filteredCoins =
@@ -88,65 +92,48 @@ export async function fetchWalletAssets(
     // Map through the balances and resolve their properties
     const walletAssets = await Promise.all(
       filteredCoins.map(async (coin: Asset) => {
-        let symbol: string;
-        let logo: string | undefined;
-        let exponent: number;
-
-        const registryAsset = LOCAL_ASSET_REGISTRY[coin.denom] || null;
-
-        if (!registryAsset) {
-          const denom = coin.denom;
-          symbol = `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
-          exponent = GREATER_EXPONENT_DEFAULT;
-          logo = undefined;
-        } else {
-          symbol = registryAsset.symbol ?? coin.denom;
-          exponent = registryAsset.exponent ?? GREATER_EXPONENT_DEFAULT;
-          logo = registryAsset.logo;
-        }
-
-        // Adjust the coin amount by the exponent (shift decimal)
-        const adjustedAmount = adjustAmountByExponent(coin.amount, exponent);
+        const registryAsset = chainAssets?.[coin.denom];
+        if (!registryAsset) return null;
 
         if (coin.denom.startsWith(IBC_PREFIX)) {
-          // Resolve IBC denom details
-          const {
-            denom: resolvedDenom,
-            symbol: resolvedSymbol,
-            logo: resolvedLogo,
-            exponent: resolvedExponent,
-          } = await resolveIbcDenom(coin.denom);
+          try {
+            const {
+              denom: resolvedDenom,
+              symbol: resolvedSymbol,
+              logo: resolvedLogo,
+              exponent: resolvedExponent,
+            } = await resolveIbcDenom(coin.denom, chainAssets, restUris);
 
-          // Adjust the amount based on the resolved exponent
-          const resolvedAmount = adjustAmountByExponent(coin.amount, resolvedExponent);
-
-          return {
-            ...coin,
-            denom: resolvedDenom,
-            symbol: resolvedSymbol,
-            logo: resolvedLogo,
-            exponent: resolvedExponent,
-            amount: resolvedAmount,
-            isIbc: true,
-            networkName,
-            networkID,
-          };
+            return {
+              ...coin,
+              denom: resolvedDenom,
+              symbol: resolvedSymbol,
+              logo: resolvedLogo,
+              exponent: resolvedExponent,
+              amount: adjustAmountByExponent(coin.amount, resolvedExponent),
+              isIbc: true,
+              networkID,
+              networkName,
+            };
+          } catch {
+            return null;
+          }
         }
 
         return {
           ...coin,
-          symbol,
-          logo,
-          exponent,
-          amount: adjustedAmount,
+          symbol: registryAsset.symbol,
+          logo: registryAsset.logo,
+          exponent: registryAsset.exponent,
+          amount: adjustAmountByExponent(coin.amount, registryAsset.exponent),
           isIbc: false,
-          networkName,
           networkID,
+          networkName,
         };
       }),
     );
 
-    return walletAssets;
+    return walletAssets.filter((a): a is Asset => a !== null);
   } catch (error) {
     console.error('Error fetching wallet assets:', error);
     return [];

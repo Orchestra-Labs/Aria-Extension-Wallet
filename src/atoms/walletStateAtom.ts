@@ -32,13 +32,11 @@ export const subscribedAssetsAtom = atom(get => {
 
   const visibleAssets: Asset[] = [];
   if (userAccount && userAccount.settings.subscribedTo) {
-    Object.entries(userAccount.settings.subscribedTo).forEach(([networkID, subscription]) => {
+    Object.entries(userAccount.settings.subscribedTo).forEach(([networkID, denoms]) => {
       const networkAssets = symphonyAssets.reduce((map: { [key: string]: Asset }, asset) => {
         map[asset.denom] = asset;
         return map;
       }, {});
-
-      const hasCoinSubscriptions = subscription.coinDenoms.length > 0;
 
       const addVisibleAsset = (denom: string) => {
         const baseAsset = networkAssets[denom];
@@ -54,8 +52,8 @@ export const subscribedAssetsAtom = atom(get => {
         }
       };
 
-      if (hasCoinSubscriptions) {
-        subscription.coinDenoms.forEach(addVisibleAsset);
+      if (denoms.length > 0) {
+        denoms.forEach(addVisibleAsset);
       } else {
         symphonyAssets.forEach(asset => addVisibleAsset(asset.denom));
       }

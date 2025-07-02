@@ -1,14 +1,20 @@
-import { walletAssetsAtom, walletAddressAtom, isFetchingWalletDataAtom } from '@/atoms';
+import {
+  walletAssetsAtom,
+  walletAddressAtom,
+  isFetchingWalletDataAtom,
+  chainRegistryAtom,
+} from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { DEFAULT_SUBSCRIPTION } from '@/constants';
 import { fetchWalletAssets } from '@/helpers';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 
 export function useWalletAssetsRefresh() {
-  const [walletAddress] = useAtom(walletAddressAtom);
   const setWalletAssets = useSetAtom(walletAssetsAtom);
   const setIsFetchingData = useSetAtom(isFetchingWalletDataAtom);
+  const walletAddress = useAtomValue(walletAddressAtom);
   const userAccount = useAtomValue(userAccountAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const refreshWalletAssets = async (address?: string) => {
     const targetAddress = address || walletAddress;
@@ -23,8 +29,11 @@ export function useWalletAssetsRefresh() {
       setIsFetchingData(true);
 
       try {
-        const assetsPromises = Object.entries(subscriptions).map(([networkID, subscription]) => {
-          return fetchWalletAssets(targetAddress, networkID, subscription);
+        const allDenoms: string[] = Object.values(subscriptions).flat();
+        const assetsPromises = Object.entries(subscriptions).map(([networkID]) => {
+          console.log('[useWalletDataRefresh] network ID:', networkID);
+          console.log('[useWalletDataRefresh] denoms:', allDenoms);
+          return fetchWalletAssets(targetAddress, networkID, allDenoms, chainRegistry);
         });
 
         const allAssets = (await Promise.all(assetsPromises)).flat();

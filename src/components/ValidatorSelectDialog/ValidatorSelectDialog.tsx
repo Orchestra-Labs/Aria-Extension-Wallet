@@ -4,6 +4,7 @@ import { TileScroller } from '../TileScroller';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
+  chainRegistryAtom,
   dialogSearchTermAtom,
   filteredDialogValidatorsAtom,
   selectedValidatorsAtom,
@@ -18,10 +19,11 @@ import {
   truncateWalletAddress,
   claimAndUnstake,
 } from '@/helpers';
-import { CombinedStakingInfo } from '@/types';
+import { CombinedStakingInfo, Uri } from '@/types';
 import { useRefreshData, useToast } from '@/hooks';
 import {
   DEFAULT_ASSET,
+  DEFAULT_CHAIN_ID,
   GREATER_EXPONENT_DEFAULT,
   TransactionType,
   ValidatorSortType,
@@ -49,6 +51,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -64,6 +67,10 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     fee: string;
     textClass: 'text-error' | 'text-warn' | 'text-blue';
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
+
+  // TODO: need to be able to change chain to stake to other chains
+  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+  const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
 
   const allValidatorsSelected = selectedValidators.length === filteredValidators.length;
   const noValidatorsSelected = selectedValidators.length === 0;
@@ -177,6 +184,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       const result = await claimRewards(
         filteredValidators[0].delegation.delegator_address,
         selectedValidators.map(v => v.delegation.validator_address),
+        rpcUris,
         isSimulation,
       );
 
@@ -196,7 +204,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     }
   };
 
-  const handleClaimAndRestake = async (isSimulation: boolean = false) => {
+  const handleClaimAndRestake = async (rpcUris: Uri[], isSimulation: boolean = false) => {
     if (!isSimulation) setAsLoading(TransactionType.CLAIM_TO_RESTAKE);
 
     try {
@@ -206,6 +214,8 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       }));
 
       const claimResult = await claimAndRestake(
+        restUris,
+        rpcUris,
         selectedValidators.map(v => ({
           delegation: v.delegation,
           balance: v.balance,
@@ -240,6 +250,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
     try {
       const result = await claimAndUnstake({
+        rpcUris,
         delegations: delegations,
         simulateOnly,
       });
@@ -285,7 +296,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       let totalAmount = isClaimDialog ? calculateTotalRewards() : calculateTotalDelegations();
       let simulationResult = isClaimDialog
         ? isClaimToRestake
-          ? await handleClaimAndRestake(true)
+          ? await handleClaimAndRestake(rpcUris, true)
           : await handleClaimToWallet(true)
         : await handleUnstake(true);
 
@@ -420,7 +431,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             onClick={() =>
               isClaimDialog
                 ? isClaimToRestake
-                  ? handleClaimAndRestake(false)
+                  ? handleClaimAndRestake(rpcUris, false)
                   : handleClaimToWallet(false)
                 : handleUnstake(false)
             }

@@ -52,6 +52,11 @@ export enum NetworkLevel {
   MAINNET = 'mainnet',
 }
 
+export enum QueryType {
+  GET = 'GET',
+  POST = 'POST',
+}
+
 export enum Position {
   TOP = 'top',
   BOTTOM = 'bottom',
@@ -59,7 +64,7 @@ export enum Position {
   RIGHT = 'right',
 }
 
-export enum SettingsOptions {
+export enum SettingsOption {
   STABLECOIN_FEE = 'stablecoinFeeElection',
   VALIDATOR_STATUS = 'viewValidatorsByStatus',
 }

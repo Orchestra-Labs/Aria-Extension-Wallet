@@ -1,38 +1,31 @@
-import { STORED_DATA_TIMEOUT } from '@/constants';
+import { NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { decompressSync } from 'fflate';
+import {
+  AccountRecord,
+  ChainRegistryRecord,
+  SimplifiedChainInfo,
+  LocalChainRegistry,
+} from '@/types';
 
+// TODO: pull in testnets as well
+// TODO: also pull IBC information
 // TODO: show status of download to user in topbar.  "checking for update", "querying for new chains", "updating chain information"
 // TODO: change to use regularly updated json file for single file download (faster, lighter, less wasteful)
-const REGISTRY_KEY = 'cosmosChains';
+const REGISTRY_KEY = 'localChainRegistry';
 const GITHUB_COMMIT_URL =
   'https://api.github.com/repos/Orchestra-Labs/cosmos-chain-registry/commits/master';
 
-type StoredChainRegistry = {
-  sha: string;
-  lastUpdated: string;
-  data: ChainRegistryCache;
-};
+export type ChainRegistryCache = Record<
+  string,
+  {
+    'chain.json'?: any;
+    'assetlist.json'?: any;
+    assets?: Record<string, any>;
+  }
+>;
 
-export type ChainRegistryCache = Record<string, { 'chain.json': any }>;
-
-export type SimplifiedChainInfo = {
-  chain_name: string;
-  status: string;
-  network_type: string;
-  pretty_name: string;
-  chain_type: string;
-  chain_id: string;
-  bech32_prefix: string;
-  fees?: any;
-  staking?: any;
-  persistent_peers?: any[];
-  rpc_apis?: any[];
-  rest_apis?: any[];
-  logo_uri?: string;
-};
-
-export const getStoredChainRegistry = (): StoredChainRegistry | null => {
+export const getStoredChainRegistry = (): ChainRegistryRecord | null => {
   const raw = getLocalStorageItem(REGISTRY_KEY);
   if (!raw) return null;
 
@@ -90,6 +83,32 @@ export const checkChainRegistryUpdate = async (): Promise<boolean> => {
   return hasChanged;
 };
 
+function extractAssets(assetlist: any, chain: any): Record<string, any> {
+  const feeTokens = new Set(chain?.fees?.fee_tokens?.map((f: any) => f.denom));
+  const networkName = chain.pretty_name;
+  const networkID = chain.chain_id;
+
+  const result: Record<string, any> = {};
+  for (const asset of assetlist.assets || []) {
+    const base = asset.base;
+    const displayUnit = asset.denom_units?.find((d: any) => d.denom === asset.symbol.toLowerCase());
+    result[base] = {
+      denom: base,
+      amount: '1',
+      isIbc: false,
+      logo: asset.logo_URIs?.png,
+      symbol: asset.symbol,
+      name: asset.name,
+      exponent: displayUnit?.exponent ?? 0,
+      isFeeToken: feeTokens.has(base),
+      networkName,
+      networkID,
+    };
+  }
+
+  return result;
+}
+
 export const fetchAndStoreChainRegistry = async (): Promise<void> => {
   try {
     console.log('[ChainRegistry] Starting full fetch & store');
@@ -110,48 +129,62 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
     const blob = await response.blob();
     const buffer = await blob.arrayBuffer();
     const decompressed = decompressSync(new Uint8Array(buffer));
-
-    const chainFiles: ChainRegistryCache = {};
     const decoder = new TextDecoder();
 
     let offset = 0;
+    const chainFiles: Record<
+      string,
+      { 'chain.json'?: any; 'assetlist.json'?: any; assets?: Record<string, any> }
+    > = {};
+    const simplifiedRegistry: LocalChainRegistry = {};
+
     while (offset + 512 <= decompressed.length) {
-      const name = new TextDecoder()
-        .decode(decompressed.slice(offset, offset + 100))
-        .replace(/\0.*$/, '');
+      const name = decoder.decode(decompressed.slice(offset, offset + 100)).replace(/\0.*$/, '');
       if (!name) break;
 
-      const sizeOctal = new TextDecoder()
+      const sizeOctal = decoder
         .decode(decompressed.slice(offset + 124, offset + 136))
         .replace(/\0.*$/, '');
       const size = parseInt(sizeOctal.trim(), 8);
       const contentStart = offset + 512;
       const contentEnd = contentStart + size;
-
-      if (name.endsWith('/chain.json')) {
-        const parts = name.split('/');
-        const chainName = parts[1];
-
-        try {
-          const content = JSON.parse(decoder.decode(decompressed.slice(contentStart, contentEnd)));
-          chainFiles[chainName] = { 'chain.json': content };
-        } catch (err) {
-          console.warn(`Invalid JSON in ${name}`);
-        }
-      }
-
       const totalSize = 512 + Math.ceil(size / 512) * 512;
       offset += totalSize;
+
+      if (!name.endsWith('.json')) continue;
+      const parts = name.split('/');
+      const chainName = parts[1];
+      const file = parts[2] as 'chain.json' | 'assetlist.json';
+      if (!chainName || !file || !['chain.json', 'assetlist.json'].includes(file)) continue;
+
+      try {
+        const content = JSON.parse(decoder.decode(decompressed.slice(contentStart, contentEnd)));
+        if (!chainFiles[chainName]) chainFiles[chainName] = {};
+        chainFiles[chainName][file] = content;
+      } catch (err) {
+        console.warn(`Invalid JSON in ${name}`);
+      }
     }
 
-    const payload: StoredChainRegistry = {
+    for (const chainName of Object.keys(chainFiles)) {
+      const entry = chainFiles[chainName];
+      if (entry['chain.json'] && entry['assetlist.json']) {
+        entry.assets = extractAssets(entry['assetlist.json'], entry['chain.json']);
+      }
+
+      if (entry['chain.json']) {
+        simplifiedRegistry[chainName] = extractChainInfo(entry['chain.json'], entry.assets ?? {});
+      }
+    }
+
+    const payload: ChainRegistryRecord = {
       sha: commit,
       lastUpdated: new Date().toISOString(),
-      data: chainFiles,
+      data: simplifiedRegistry,
     };
 
     setLocalStorageItem(REGISTRY_KEY, JSON.stringify(payload));
-    console.log('Stored entire registry:', Object.keys(chainFiles).length, 'chains');
+    console.log('Stored flattened registry:', Object.keys(simplifiedRegistry).length, 'chains');
   } catch (err) {
     console.error('Failed to fetch and store full registry:', err);
   }
@@ -177,26 +210,64 @@ export const listChainsByNetworkType = (
 export const getChainsByNetworkType = (
   registry: ChainRegistryCache,
   networkType: 'mainnet' | 'testnet',
-): any[] => {
+): SimplifiedChainInfo[] => {
   return Object.entries(registry)
     .filter(([_, files]) => files['chain.json']?.network_type === networkType)
-    .map(([_, files]) => files['chain.json']);
+    .map(([_, files]) => extractChainInfo(files['chain.json'], files.assets));
 };
 
-export const extractChainInfo = (raw: any): SimplifiedChainInfo => {
+export const filterChainRegistryToSubscriptions = (
+  registry: LocalChainRegistry,
+  account: AccountRecord,
+): LocalChainRegistry => {
+  const subscriptions = account.settings.subscribedTo;
+  console.log('[ChainRegistry] account subscriptions:', subscriptions);
+
+  const result: LocalChainRegistry = {};
+
+  for (const chainID in subscriptions) {
+    const assets = subscriptions[chainID];
+    console.log(`[ChainRegistry] assets: for ${chainID}: ${assets}`);
+
+    // TODO: seems this is only matching mainnets, not testnets.  pull in testnets as well
+    const match = Object.values(registry).find(
+      c => c.chain_id.trim().toLowerCase() === chainID.trim().toLowerCase(),
+    );
+    console.log(
+      '[ChainRegistry] registry chain_ids:',
+      Object.values(registry).map(c => c.chain_id),
+    );
+    console.log(`[ChainRegistry] match?: ${JSON.stringify(match)}}`);
+
+    if (match) {
+      result[match.chain_name] = {
+        ...match,
+        assets: Object.fromEntries(
+          Object.entries(match.assets || {}).filter(([k]) => assets.includes(k)),
+        ),
+      };
+    }
+  }
+
+  return result;
+};
+
+export const extractChainInfo = (raw: any, assets?: Record<string, any>): SimplifiedChainInfo => {
+  const networkLevel = raw.network_type === 'mainnet' ? NetworkLevel.MAINNET : NetworkLevel.TESTNET;
+
   return {
     chain_name: raw.chain_name,
     status: raw.status,
-    network_type: raw.network_type,
+    network_level: networkLevel,
     pretty_name: raw.pretty_name,
     chain_type: raw.chain_type,
     chain_id: raw.chain_id,
     bech32_prefix: raw.bech32_prefix,
     fees: raw.fees,
     staking: raw.staking,
-    persistent_peers: raw.peers?.persistent_peers ?? [],
-    rpc_apis: raw.apis?.rpc ?? [],
-    rest_apis: raw.apis?.rest ?? [],
+    rpc_uris: raw.apis?.rpc ?? [],
+    rest_uris: raw.apis?.rest ?? [],
     logo_uri: raw.logo_URIs?.png || raw.images?.find((img: any) => !!img.png)?.png || null,
+    assets: assets ?? {},
   };
 };

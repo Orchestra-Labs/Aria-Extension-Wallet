@@ -1,6 +1,12 @@
-import { incrementErrorCount, performRpcQuery, selectNodeProviders } from './queryNodes';
+import { performRpcQuery } from './queryNodes';
 import { SwapObject, TransactionResult, RPCResponse, Asset } from '@/types';
-import { CHAIN_ENDPOINTS, DELAY_BETWEEN_NODE_ATTEMPTS, MAX_NODES_PER_QUERY } from '@/constants';
+import {
+  COSMOS_CHAIN_ENDPOINTS,
+  DEFAULT_CHAIN_ID,
+  DELAY_BETWEEN_NODE_ATTEMPTS,
+  LOCAL_CHAIN_REGISTRY,
+  MAX_RETRIES_PER_QUERY,
+} from '@/constants';
 import { createOfflineSignerFromMnemonic } from './dataHelpers/wallet';
 import { delay } from './timer';
 import { getValidFeeDenom } from './feeDenom';
@@ -21,7 +27,7 @@ export const isValidSwap = ({
   return result;
 };
 
-// TODO: merge in with queryNodes.  do not need separate signer if endpoint and message object are used
+// TODO: merge in with queryNodes.  add message object to query and parameter to determine which signer to use
 const queryWithRetry = async ({
   endpoint,
   walletAddress,
@@ -35,15 +41,15 @@ const queryWithRetry = async ({
   feeDenom: string;
   simulateOnly?: boolean;
 }): Promise<any> => {
-  const providers = selectNodeProviders();
+  const providers = LOCAL_CHAIN_REGISTRY[DEFAULT_CHAIN_ID].rpc_uris;
   console.log('Selected node providers:', providers);
 
   let numberAttempts = 0;
 
-  while (numberAttempts < MAX_NODES_PER_QUERY) {
+  while (numberAttempts < MAX_RETRIES_PER_QUERY) {
     for (const provider of providers) {
       try {
-        const queryMethod = provider.rpc;
+        const queryMethod = provider.address;
         console.log(`Querying node ${queryMethod} with endpoint: ${endpoint}`);
 
         const sessionToken = getSessionToken();
@@ -53,6 +59,7 @@ const queryWithRetry = async ({
         }
         const offlineSigner = await createOfflineSignerFromMnemonic(sessionToken.mnemonic || '');
 
+        // TODO: is this the only part different between here and queryNodes?
         const client = await getSigningSymphonyClient({
           rpcEndpoint: queryMethod,
           signer: offlineSigner,
@@ -67,12 +74,12 @@ const queryWithRetry = async ({
         );
         return result;
       } catch (error) {
-        incrementErrorCount(provider.rpc);
+        // incrementErrorCount(provider.rpc);
         console.error('Error querying node:', error);
       }
       numberAttempts++;
 
-      if (numberAttempts >= MAX_NODES_PER_QUERY) {
+      if (numberAttempts >= MAX_RETRIES_PER_QUERY) {
         break;
       }
 
@@ -80,7 +87,7 @@ const queryWithRetry = async ({
     }
   }
 
-  throw new Error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`);
+  throw new Error(`All node query attempts failed after ${MAX_RETRIES_PER_QUERY} attempts.`);
 };
 
 export const swapTransaction = async (
@@ -89,7 +96,7 @@ export const swapTransaction = async (
   simulateOnly: boolean = false,
 ): Promise<TransactionResult> => {
   console.log('Attempting swap with object:', swapObject);
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
     swapSend({
@@ -154,7 +161,7 @@ export const multiSwapTransaction = async (
   swapObjects: SwapObject[],
   simulateOnly: boolean = false,
 ): Promise<TransactionResult> => {
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = swapObjects.map(swapObject =>
     swapSend({

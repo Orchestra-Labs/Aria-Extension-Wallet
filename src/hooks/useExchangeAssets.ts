@@ -3,12 +3,14 @@ import { Asset } from '@/types';
 import {
   LOCAL_ASSET_REGISTRY,
   DEFAULT_ASSET,
-  CHAIN_ENDPOINTS,
   GREATER_EXPONENT_DEFAULT,
+  SYMPHONY_ENDPOINTS,
+  DEFAULT_CHAIN_ID,
+  QueryType,
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { sendStateAtom, walletAssetsAtom } from '@/atoms';
+import { chainRegistryAtom, sendStateAtom, walletAssetsAtom } from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -25,12 +27,22 @@ interface ExchangeRequirementResponse {
   };
 }
 
+// TODO: enable use on both symphony testnet and symphony mainnet
 export const useExchangeAssets = () => {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const sendState = useAtomValue(sendStateAtom);
   const walletAssets = useAtomValue(walletAssetsAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const chainInfo = chainRegistry[DEFAULT_CHAIN_ID];
+  const restUris = chainInfo?.rest_uris;
+
+  if (!restUris || restUris.length === 0) {
+    console.error('[useExchangeAssets] Missing rest_uris for chain ID:', DEFAULT_CHAIN_ID);
+  }
 
   const fetchExchangeAssets = async () => {
     setIsLoading(true);
@@ -40,10 +52,14 @@ export const useExchangeAssets = () => {
       const defaultAsset = DEFAULT_ASSET;
       const sendAsset = sendState.asset;
 
+      console.log('[useExchangeAssets] querying for exchange rates for:', DEFAULT_CHAIN_ID);
+      console.log('[useExchangeAssets] using rest uris:', restUris);
       const response = (await queryRestNode({
-        endpoint: `${CHAIN_ENDPOINTS.exchangeRequirements}`,
-        queryType: 'GET',
+        endpoint: `${SYMPHONY_ENDPOINTS.exchangeRequirements}`,
+        queryType: QueryType.GET,
+        restUris,
       })) as unknown as ExchangeRequirementResponse;
+      console.log('[useExchangeAssets] noted response:', response);
 
       if (!response.exchange_requirements) {
         throw new Error('Invalid response format');
@@ -66,8 +82,9 @@ export const useExchangeAssets = () => {
       // If sendAsset is different from DEFAULT_ASSET, get the exchange rate from sendAsset to DEFAULT_ASSET
       if (sendAsset.denom !== defaultAsset.denom) {
         const exchangeRateResponse = await queryRestNode({
-          endpoint: `${CHAIN_ENDPOINTS.swap}offerCoin=1000000${sendAsset.denom}&askDenom=${defaultAsset.denom}`,
-          queryType: 'GET',
+          endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=1000000${sendAsset.denom}&askDenom=${defaultAsset.denom}`,
+          queryType: QueryType.GET,
+          restUris,
         });
 
         adjustmentRate = parseFloat(exchangeRateResponse.return_coin.amount) / 1000000;

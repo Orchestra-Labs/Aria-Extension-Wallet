@@ -1,4 +1,4 @@
-import { NetworkLevel, SettingsOptions } from '@/constants';
+import { NetworkLevel } from '@/constants';
 
 export interface SessionToken {
   mnemonic: string;
@@ -7,52 +7,18 @@ export interface SessionToken {
   timestamp: string;
 }
 
-export interface SubscriptionRecord {
-  coinDenoms: string[];
-}
-
-export interface WalletRecord {
-  id: string;
-  name: string;
-  encryptedMnemonic: string;
-  settings: {};
-}
-
-export interface AccountRecord {
-  id: string; // password and account share ID
-  // prioritize lowest level settings for priority (wallet visibility over account visibility)
-  settings: {
-    defaultNetworkID: string;
-    defaultCoinDenom: string;
-    subscribedTo: { [networkID: string]: SubscriptionRecord };
-    activeWalletID: string;
-    [SettingsOptions.STABLECOIN_FEE]: boolean;
-    [SettingsOptions.VALIDATOR_STATUS]: boolean;
-    // initialization settings:
-    hasSetCoinList: boolean;
-    hasViewedTutorial: boolean;
-  };
-  wallets: WalletRecord[];
-}
-
-export interface PasswordRecord {
-  id: string; // password and account share ID
-  hash: string;
-  salt: string;
-}
-
 export interface Asset {
   denom: string;
   amount: string;
   exchangeRate?: string;
   isIbc: boolean;
-  logo?: string;
-  symbol?: string;
-  name?: string;
-  exponent?: number;
+  logo: string;
+  symbol: string;
+  name: string;
+  exponent: number;
   isFeeToken?: boolean;
-  networkName?: string;
-  networkID?: string;
+  networkName: string;
+  networkID: string;
 }
 
 export interface WalletAssets {
@@ -321,8 +287,7 @@ export interface IBCConnectionFile {
 export interface TransactionState {
   asset: Asset;
   amount: number;
-  chainName: string;
-  networkLevel: NetworkLevel;
+  chainID: string;
 }
 
 export interface BaseAccount {

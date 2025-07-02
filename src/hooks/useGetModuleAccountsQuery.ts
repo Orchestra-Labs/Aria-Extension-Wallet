@@ -1,25 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { CHAIN_ENDPOINTS } from '@/constants';
+import { COSMOS_CHAIN_ENDPOINTS, QueryType } from '@/constants';
 import { queryRestNode } from '@/helpers';
-import { ModuleAccount } from '@/types';
+import { ModuleAccount, Uri } from '@/types';
 
 type ModuleAccountsResponseDto = {
   accounts: ModuleAccount[];
 };
 
-const getModuleAccountsRequest = async () => {
+type RequestParams = {
+  restUris: Uri[];
+};
+
+const getModuleAccountsRequest = async ({ restUris }: RequestParams) => {
   const response = await queryRestNode({
-    endpoint: CHAIN_ENDPOINTS.getModuleAccounts,
-    queryType: 'GET',
+    endpoint: COSMOS_CHAIN_ENDPOINTS.getModuleAccounts,
+    queryType: QueryType.GET,
+    restUris,
   });
 
   return response as unknown as ModuleAccountsResponseDto;
 };
 
-export function useGetModuleAccountsQuery() {
+export function useGetModuleAccountsQuery(params: RequestParams) {
   return useQuery({
-    queryKey: [CHAIN_ENDPOINTS.getModuleAccounts],
-    queryFn: getModuleAccountsRequest,
+    queryKey: [COSMOS_CHAIN_ENDPOINTS.getModuleAccounts],
+    queryFn: () => getModuleAccountsRequest(params),
   });
 }

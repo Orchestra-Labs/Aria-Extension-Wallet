@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { CHAIN_ENDPOINTS } from '@/constants';
+import { DEFAULT_CHAIN_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
+import { useAtomValue } from 'jotai';
+import { chainRegistryAtom } from '@/atoms';
 
 interface ExchangeRequirementsResponse {
   total: {
@@ -10,9 +12,14 @@ interface ExchangeRequirementsResponse {
 }
 
 export const useExchangeRequirements = () => {
+  const chainRegistry = useAtomValue(chainRegistryAtom);
   const [totalRequirement, setTotalRequirement] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+  console.log('[useExchangeRequirements] querying for exchange rates for:', DEFAULT_CHAIN_ID);
+  console.log('[useExchangeRequirements] using rest uris:', restUris);
 
   const fetchExchangeRequirement = async () => {
     setIsLoading(true);
@@ -20,8 +27,9 @@ export const useExchangeRequirements = () => {
 
     try {
       const response = (await queryRestNode({
-        endpoint: `${CHAIN_ENDPOINTS.exchangeRequirements}`,
-        queryType: 'GET',
+        endpoint: `${SYMPHONY_ENDPOINTS.exchangeRequirements}`,
+        queryType: QueryType.GET,
+        restUris,
       })) as unknown as ExchangeRequirementsResponse;
 
       if (!response?.total?.amount) {

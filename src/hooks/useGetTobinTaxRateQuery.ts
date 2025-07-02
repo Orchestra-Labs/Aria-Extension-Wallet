@@ -1,16 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { CHAIN_ENDPOINTS } from '@/constants';
+import { DEFAULT_CHAIN_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
+import { useAtomValue } from 'jotai';
+import { chainRegistryAtom } from '@/atoms';
 
 type TobinTaxRateResponseDto = {
   tax_rate: string;
 };
 
 const getTobinTaxRateRequest = async () => {
+  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+
   const response = await queryRestNode({
-    endpoint: CHAIN_ENDPOINTS.getTobinTaxRate,
-    queryType: 'GET',
+    endpoint: SYMPHONY_ENDPOINTS.getTobinTaxRate,
+    queryType: QueryType.GET,
+    restUris,
   });
 
   return response as unknown as TobinTaxRateResponseDto;
@@ -18,7 +24,7 @@ const getTobinTaxRateRequest = async () => {
 
 export function useGetTobinTaxRateQuery() {
   return useQuery({
-    queryKey: [CHAIN_ENDPOINTS.getTobinTaxRate],
+    queryKey: [SYMPHONY_ENDPOINTS.getTobinTaxRate],
     queryFn: getTobinTaxRateRequest,
   });
 }

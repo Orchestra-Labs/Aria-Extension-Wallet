@@ -3,13 +3,20 @@ import BigNumber from 'bignumber.js';
 import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 
-import { CHAIN_ENDPOINTS, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
-import { receiveStateAtom, sendStateAtom } from '@/atoms';
+import {
+  SYMPHONY_ENDPOINTS,
+  GREATER_EXPONENT_DEFAULT,
+  LOCAL_ASSET_REGISTRY,
+  DEFAULT_CHAIN_ID,
+  QueryType,
+} from '@/constants';
+import { chainRegistryAtom, receiveStateAtom, sendStateAtom } from '@/atoms';
 import { isValidSwap, queryRestNode } from '@/helpers';
 
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const sendAsset = sendState.asset;
   const receiveAsset = receiveState.asset;
@@ -33,10 +40,13 @@ export function useExchangeRate() {
       const exponent = LOCAL_ASSET_REGISTRY[sendAsset]?.exponent || GREATER_EXPONENT_DEFAULT;
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
 
+      const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+
       // Use queryRestNode to query exchange rates
       const response = await queryRestNode({
-        endpoint: `${CHAIN_ENDPOINTS.swap}offerCoin=${formattedOfferAmount}${sendAsset}&askDenom=${receiveAsset}`,
-        queryType: 'GET',
+        endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=${formattedOfferAmount}${sendAsset}&askDenom=${receiveAsset}`,
+        queryType: QueryType.GET,
+        restUris,
       });
 
       const returnExchange = (response.return_coin?.amount / Math.pow(10, exponent)).toFixed(

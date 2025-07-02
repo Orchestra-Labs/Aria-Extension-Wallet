@@ -8,8 +8,9 @@ import {
   RPCResponse,
   SendObject,
   TransactionResult,
+  Uri,
 } from '@/types';
-import { CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
+import { COSMOS_CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import { getIBCConnections, ibcConnectionsNeedRefresh, saveIBCConnections } from './dataHelpers';
 import { queryRestNode, queryRpcNode } from './queryNodes';
 import { getValidFeeDenom } from './feeDenom';
@@ -27,6 +28,7 @@ const getValidIBCChannel = async (
   sendAddress: string,
   recipientAddress: string,
   network: NetworkLevel,
+  restUris: Uri[],
 ): Promise<IBCChannel | null> => {
   if (!recipientAddress || !sendAddress) return null;
   console.log(
@@ -111,7 +113,7 @@ const getValidIBCChannel = async (
   }
 
   // Query active IBC channels
-  const activeChannels = await fetchActiveIBCChannels();
+  const activeChannels = await fetchActiveIBCChannels(restUris);
 
   if (!activeChannels.length) {
     console.error('No active IBC channels found on the sending chain.');
@@ -145,27 +147,30 @@ export const isIBC = async ({
   sendAddress,
   recipientAddress,
   network,
+  restUris,
 }: {
   sendAddress: string;
   recipientAddress: string;
   network: NetworkLevel;
+  restUris: Uri[];
 }): Promise<boolean> => {
   console.log('checking is ibc.  send address', sendAddress, 'receive address', recipientAddress);
   if (sendAddress === recipientAddress) {
     return false;
   }
 
-  const validChannel = await getValidIBCChannel(sendAddress, recipientAddress, network);
+  const validChannel = await getValidIBCChannel(sendAddress, recipientAddress, network, restUris);
   console.log('checking is ibc.  valid channel', validChannel);
 
   return validChannel !== null;
 };
 
-export const fetchActiveIBCChannels = async (): Promise<IBCChannel[]> => {
+export const fetchActiveIBCChannels = async (restUris: Uri[]): Promise<IBCChannel[]> => {
   console.log('Fetching active IBC channels...');
   try {
     const response = await queryRestNode({
-      endpoint: CHAIN_ENDPOINTS.getIBCConnections,
+      endpoint: COSMOS_CHAIN_ENDPOINTS.getIBCConnections,
+      restUris,
     });
     console.log('Fetched IBC channels response:', response);
     return response.channels?.filter((channel: IBCChannel) => channel.state === 'STATE_OPEN') || [];
@@ -241,15 +246,16 @@ const sendIBCTransaction = async (
   sendObject: SendObject,
   connection: IBCChannel,
   simulateOnly: boolean = false,
+  rpcUris: Uri[],
 ): Promise<TransactionResult> => {
   console.log('Preparing to send IBC transaction:', {
     fromAddress,
     sendObject,
     connection,
     simulateOnly,
+    rpcUris,
   });
-
-  const endpoint = CHAIN_ENDPOINTS.sendIbcMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendIbcMessage;
 
   const ibcMessageValue = {
     sourcePort: connection.port_id, // Usually "transfer" for IBC token transfers
@@ -274,6 +280,7 @@ const sendIBCTransaction = async (
 
     const response = await queryRpcNode({
       endpoint,
+      rpcUris,
       messages,
       feeDenom,
       simulateOnly,
@@ -312,9 +319,13 @@ const sendIBCTransaction = async (
 
 export const sendIBC = async ({
   ibcObject,
+  restUris,
+  rpcUris,
   simulateTransaction = false,
 }: {
   ibcObject: IBCObject;
+  restUris: Uri[];
+  rpcUris: Uri[];
   simulateTransaction?: boolean;
 }): Promise<TransactionResult> => {
   console.log('🚀 ~ sendIBC:', sendIBC);
@@ -323,6 +334,7 @@ export const sendIBC = async ({
       ibcObject.fromAddress,
       ibcObject.sendObject.recipientAddress,
       ibcObject.networkLevel,
+      restUris,
     );
 
     if (!validChannel) {
@@ -341,6 +353,7 @@ export const sendIBC = async ({
       ibcObject.sendObject,
       validChannel,
       simulateTransaction,
+      rpcUris,
     );
 
     console.log('IBC Transaction result:', transactionResult);

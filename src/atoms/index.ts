@@ -1,6 +1,7 @@
 export * from './accountAtom';
 export * from './addressAtom';
 export * from './assetsAtom';
+export * from './chainRegistryAtom';
 export * from './changeMapAtom';
 export * from './paginationAtom';
 export * from './isLoggedInAtom';

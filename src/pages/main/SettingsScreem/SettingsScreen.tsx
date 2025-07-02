@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { isInitialDataLoadAtom } from '@/atoms';
 import { useAtom, useAtomValue } from 'jotai';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES, SettingsOptions } from '@/constants';
+import { ROUTES, SettingsOption } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { saveAccountByID } from '@/helpers/dataHelpers/account';
 import { userAccountAtom } from '@/atoms/accountAtom';
@@ -12,7 +12,7 @@ interface SettingsScreenProps {}
 
 const DEFAULT_CONFIG = {
   // [SettingsOptions.STABLECOIN_FEE]: false,
-  [SettingsOptions.VALIDATOR_STATUS]: false,
+  [SettingsOption.VALIDATOR_STATUS]: false,
 };
 
 const PAGE_TITLE = 'Change Settings';
@@ -29,7 +29,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
     navigate(ROUTES.APP.ROOT);
   };
 
-  const toggleOption = (option: SettingsOptions) => {
+  const toggleOption = (option: SettingsOption) => {
     if (tempSettings) {
       const updatedAccount = {
         ...tempSettings,
@@ -83,10 +83,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
             <input
               type="checkbox"
               checked={
-                (tempSettings && tempSettings[SettingsOptions.VALIDATOR_STATUS]) ||
-                DEFAULT_CONFIG[SettingsOptions.VALIDATOR_STATUS]
+                (tempSettings && tempSettings[SettingsOption.VALIDATOR_STATUS]) ||
+                DEFAULT_CONFIG[SettingsOption.VALIDATOR_STATUS]
               }
-              onChange={() => toggleOption(SettingsOptions.VALIDATOR_STATUS)}
+              onChange={() => toggleOption(SettingsOption.VALIDATOR_STATUS)}
               className="form-checkbox h-5 w-5 text-blue-600"
             />
             <span className="text-left flex">View Validators by Activity Status</span>

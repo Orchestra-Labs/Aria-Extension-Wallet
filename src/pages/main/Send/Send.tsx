@@ -9,7 +9,6 @@ import {
   GREATER_EXPONENT_DEFAULT,
   InputStatus,
   LOCAL_CHAIN_REGISTRY,
-  NetworkLevel,
   ROUTES,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
@@ -25,6 +24,7 @@ import {
   addressVerifiedAtom,
   symphonyAssetsAtom,
   feeStateAtom,
+  chainRegistryAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
@@ -42,9 +42,8 @@ import {
   swapTransaction,
   truncateWalletAddress,
 } from '@/helpers';
-import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
+import { useExchangeRate, useRefreshData, useToast, useGetTobinTaxRateQuery } from '@/hooks/';
 import { AddressInput } from './AddressInput';
-import { useGetTobinTaxRateQuery } from '@/hooks/useGetTobinTaxRateQuery';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -75,6 +74,7 @@ export const Send = () => {
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const [addressVerified, setAddressVerified] = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
   const walletState = useAtomValue(walletStateAtom);
   const walletAssets = walletState?.assets || [];
 
@@ -149,8 +149,16 @@ export const Send = () => {
     sendObject: any;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
+    const sendChain = chainRegistry[sendState.chainID];
+    const rpcUris = sendChain.rpc_uris;
+
     console.log('Executing sendTransaction');
-    const result = await sendTransaction(walletState.address, sendObject, simulateTransaction);
+    const result = await sendTransaction(
+      walletState.address,
+      sendObject,
+      simulateTransaction,
+      rpcUris,
+    );
     console.log('sendTransaction result:', result);
 
     setTransactionLog({
@@ -174,25 +182,45 @@ export const Send = () => {
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     const fromAddress = walletState.address;
-    const sendChain = sendState.chainName;
-    const receiveChain = receiveState.chainName;
-    const networkLevel = NetworkLevel.TESTNET;
-    const ibcObject = { fromAddress, sendObject, sendChain, receiveChain, networkLevel };
+    const sendChain = chainRegistry[sendState.chainID];
+    const receiveChain = chainRegistry[receiveState.chainID];
 
-    const result = await sendIBC({ ibcObject, simulateTransaction });
-    console.log('IBC Transaction Result:', result);
+    const sendChainName = sendChain.chain_name;
+    const receiveChainName = receiveChain.chain_name;
+    const sendChainLevel = sendChain.network_level;
+    const receiveChainLevel = receiveChain.network_level;
+    const ibcObject = {
+      fromAddress,
+      sendObject,
+      sendChain: sendChainName,
+      receiveChain: receiveChainName,
+      networkLevel: sendChainLevel,
+    };
+    const restUris = sendChain.rest_uris;
+    const rpcUris = sendChain.rpc_uris;
 
-    setTransactionLog({
-      isSimulation: simulateTransaction,
-      entries: [
-        {
-          sendObject,
-          isSuccess: result?.data?.code === 0,
-        },
-      ],
-    });
+    if (sendChainLevel === receiveChainLevel) {
+      const result = await sendIBC({ ibcObject, restUris, rpcUris, simulateTransaction });
+      console.log('IBC Transaction Result:', result);
 
-    return result;
+      setTransactionLog({
+        isSimulation: simulateTransaction,
+        entries: [
+          {
+            sendObject,
+            isSuccess: result?.data?.code === 0,
+          },
+        ],
+      });
+
+      return result;
+    } else {
+      console.error('Network level mismatch');
+      return {
+        success: false,
+        message: 'Network level mismatch.',
+      };
+    }
   };
 
   const executeSwap = async ({
@@ -422,20 +450,26 @@ export const Send = () => {
     sendStateOverride?: TransactionState;
     receiveStateOverride?: TransactionState;
   } = {}) => {
+    const sendChain = chainRegistry[sendState.chainID];
+    const receiveChain = chainRegistry[receiveState.chainID];
     const sendAsset = sendStateOverride.asset;
     const receiveAsset = receiveStateOverride.asset;
-    const network = sendStateOverride.networkLevel;
+    const sendChainLevel = sendChain.network_level;
+    const receiveChainLevel = receiveChain.network_level;
 
     if (!sendAsset || !receiveAsset) {
       console.error('Missing assets for transaction type update');
       return;
     }
 
+    const restUris = sendChain.rest_uris;
+
     try {
       const isIBCEnabled = await isIBC({
         sendAddress: walletState.address,
         recipientAddress,
-        network,
+        network: sendChainLevel,
+        restUris,
       });
 
       const isSwapEnabled = isValidSwap({ sendAsset, receiveAsset });
@@ -444,6 +478,8 @@ export const Send = () => {
         recipientAddress,
         sendState: sendStateOverride,
         receiveState: receiveStateOverride,
+        sendChainLevel,
+        receiveChainLevel,
       });
 
       const newTransactionType = {
@@ -892,11 +928,17 @@ export const Send = () => {
             !error &&
             transactionLog.entries.map((entry, index) => {
               const { sendObject } = entry;
-              const isIBC = sendState.chainName !== receiveState.chainName;
+
+              const sendChain = chainRegistry[sendState.chainID];
+              const receiveChain = chainRegistry[receiveState.chainID];
+              const sendChainName = sendChain.chain_name;
+              const receiveChainName = receiveChain.chain_name;
+
+              const isIBC = sendChainName !== receiveChainName;
               const isSwap = sendState.asset?.denom !== receiveState.asset?.denom;
 
               const sendAssetSymbol =
-                (sendState.chainName === DEFAULT_CHAIN_NAME
+                (sendChainName === DEFAULT_CHAIN_NAME
                   ? symphonyAssets.find(asset => asset.denom === sendState.asset?.denom)?.symbol
                   : sendState.asset?.symbol) || 'MLD';
               const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
@@ -906,8 +948,8 @@ export const Send = () => {
               );
               const receiveChainPrefix =
                 Object.values(LOCAL_CHAIN_REGISTRY).find(
-                  entry => entry.chainName?.toLowerCase() === receiveState.chainName.toLowerCase(),
-                )?.prefix || '';
+                  entry => entry.chain_name?.toLowerCase() === receiveChainName.toLowerCase(),
+                )?.bech32_prefix || '';
 
               let description = `Send ${sendReadableAmount}`;
               if (isIBC) {
@@ -924,7 +966,7 @@ export const Send = () => {
               } else {
                 description += ` to ${truncateWalletAddress(receiveChainPrefix, sendObject.recipientAddress)}`;
               }
-              description += ` on ${receiveState.chainName.charAt(0).toUpperCase()}${receiveState.chainName.slice(1)}`;
+              description += ` on ${receiveChainName.charAt(0).toUpperCase()}${receiveChainName.slice(1)}`;
 
               return (
                 <div
