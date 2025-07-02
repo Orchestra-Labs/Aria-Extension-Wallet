@@ -16,7 +16,8 @@ const isIndexerError = (error: any): boolean => {
 
 // Helper: Perform a REST API query to a selected node
 const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
-  const uriEndpoint = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
+  const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
+  const uriEndpoint = `${adjustedUri}${endpoint}`;
   console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
   const response = await fetch(`${uriEndpoint}`, {
