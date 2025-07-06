@@ -18,6 +18,7 @@ import { getIBCFile, ibcFileNeedsRefresh, saveIBCFile } from './dataHelpers/ibcC
 import { bech32 } from 'bech32';
 import { fetchBech32Prefixes } from './fetchBech32Prefixes';
 
+// TODO: pull on initial query for registry
 const GITHUB_API_BASE_URL = 'https://api.github.com/repos/cosmos/chain-registry/contents';
 const IBC_URLS = {
   testnet: `${GITHUB_API_BASE_URL}/testnets/_IBC`,
@@ -28,6 +29,7 @@ const getValidIBCChannel = async (
   sendAddress: string,
   recipientAddress: string,
   network: NetworkLevel,
+  prefix: string,
   restUris: Uri[],
 ): Promise<IBCChannel | null> => {
   if (!recipientAddress || !sendAddress) return null;
@@ -113,7 +115,7 @@ const getValidIBCChannel = async (
   }
 
   // Query active IBC channels
-  const activeChannels = await fetchActiveIBCChannels(restUris);
+  const activeChannels = await fetchActiveIBCChannels(prefix, restUris);
 
   if (!activeChannels.length) {
     console.error('No active IBC channels found on the sending chain.');
@@ -147,11 +149,13 @@ export const isIBC = async ({
   sendAddress,
   recipientAddress,
   network,
+  prefix,
   restUris,
 }: {
   sendAddress: string;
   recipientAddress: string;
   network: NetworkLevel;
+  prefix: string;
   restUris: Uri[];
 }): Promise<boolean> => {
   console.log('checking is ibc.  send address', sendAddress, 'receive address', recipientAddress);
@@ -159,17 +163,27 @@ export const isIBC = async ({
     return false;
   }
 
-  const validChannel = await getValidIBCChannel(sendAddress, recipientAddress, network, restUris);
+  const validChannel = await getValidIBCChannel(
+    sendAddress,
+    recipientAddress,
+    network,
+    prefix,
+    restUris,
+  );
   console.log('checking is ibc.  valid channel', validChannel);
 
   return validChannel !== null;
 };
 
-export const fetchActiveIBCChannels = async (restUris: Uri[]): Promise<IBCChannel[]> => {
+export const fetchActiveIBCChannels = async (
+  prefix: string,
+  restUris: Uri[],
+): Promise<IBCChannel[]> => {
   console.log('Fetching active IBC channels...');
   try {
     const response = await queryRestNode({
       endpoint: COSMOS_CHAIN_ENDPOINTS.getIBCConnections,
+      prefix,
       restUris,
     });
     console.log('Fetched IBC channels response:', response);
@@ -246,6 +260,7 @@ const sendIBCTransaction = async (
   sendObject: SendObject,
   connection: IBCChannel,
   simulateOnly: boolean = false,
+  prefix: string,
   rpcUris: Uri[],
 ): Promise<TransactionResult> => {
   console.log('Preparing to send IBC transaction:', {
@@ -253,6 +268,7 @@ const sendIBCTransaction = async (
     sendObject,
     connection,
     simulateOnly,
+    prefix,
     rpcUris,
   });
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendIbcMessage;
@@ -280,6 +296,7 @@ const sendIBCTransaction = async (
 
     const response = await queryRpcNode({
       endpoint,
+      prefix,
       rpcUris,
       messages,
       feeDenom,
@@ -319,11 +336,13 @@ const sendIBCTransaction = async (
 
 export const sendIBC = async ({
   ibcObject,
+  prefix,
   restUris,
   rpcUris,
   simulateTransaction = false,
 }: {
   ibcObject: IBCObject;
+  prefix: string;
   restUris: Uri[];
   rpcUris: Uri[];
   simulateTransaction?: boolean;
@@ -334,6 +353,7 @@ export const sendIBC = async ({
       ibcObject.fromAddress,
       ibcObject.sendObject.recipientAddress,
       ibcObject.networkLevel,
+      prefix,
       restUris,
     );
 
@@ -353,6 +373,7 @@ export const sendIBC = async ({
       ibcObject.sendObject,
       validChannel,
       simulateTransaction,
+      prefix,
       rpcUris,
     );
 

@@ -1,12 +1,12 @@
 import { Loader } from '@/components';
-import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT } from '@/constants';
+import { DEFAULT_MAINNET_ASSET, GREATER_EXPONENT_DEFAULT } from '@/constants';
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
 import { useExchangePoolBalance, useExchangeRequirements } from '@/hooks';
 import { useReservePoolBalance } from '@/hooks';
 import { useGetTobinTaxRateQuery } from '@/hooks/useGetTobinTaxRateQuery';
 import { Button } from '@/ui-kit';
 
-const DEFAULT_ASSET_SYMBOL = DEFAULT_ASSET.symbol || 'MLD';
+const DEFAULT_ASSET_SYMBOL = DEFAULT_MAINNET_ASSET.symbol;
 
 interface PoolStatusBlockProps {
   onBack: () => void;
@@ -34,19 +34,28 @@ export const PoolStatusBlock = ({ onBack }: PoolStatusBlockProps) => {
   // Formatted values (rounded to whole numbers)
   const formattedReservePoolBalance = formatBalanceDisplay(
     `${Math.round(
-      convertToGreaterUnit(reserveAmount, DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT),
+      convertToGreaterUnit(
+        reserveAmount,
+        DEFAULT_MAINNET_ASSET.exponent || GREATER_EXPONENT_DEFAULT,
+      ),
     )}`,
     DEFAULT_ASSET_SYMBOL,
   );
   const formattedExchangePoolBalance = formatBalanceDisplay(
     `${Math.round(
-      convertToGreaterUnit(exchangeAmount, DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT),
+      convertToGreaterUnit(
+        exchangeAmount,
+        DEFAULT_MAINNET_ASSET.exponent || GREATER_EXPONENT_DEFAULT,
+      ),
     )}`,
     DEFAULT_ASSET_SYMBOL,
   );
   const formattedExchangeRequirement = formatBalanceDisplay(
     `${Math.round(
-      convertToGreaterUnit(requirementAmount, DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT),
+      convertToGreaterUnit(
+        requirementAmount,
+        DEFAULT_MAINNET_ASSET.exponent || GREATER_EXPONENT_DEFAULT,
+      ),
     )}`,
     DEFAULT_ASSET_SYMBOL,
   );

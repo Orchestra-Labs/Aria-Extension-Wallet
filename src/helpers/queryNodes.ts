@@ -1,9 +1,13 @@
-import { DEFAULT_ASSET, MAX_RETRIES_PER_QUERY, QueryType } from '@/constants';
+import { DEFAULT_MAINNET_ASSET, MAX_RETRIES_PER_QUERY, QueryType } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
-import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
 import { RPCResponse, Uri } from '@/types';
-import { getSessionToken } from './dataHelpers';
+import {
+  createOfflineSignerByPrefix,
+  getAddressByChainPrefix,
+  getSessionToken,
+} from './dataHelpers';
+import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 
@@ -18,7 +22,7 @@ const isIndexerError = (error: any): boolean => {
 const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
   const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
   const uriEndpoint = `${adjustedUri}${endpoint}`;
-  console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
+  // console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
   const response = await fetch(`${uriEndpoint}`, {
     method: queryType,
@@ -27,12 +31,15 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
   });
 
   if (!response.ok) {
-    console.error('Node query failed:', response);
+    console.error('[queryNodes] Node query failed:', response);
     throw new Error('Node query failed');
   }
 
   const responseBody = await response.json();
-  console.log('REST query successful, response:', responseBody);
+  // console.log(
+  //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
+  //   responseBody,
+  // );
 
   return responseBody;
 };
@@ -51,26 +58,26 @@ export const performRpcQuery = async (
   },
   memo: string = 'wallet',
 ): Promise<RPCResponse> => {
-  console.log('Performing RPC query...');
-  console.log('Client:', client);
-  console.log('Wallet Address:', walletAddress);
-  console.log('Messages:', messages);
-  console.log('Fee Denom:', feeDenom);
-  console.log('Simulate Only:', simulateOnly);
-  console.log('Fee:', fee);
+  // console.log('[queryNodes] Performing RPC query...');
+  // console.log('[queryNodes] Client:', client);
+  // console.log('[queryNodes] Wallet Address:', walletAddress);
+  // console.log('[queryNodes] Messages:', messages);
+  // console.log('[queryNodes] Fee Denom:', feeDenom);
+  // console.log('[queryNodes] Simulate Only:', simulateOnly);
+  // console.log('[queryNodes] Fee:', fee);
 
   try {
     let calculatedFee = fee;
 
     if (!fee || !calculatedFee) {
-      console.log('Calculating fee...');
+      console.log('[queryNodes] Calculating fee...');
       // TODO: change hardcoded value to default from registry
       const defaultGasPrice = GasPrice.fromString(`0.025${feeDenom}`);
       let gasEstimation = await client.simulate(walletAddress, messages, '');
-      console.log('Gas Estimation:', gasEstimation);
+      console.log('[queryNodes] Gas Estimation:', gasEstimation);
 
       gasEstimation = Math.ceil(gasEstimation * 1.1);
-      console.log('Adjusted Gas Estimation:', gasEstimation);
+      console.log('[queryNodes] Adjusted Gas Estimation:', gasEstimation);
 
       calculatedFee = {
         amount: [
@@ -84,7 +91,7 @@ export const performRpcQuery = async (
     }
 
     if (simulateOnly) {
-      console.log('Simulation success, returning fee info.');
+      console.log('[queryNodes] Simulation success, returning fee info.');
       return {
         code: 0,
         message: 'Simulation success',
@@ -94,7 +101,7 @@ export const performRpcQuery = async (
     }
 
     const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
-    console.log('Transaction result:', result);
+    console.log('[queryNodes] Transaction result:', result);
 
     if (result.code === 0) {
       return {
@@ -106,10 +113,10 @@ export const performRpcQuery = async (
       };
     }
 
-    console.error('Transaction failed with code:', result.code);
+    console.error('[queryNodes] Transaction failed with code:', result.code);
     throw new Error(`Transaction failed with ${result.code}`);
   } catch (error: any) {
-    console.error('Error during RPC query:', error);
+    console.error('[queryNodes] Error during RPC query:', error);
 
     if (isIndexerError(error)) {
       console.log('Indexer error detected.');
@@ -132,7 +139,9 @@ const queryWithRetry = async ({
   feeDenom,
   simulateOnly = false,
   fee,
+  prefix,
   uris,
+  isSymphonyQuery = false,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -144,7 +153,9 @@ const queryWithRetry = async ({
     amount: { denom: string; amount: string }[];
     gas: string;
   };
+  prefix: string;
   uris: Uri[];
+  isSymphonyQuery?: boolean;
 }): Promise<RPCResponse> => {
   let attemptCount = 0;
   let lastError: any = null;
@@ -155,13 +166,13 @@ const queryWithRetry = async ({
     const uriIndex = attemptCount;
     const uri = shuffledUris[uriIndex];
 
-    console.log(`[queryNodes] URIs in list: ${JSON.stringify(uris)}`);
-    console.log(
-      `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, start of loop`,
-    );
-    console.log(
-      `[queryNodes] Attempt count ${attemptCount}, shuffled Uris length ${shuffledUris.length - 1}, max retries ${MAX_RETRIES_PER_QUERY}`,
-    );
+    // console.log(`[queryNodes] URIs in list: ${JSON.stringify(uris)}`);
+    // console.log(
+    //   `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, start of loop`,
+    // );
+    // console.log(
+    //   `[queryNodes] Attempt count ${attemptCount}, shuffled Uris length ${shuffledUris.length - 1}, max retries ${MAX_RETRIES_PER_QUERY}`,
+    // );
 
     try {
       if (useRPC) {
@@ -169,10 +180,13 @@ const queryWithRetry = async ({
         if (!sessionToken) throw new Error("Session token doesn't exist");
 
         const mnemonic = sessionToken.mnemonic;
-        const address = await getAddress(mnemonic);
-        const signer = await createOfflineSignerFromMnemonic(mnemonic);
+        const address = await getAddressByChainPrefix(mnemonic, prefix);
+        const signer = await createOfflineSignerByPrefix(mnemonic, prefix);
 
-        const client = await SigningStargateClient.connectWithSigner(uri.address, signer);
+        // console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
+        const client = isSymphonyQuery
+          ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer })
+          : await SigningStargateClient.connectWithSigner(uri.address, signer);
 
         const result = await performRpcQuery(
           client,
@@ -188,9 +202,11 @@ const queryWithRetry = async ({
         return result;
       }
     } catch (error) {
-      attemptCount++;
+      console.error(`[queryNodes] ${error}`);
 
+      attemptCount++;
       lastError = error;
+
       const backoff = Math.min(2 ** attemptCount * 500, 5000);
       console.log(
         `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
@@ -213,12 +229,14 @@ const queryWithRetry = async ({
 export const queryRestNode = async ({
   endpoint,
   queryType = QueryType.GET,
-  feeDenom = DEFAULT_ASSET.denom,
+  feeDenom = DEFAULT_MAINNET_ASSET.denom,
+  prefix,
   restUris,
 }: {
   endpoint: string;
   queryType?: QueryType;
   feeDenom?: string;
+  prefix: string;
   restUris: Uri[];
 }) =>
   queryWithRetry({
@@ -226,18 +244,21 @@ export const queryRestNode = async ({
     useRPC: false,
     queryType,
     feeDenom,
+    prefix,
     uris: restUris,
   });
 
 export const queryRpcNode = async ({
   endpoint,
   messages,
-  feeDenom = DEFAULT_ASSET.denom,
+  feeDenom = DEFAULT_MAINNET_ASSET.denom,
   simulateOnly = false,
   fee,
+  prefix,
   rpcUris,
 }: {
   endpoint: string;
+  prefix: string;
   rpcUris: Uri[];
   messages?: any[];
   feeDenom?: string;
@@ -254,5 +275,6 @@ export const queryRpcNode = async ({
     feeDenom,
     simulateOnly,
     fee,
+    prefix,
     uris: rpcUris,
   });

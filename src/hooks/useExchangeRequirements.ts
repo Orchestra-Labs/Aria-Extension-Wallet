@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DEFAULT_CHAIN_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
+import { SYMPHONY_MAINNET_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
 import { chainRegistryAtom } from '@/atoms';
@@ -17,8 +17,10 @@ export const useExchangeRequirements = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
-  console.log('[useExchangeRequirements] querying for exchange rates for:', DEFAULT_CHAIN_ID);
+  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+  console.log('[useExchangeRequirements] querying for exchange rates for:', SYMPHONY_MAINNET_ID);
   console.log('[useExchangeRequirements] using rest uris:', restUris);
 
   const fetchExchangeRequirement = async () => {
@@ -29,6 +31,7 @@ export const useExchangeRequirements = () => {
       const response = (await queryRestNode({
         endpoint: `${SYMPHONY_ENDPOINTS.exchangeRequirements}`,
         queryType: QueryType.GET,
+        prefix,
         restUris,
       })) as unknown as ExchangeRequirementsResponse;
 

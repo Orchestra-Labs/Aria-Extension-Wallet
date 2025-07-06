@@ -8,31 +8,33 @@ import Long from 'long';
 
 import { COSMOS_SIGNING_METHODS } from '@/constants/wc';
 import {
-  createAminoSignerFromMnemonic,
-  createOfflineSignerFromMnemonic,
+  createAminoSignerByPrefix,
+  createOfflineSignerByPrefix,
   getSessionToken,
   walletkit,
 } from '@/helpers';
+import { SYMPHONY_PREFIX } from '@/constants';
 
 const bufferFromBase64 = (base64: string) => Buffer.from(base64, 'base64');
 const base64FromUint8Array = (array: Uint8Array) => Buffer.from(array).toString('base64');
 
 type Params = {
   requestEvent: SignClientTypes.EventArguments['session_request'];
+  prefix?: string;
 };
 
-const approveWCTransaction = async ({ requestEvent }: Params) => {
+const approveWCTransaction = async ({ requestEvent, prefix }: Params) => {
   const { id, params, topic } = requestEvent;
-
   const { request } = params;
 
-  const sessionToken = await getSessionToken();
+  const sessionToken = getSessionToken();
   if (!sessionToken) {
     throw new Error(getSdkError('USER_DISCONNECTED').message);
   }
 
-  const directSigner = await createOfflineSignerFromMnemonic(sessionToken.mnemonic || '');
-  const aminoSigner = await createAminoSignerFromMnemonic(sessionToken.mnemonic || '');
+  const signerPrefix = prefix || SYMPHONY_PREFIX;
+  const directSigner = await createOfflineSignerByPrefix(sessionToken.mnemonic, signerPrefix);
+  const aminoSigner = await createAminoSignerByPrefix(sessionToken.mnemonic, signerPrefix);
 
   const signTransaction = async () => {
     const accounts = await directSigner.getAccounts();

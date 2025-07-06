@@ -12,7 +12,7 @@ import {
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
-import { DEFAULT_CHAIN_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
+import { SYMPHONY_MAINNET_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { Asset, SubscriptionRecord } from '@/types';
 import { saveAccountByID } from '@/helpers/dataHelpers/account';
@@ -23,8 +23,6 @@ interface EditCoinListScreenProps {}
 const PAGE_TITLE = 'Select Visible Coins';
 
 // TODO: make registry, add github action to auto-update entries based on items in pull request. then sort?
-// TODO: save registry info into localStorage, set default data expiration to one day
-// TODO: pull registry info whenever data is empty or data expires
 export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const navigate = useNavigate();
 
@@ -90,7 +88,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       const updatedSubscriptions: SubscriptionRecord = {};
 
       // TODO: change page's save structure to reflect subscription/registry structure to prevent excess looping here
-      const networkID = DEFAULT_CHAIN_ID;
+      const networkID = SYMPHONY_MAINNET_ID;
       const networkCoinDenoms = unfilteredAssets.map(asset => asset.denom);
       const selectedNetworkCoins = selectedCoins.map(coin => coin.denom);
 

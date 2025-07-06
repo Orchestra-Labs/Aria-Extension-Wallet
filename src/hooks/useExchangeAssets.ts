@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Asset } from '@/types';
 import {
-  LOCAL_ASSET_REGISTRY,
-  DEFAULT_ASSET,
   GREATER_EXPONENT_DEFAULT,
   SYMPHONY_ENDPOINTS,
-  DEFAULT_CHAIN_ID,
   QueryType,
+  SYMPHONY_MAINNET_ID,
+  DEFAULT_MAINNET_ASSET,
+  LOCAL_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { chainRegistryAtom, sendStateAtom, walletAssetsAtom } from '@/atoms';
+import { allWalletAssetsAtom, chainRegistryAtom, sendStateAtom } from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -27,21 +27,27 @@ interface ExchangeRequirementResponse {
   };
 }
 
-// TODO: enable use on both symphony testnet and symphony mainnet
 export const useExchangeAssets = () => {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const sendState = useAtomValue(sendStateAtom);
-  const walletAssets = useAtomValue(walletAssetsAtom);
+  const walletAssets = useAtomValue(allWalletAssetsAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const chainInfo = chainRegistry[DEFAULT_CHAIN_ID];
-  const restUris = chainInfo?.rest_uris;
+  const chainInfo = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  console.log(`[useExchangeAssets] chainInfo for ${SYMPHONY_MAINNET_ID}:`, chainInfo);
 
-  if (!restUris || restUris.length === 0) {
-    console.error('[useExchangeAssets] Missing rest_uris for chain ID:', DEFAULT_CHAIN_ID);
+  if (!chainInfo) {
+    console.error(`[useExchangeAssets] No chain info found for ${SYMPHONY_MAINNET_ID}`);
+  }
+
+  const prefix = chainInfo?.bech32_prefix || '';
+  const restUris = chainInfo?.rest_uris || [];
+
+  if (!restUris.length) {
+    console.error('[useExchangeAssets] Missing rest URIs for', SYMPHONY_MAINNET_ID);
   }
 
   const fetchExchangeAssets = async () => {
@@ -49,14 +55,15 @@ export const useExchangeAssets = () => {
     setError(null);
 
     try {
-      const defaultAsset = DEFAULT_ASSET;
+      const defaultAsset = DEFAULT_MAINNET_ASSET;
       const sendAsset = sendState.asset;
 
-      console.log('[useExchangeAssets] querying for exchange rates for:', DEFAULT_CHAIN_ID);
+      console.log('[useExchangeAssets] querying for exchange rates for:', SYMPHONY_MAINNET_ID);
       console.log('[useExchangeAssets] using rest uris:', restUris);
       const response = (await queryRestNode({
         endpoint: `${SYMPHONY_ENDPOINTS.exchangeRequirements}`,
         queryType: QueryType.GET,
+        prefix,
         restUris,
       })) as unknown as ExchangeRequirementResponse;
       console.log('[useExchangeAssets] noted response:', response);
@@ -74,7 +81,7 @@ export const useExchangeAssets = () => {
             denom: defaultAsset.denom,
             amount: '0',
           },
-          exchange_rate: defaultAsset.amount, // Default exchange rate for the default asset
+          exchange_rate: defaultAsset?.exchangeRate || '0',
         });
       }
 
@@ -84,6 +91,7 @@ export const useExchangeAssets = () => {
         const exchangeRateResponse = await queryRestNode({
           endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=1000000${sendAsset.denom}&askDenom=${defaultAsset.denom}`,
           queryType: QueryType.GET,
+          prefix,
           restUris,
         });
 
@@ -93,20 +101,23 @@ export const useExchangeAssets = () => {
       const exchangeAssets = mergedExchangeRequirements.map(requirement => {
         const { denom, amount } = requirement.base_currency;
 
-        // Check if the asset exists in the local registry
-        const registryAsset = LOCAL_ASSET_REGISTRY[denom];
+        const registryAsset =
+          LOCAL_MAINNET_ASSET_REGISTRY[denom] ||
+          Object.values(chainInfo?.assets || {}).find(
+            (a: Asset) => a.denom === denom || a.symbol === denom,
+          );
 
         const symbol =
-          registryAsset && registryAsset.symbol
-            ? registryAsset.symbol
-            : `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
+          registryAsset?.symbol ||
+          `H${denom.startsWith('u') ? denom.slice(1) : denom}`.toUpperCase();
 
-        const logo = registryAsset ? registryAsset.logo : defaultAsset.logo;
-        const exponent = registryAsset ? registryAsset.exponent! : GREATER_EXPONENT_DEFAULT;
-        const isIbc = registryAsset ? registryAsset.isIbc : false;
+        const logo = registryAsset?.logo || defaultAsset.logo;
+        const exponent = registryAsset?.exponent ?? GREATER_EXPONENT_DEFAULT;
+        const isIbc = registryAsset?.isIbc ?? false;
+
         const baseExchangeRate = parseFloat(requirement.exchange_rate || '1');
-
         let exchangeRate;
+
         if (denom === sendAsset.denom) {
           exchangeRate = '1';
         } else if (isIbc) {
@@ -121,7 +132,7 @@ export const useExchangeAssets = () => {
           symbol,
           denom,
           amount,
-          logo: logo ?? '',
+          logo,
           exponent,
           isIbc,
           exchangeRate,
@@ -131,13 +142,15 @@ export const useExchangeAssets = () => {
       console.log('exchange assets', exchangeAssets);
 
       const additionalAssets = walletAssets.filter(
-        walletAsset => !exchangeAssets.some(processed => processed.denom === walletAsset.denom),
+        (walletAsset: Asset) =>
+          !exchangeAssets.some(processed => processed.denom === walletAsset.denom),
       );
+
       console.log('additional assets', additionalAssets);
 
       const mergedAssets = [
         ...exchangeAssets,
-        ...additionalAssets.map(walletAsset => {
+        ...additionalAssets.map((walletAsset: Asset) => {
           const exchangeData = exchangeAssets.find(e => e.denom === walletAsset.denom);
           return {
             ...walletAsset,

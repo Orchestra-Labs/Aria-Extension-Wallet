@@ -16,14 +16,29 @@ export type RequestParams = {
 };
 
 const getBalancesRequest = async ({ walletAddress, chainID }: RequestParams) => {
+  console.log('[getBalancesRequest] walletAddress:', walletAddress);
+  console.log('[getBalancesRequest] chainID:', chainID);
+
   const chainRegistry = useAtomValue(chainRegistryAtom);
-  const restUris = chainRegistry[chainID].rest_uris;
+  const chain = chainRegistry.mainnet[chainID];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+
+  console.log('[getBalancesRequest] prefix:', prefix);
+  console.log('[getBalancesRequest] restUris:', restUris);
+  console.log(
+    '[getBalancesRequest] endpoint:',
+    `${COSMOS_CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
+  );
 
   // Use queryNode to try querying balances across nodes
   const response = await queryRestNode({
     endpoint: `${COSMOS_CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
+    prefix,
     restUris,
   });
+
+  console.log('[getBalancesRequest] response:', response);
 
   if (!response.balances) {
     // TODO: show error to user

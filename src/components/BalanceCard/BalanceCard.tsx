@@ -3,9 +3,14 @@ import { NavLink } from 'react-router-dom';
 import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
 import { Button } from '@/ui-kit';
 import { useAtomValue } from 'jotai';
-import { isInitialDataLoadAtom, walletAssetsAtom, validatorDataAtom } from '@/atoms';
+import { allWalletAssetsAtom, isInitialDataLoadAtom, validatorDataAtom } from '@/atoms';
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
-import { ROUTES, DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
+import {
+  ROUTES,
+  DEFAULT_MAINNET_ASSET,
+  GREATER_EXPONENT_DEFAULT,
+  LOCAL_MAINNET_ASSET_REGISTRY,
+} from '@/constants';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
 import { useExchangeRate } from '@/hooks';
@@ -18,14 +23,14 @@ interface BalanceCardProps {
 
 export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardProps) => {
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
-  const walletAssets = useAtomValue(walletAssetsAtom);
+  const walletAssets = useAtomValue(allWalletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
-  const symbol = LOCAL_ASSET_REGISTRY.note.symbol || DEFAULT_ASSET.symbol || 'MLD';
-  const currentExponent = LOCAL_ASSET_REGISTRY.note.exponent || GREATER_EXPONENT_DEFAULT;
+  const symbol = LOCAL_MAINNET_ASSET_REGISTRY.note.symbol || DEFAULT_MAINNET_ASSET.symbol || 'MLD';
+  const currentExponent = LOCAL_MAINNET_ASSET_REGISTRY.note.exponent || GREATER_EXPONENT_DEFAULT;
 
   let title = '';
   let primaryText = '';
@@ -37,7 +42,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
       const amount = new BigNumber(asset.amount || 0);
 
       // Use exchangeRate from hook if available, otherwise assume 1 for same denom
-      const rate = denom === LOCAL_ASSET_REGISTRY.note.denom ? 1 : exchangeRate;
+      const rate = denom === LOCAL_MAINNET_ASSET_REGISTRY.note.denom ? 1 : exchangeRate;
 
       return sum.plus(amount.multipliedBy(rate || 0));
     }, new BigNumber(0));
@@ -64,7 +69,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     );
 
     const totalStakedMLD = validatorData
-      .filter(item => item.balance?.denom === LOCAL_ASSET_REGISTRY.note.denom)
+      .filter(item => item.balance?.denom === LOCAL_MAINNET_ASSET_REGISTRY.note.denom)
       .reduce((sum, item) => sum + parseFloat(item.balance?.amount || '0'), 0);
 
     secondaryText = formatBalanceDisplay(
@@ -156,7 +161,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                   <Button className="w-full" asChild>
                     <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
                   </Button>
-                  <ReceiveDialog asset={DEFAULT_ASSET} />
+                  <ReceiveDialog asset={DEFAULT_MAINNET_ASSET} />
                 </>
               ) : (
                 <>

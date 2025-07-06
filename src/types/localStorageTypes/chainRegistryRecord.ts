@@ -1,4 +1,5 @@
 import { NetworkLevel } from '@/constants';
+import { Asset } from '../types';
 
 export interface Uri {
   address: string;
@@ -39,7 +40,7 @@ export interface SimplifiedChainInfo {
   rpc_uris: Uri[];
   rest_uris: Uri[];
   logo_uri?: string;
-  assets?: Record<string, any>;
+  assets?: Record<string, Asset>;
 }
 
 export interface LocalChainRegistry extends Record<string, SimplifiedChainInfo> {}
@@ -47,5 +48,8 @@ export interface LocalChainRegistry extends Record<string, SimplifiedChainInfo> 
 export interface ChainRegistryRecord {
   sha: string;
   lastUpdated: string;
-  data: LocalChainRegistry;
+  data: {
+    mainnet: LocalChainRegistry;
+    testnet: LocalChainRegistry;
+  };
 }

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { DEFAULT_CHAIN_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
+import { SYMPHONY_MAINNET_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
 import { chainRegistryAtom } from '@/atoms';
@@ -11,11 +11,14 @@ type TobinTaxRateResponseDto = {
 
 const getTobinTaxRateRequest = async () => {
   const chainRegistry = useAtomValue(chainRegistryAtom);
-  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
+  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
 
   const response = await queryRestNode({
     endpoint: SYMPHONY_ENDPOINTS.getTobinTaxRate,
     queryType: QueryType.GET,
+    prefix,
     restUris,
   });
 

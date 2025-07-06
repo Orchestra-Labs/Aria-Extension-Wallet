@@ -18,6 +18,7 @@ export const sendTransaction = async (
   fromAddress: string,
   sendObject: SendObject,
   simulateOnly: boolean = false,
+  prefix: string,
   rpcUris: Uri[],
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
@@ -45,6 +46,7 @@ export const sendTransaction = async (
 
     const response = await queryRpcNode({
       endpoint,
+      prefix,
       rpcUris,
       messages,
       feeDenom,
@@ -89,6 +91,7 @@ export const multiSendTransaction = async (
   fromAddress: string,
   sendObjects: SendObject[],
   simulateOnly: boolean = false,
+  prefix: string,
   rpcUris: Uri[],
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
@@ -107,6 +110,7 @@ export const multiSendTransaction = async (
   try {
     const response = await queryRpcNode({
       endpoint,
+      prefix,
       rpcUris,
       messages,
       feeDenom,

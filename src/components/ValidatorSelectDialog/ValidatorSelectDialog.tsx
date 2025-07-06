@@ -22,8 +22,8 @@ import {
 import { CombinedStakingInfo, Uri } from '@/types';
 import { useRefreshData, useToast } from '@/hooks';
 import {
-  DEFAULT_ASSET,
-  DEFAULT_CHAIN_ID,
+  DEFAULT_MAINNET_ASSET,
+  SYMPHONY_MAINNET_ID,
   GREATER_EXPONENT_DEFAULT,
   TransactionType,
   ValidatorSortType,
@@ -69,8 +69,9 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
 
   // TODO: need to be able to change chain to stake to other chains
-  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
-  const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
+  const prefix = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].bech32_prefix;
+  const restUris = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].rest_uris;
+  const rpcUris = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].rpc_uris;
 
   const allValidatorsSelected = selectedValidators.length === filteredValidators.length;
   const noValidatorsSelected = selectedValidators.length === 0;
@@ -184,6 +185,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       const result = await claimRewards(
         filteredValidators[0].delegation.delegator_address,
         selectedValidators.map(v => v.delegation.validator_address),
+        prefix,
         rpcUris,
         isSimulation,
       );
@@ -214,6 +216,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       }));
 
       const claimResult = await claimAndRestake(
+        prefix,
         restUris,
         rpcUris,
         selectedValidators.map(v => ({
@@ -250,6 +253,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
     try {
       const result = await claimAndUnstake({
+        prefix,
         rpcUris,
         delegations: delegations,
         simulateOnly,
@@ -274,7 +278,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const formatFee = (amount: number, gasWanted: number) => {
     const defaultGasPrice = 0.025;
     const exponent = GREATER_EXPONENT_DEFAULT;
-    const symbol = DEFAULT_ASSET.symbol || 'MLD';
+    const symbol = DEFAULT_MAINNET_ASSET.symbol;
     const feeAmount = gasWanted * defaultGasPrice;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 

@@ -1,18 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { walletStateAtom } from '@/atoms';
-import { useAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import { DATA_FRESHNESS_TIMEOUT } from '@/constants';
 import { useRefreshData } from './useRefreshData';
+import { sessionWalletAtom } from '@/atoms';
 
 export const useUpdateWalletTimer = () => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { refreshData } = useRefreshData();
+  const sessionWallet = useAtomValue(sessionWalletAtom);
 
-  const [walletState] = useAtom(walletStateAtom);
+  const hasAnyWallets = Object.values(sessionWallet.chainWallets).some(wallet => !!wallet.address);
 
   const updateWalletAssets = () => {
-    if (walletState.address) {
-      console.log('Refreshing wallet assets on interval for', walletState);
+    if (hasAnyWallets) {
+      console.log('Refreshing wallet assets on interval');
       refreshData();
     }
   };
@@ -28,19 +29,19 @@ export const useUpdateWalletTimer = () => {
   const startTimer = () => {
     clearExistingTimer();
 
-    if (walletState.address) {
+    if (hasAnyWallets) {
       console.log('Setting new timer to refresh wallet assets every', DATA_FRESHNESS_TIMEOUT, 'ms');
       timerRef.current = setInterval(updateWalletAssets, DATA_FRESHNESS_TIMEOUT);
     }
   };
 
   useEffect(() => {
-    if (walletState.address !== '') {
+    if (hasAnyWallets) {
       startTimer();
     }
 
     return () => {
       clearExistingTimer();
     };
-  }, [walletState.address]);
+  }, [sessionWallet]);
 };

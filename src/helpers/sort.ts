@@ -9,41 +9,67 @@ export function filterAndSortAssets(
   sortOrder: 'Asc' | 'Desc',
   showAllAssets: boolean = true,
 ): typeof assets {
+  console.log('[sort] input assets:', assets);
+  console.log('[sort] searchTerm:', searchTerm);
+
   const lowercasedSearchTerm = searchTerm.toLowerCase();
 
-  // Filter assets based on search term
-  const filteredAssets = assets.filter(
-    asset =>
-      asset.denom.toLowerCase().includes(lowercasedSearchTerm) ||
-      asset.symbol?.toLowerCase().includes(lowercasedSearchTerm),
-  );
+  const filteredAssets = assets.filter(asset => {
+    const searchFields = [
+      asset.denom.toLowerCase(),
+      asset.symbol?.toLowerCase(),
+      asset.name?.toLowerCase(),
+      asset.networkName.toLowerCase(),
+      asset.networkID.toLowerCase(),
+    ].filter(Boolean);
+    return searchFields.some(field => field.includes(lowercasedSearchTerm));
+  });
 
   // Filter for non-zero values if required
+  console.log('[sort] filtered assets:', filteredAssets);
+
   const finalAssets = showAllAssets
     ? filteredAssets
     : filteredAssets.filter(asset => parseFloat(asset.amount) > 0);
 
   // Sort the assets based on type and order
+  console.log('[sort] final assets to sort:', finalAssets);
+
   return finalAssets.sort((a, b) => {
-    let valueA: string | number;
-    let valueB: string | number;
-
     if (sortType === 'name') {
-      valueA = stripNonAlphanumerics(a.symbol?.toLowerCase() || a.denom.toLowerCase());
-      valueB = stripNonAlphanumerics(b.symbol?.toLowerCase() || b.denom.toLowerCase());
+      // NOTE: if putting name before symbol, change it here
+      const getPriorityFields = (asset: Asset) =>
+        [
+          asset.symbol.toLowerCase(),
+          asset.name.toLowerCase(),
+          asset.networkName.toLowerCase(),
+          asset.denom.toLowerCase(),
+          asset.networkID.toLowerCase(),
+        ].map(val => stripNonAlphanumerics(val || ''));
 
-      return sortOrder === 'Asc'
-        ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-        : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
-    } else {
-      valueA = parseFloat(a.amount);
-      valueB = parseFloat(b.amount);
-    }
+      const [a1, a2, a3, a4, a5] = getPriorityFields(a);
+      const [b1, b2, b3, b4, b5] = getPriorityFields(b);
 
-    if (sortOrder === 'Asc') {
-      return valueA > valueB ? 1 : -1;
+      console.log('[sort] comparing A:', [a1, a2, a3, a4, a5]);
+      console.log('[sort] comparing B:', [b1, b2, b3, b4, b5]);
+
+      const compareChain = [a1, a2, a3, a4, a5].map((val, idx) => {
+        return val.localeCompare([b1, b2, b3, b4, b5][idx], undefined, { sensitivity: 'base' });
+      });
+
+      const result = compareChain.find(res => res !== 0) ?? 0;
+      console.log('[sort] name sort result:', result);
+      return sortOrder === 'Asc' ? result : -result;
     } else {
-      return valueA < valueB ? 1 : -1;
+      const valueA = parseFloat(a.amount);
+      const valueB = parseFloat(b.amount);
+      console.log('[sort] amount sort values:', valueA, valueB);
+
+      if (sortOrder === 'Asc') {
+        return valueA > valueB ? 1 : -1;
+      } else {
+        return valueA < valueB ? 1 : -1;
+      }
     }
   });
 }

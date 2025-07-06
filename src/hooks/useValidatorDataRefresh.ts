@@ -1,43 +1,44 @@
-import {
-  chainRegistryAtom,
-  isFetchingValidatorDataAtom,
-  validatorDataAtom,
-  walletAddressAtom,
-} from '@/atoms';
-import { DEFAULT_CHAIN_ID } from '@/constants';
+import { chainRegistryAtom, isFetchingValidatorDataAtom, validatorDataAtom } from '@/atoms';
 import { fetchValidatorData } from '@/helpers';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { sessionWalletAtom } from '@/atoms/walletAtom';
 
 export function useValidatorDataRefresh() {
-  const [walletAddress] = useAtom(walletAddressAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
   const setValidatorState = useSetAtom(validatorDataAtom);
   const setIsFetchingData = useSetAtom(isFetchingValidatorDataAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const { chainWallets } = useAtomValue(sessionWalletAtom);
 
-  const refreshValidatorData = async (address?: string) => {
-    const targetAddress = address || walletAddress;
+  const refreshValidatorData = async () => {
+    setIsFetchingData(true);
+    const allValidatorData = [];
 
-    if (targetAddress) {
-      setIsFetchingData(true);
+    try {
+      for (const [chainId, wallet] of Object.entries(chainWallets)) {
+        if (!wallet.address) continue;
 
-      try {
-        const newValidatorData = await fetchValidatorData(
-          chainRegistry,
-          DEFAULT_CHAIN_ID,
-          targetAddress,
+        const chain = chainRegistry.mainnet[chainId] || chainRegistry.testnet[chainId];
+        if (!chain) {
+          console.warn(`[ValidatorDataRefresh] No chain data for ${chainId}, skipping`);
+          continue;
+        }
+
+        console.log(`[ValidatorRefresh] Fetching validators for ${chainId}`);
+        const data = await fetchValidatorData(
+          { ...chainRegistry.mainnet, ...chainRegistry.testnet },
+          chainId,
+          wallet.address,
         );
-        setValidatorState(newValidatorData);
-      } catch (error) {
-        console.error('Error refreshing validator data:', error);
-      } finally {
-        setIsFetchingData(false);
+        allValidatorData.push(...data);
       }
+
+      setValidatorState(allValidatorData);
+    } catch (error) {
+      console.error('Error refreshing validator data:', error);
+    } finally {
+      setIsFetchingData(false);
     }
   };
 
-  const triggerValidatorDataRefresh = (address?: string) => {
-    refreshValidatorData(address);
-  };
-
-  return { triggerValidatorDataRefresh };
+  return { triggerValidatorDataRefresh: refreshValidatorData };
 }

@@ -1,4 +1,9 @@
-import { NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
+import {
+  NetworkLevel,
+  STORED_DATA_TIMEOUT,
+  SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
+} from '@/constants';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { decompressSync } from 'fflate';
 import {
@@ -6,24 +11,257 @@ import {
   ChainRegistryRecord,
   SimplifiedChainInfo,
   LocalChainRegistry,
+  Asset,
+  Uri,
 } from '@/types';
 
-// TODO: pull in testnets as well
 // TODO: also pull IBC information
 // TODO: show status of download to user in topbar.  "checking for update", "querying for new chains", "updating chain information"
 // TODO: change to use regularly updated json file for single file download (faster, lighter, less wasteful)
 const REGISTRY_KEY = 'localChainRegistry';
 const GITHUB_COMMIT_URL =
   'https://api.github.com/repos/Orchestra-Labs/cosmos-chain-registry/commits/master';
+// NOTE: backup is required, as many don't seem to maintain their entries in the CosmosHub repository
+const KEPLR_REGISTRY_URL =
+  'https://api.github.com/repos/Orchestra-Labs/keplr-chain-registry/contents/cosmos';
 
-export type ChainRegistryCache = Record<
-  string,
-  {
-    'chain.json'?: any;
-    'assetlist.json'?: any;
-    assets?: Record<string, any>;
+type ChainRegistryFiles = {
+  'chain.json'?: any;
+  'assetlist.json'?: any;
+  assets?: Record<string, Asset>;
+};
+export type ChainRegistryCache = Record<string, ChainRegistryFiles>;
+
+const fetchKeplrRegistryData = async (): Promise<any[]> => {
+  console.groupCollapsed('[fetchKeplrRegistryData] Fetching Keplr registry data');
+  try {
+    console.log('Fetching directory listing from:', KEPLR_REGISTRY_URL);
+    const dirResponse = await fetch(KEPLR_REGISTRY_URL, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+    if (!dirResponse.ok) {
+      console.error(`Directory fetch failed: ${dirResponse.status}`);
+      return [];
+    }
+
+    const dirContents = await dirResponse.json();
+    console.log('Directory contents received:', dirContents);
+
+    if (!Array.isArray(dirContents)) {
+      console.error('Directory contents is not an array:', dirContents);
+      return [];
+    }
+
+    const jsonFiles = dirContents.filter((file: any) => {
+      const isValid =
+        file &&
+        typeof file === 'object' &&
+        file.type === 'file' &&
+        typeof file.name === 'string' &&
+        file.name.endsWith('.json') &&
+        typeof file.download_url === 'string';
+
+      if (!isValid) {
+        console.warn('Skipping invalid file entry:', file);
+      }
+      return isValid;
+    });
+
+    console.log(`Found ${jsonFiles.length} valid JSON files to process`);
+
+    const chainData = await Promise.all(
+      jsonFiles.map(async (file: any) => {
+        console.groupCollapsed(`[fetchChainFile] Processing ${file.name}`);
+        try {
+          console.log('Fetching file from:', file.download_url);
+          const fileResponse = await fetch(file.download_url);
+
+          if (!fileResponse.ok) {
+            console.warn(`File fetch failed: ${fileResponse.status}`);
+            return null;
+          }
+
+          const data = await fileResponse.json();
+          console.log('File content received:', data);
+
+          if (!data || typeof data !== 'object') {
+            console.warn('Invalid JSON content');
+            return null;
+          }
+
+          if (typeof data.chainId !== 'string') {
+            console.warn('Missing or invalid chainId');
+            return null;
+          }
+
+          if (typeof data.chainName !== 'string') {
+            console.warn('Missing or invalid chainName');
+            return null;
+          }
+
+          console.log('Valid chain data found');
+          return data;
+        } catch (error) {
+          console.error(`Error processing ${file.name}:`, error);
+          return null;
+        } finally {
+          console.groupEnd();
+        }
+      }),
+    );
+
+    const validChains = chainData.filter(Boolean);
+    console.log(`Successfully fetched ${validChains.length} valid chain configurations`);
+    return validChains;
+  } catch (error) {
+    console.error('Error in fetchKeplrRegistryData:', error);
+    return [];
+  } finally {
+    console.groupEnd();
   }
->;
+};
+
+const mergeKeplrData = (chainInfo: SimplifiedChainInfo, keplrData: any): SimplifiedChainInfo => {
+  console.groupCollapsed(`[mergeKeplrData] Merging data for chain: ${chainInfo.chain_id}`);
+  try {
+    console.log('Original chainInfo:', chainInfo);
+    console.log('Keplr data to merge:', keplrData);
+
+    // Skip Symphony chains and invalid data
+    if ([SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID].includes(chainInfo.chain_id)) {
+      console.log('Skipping merge for Symphony chain');
+      return chainInfo;
+    }
+
+    if (!keplrData) {
+      console.warn('No Keplr data provided to merge');
+      return chainInfo;
+    }
+
+    // Validate chainInfo structure
+    if (!chainInfo || typeof chainInfo !== 'object') {
+      console.error('Invalid chainInfo structure:', chainInfo);
+      return chainInfo;
+    }
+
+    // Create safe URI objects with detailed logging
+    const createUri = (url: unknown, providerName?: string): Uri => {
+      console.groupCollapsed(`[createUri] Creating URI from:`, url);
+      try {
+        if (typeof url !== 'string') {
+          console.warn(`URL is not a string:`, url);
+          return {
+            address: '',
+            provider: providerName || 'Invalid',
+          };
+        }
+
+        if (!url.startsWith('http')) {
+          console.warn(`Invalid URL format (doesn't start with http):`, url);
+          return {
+            address: '',
+            provider: providerName || 'Invalid',
+          };
+        }
+
+        console.log(`Creating valid URI for:`, url);
+        return {
+          address: url,
+          provider: providerName || 'Keplr',
+        };
+      } finally {
+        console.groupEnd();
+      }
+    };
+
+    // Extract provider info with validation
+    const providerName = (() => {
+      try {
+        if (keplrData.nodeProvider && typeof keplrData.nodeProvider === 'object') {
+          console.log('Found nodeProvider:', keplrData.nodeProvider);
+          return typeof keplrData.nodeProvider.name === 'string'
+            ? keplrData.nodeProvider.name
+            : undefined;
+        }
+        console.log('No valid nodeProvider found');
+        return undefined;
+      } catch (error) {
+        console.warn('Error extracting provider name:', error);
+        return undefined;
+      }
+    })();
+
+    // Extract bech32 prefix with validation
+    const bech32Prefix = (() => {
+      try {
+        if (keplrData.bech32Config && typeof keplrData.bech32Config === 'object') {
+          console.log('Found bech32Config:', keplrData.bech32Config);
+          return typeof keplrData.bech32Config.bech32PrefixAccAddr === 'string'
+            ? keplrData.bech32Config.bech32PrefixAccAddr
+            : chainInfo.bech32_prefix;
+        }
+        console.log('Using default bech32 prefix');
+        return chainInfo.bech32_prefix;
+      } catch (error) {
+        console.warn('Error extracting bech32 prefix:', error);
+        return chainInfo.bech32_prefix;
+      }
+    })();
+
+    // Log RPC URI processing
+    const rpcUris = (() => {
+      console.groupCollapsed('[RPC URIs] Processing RPC endpoints');
+      try {
+        if (typeof keplrData.rpc === 'string') {
+          console.log('Processing Keplr RPC:', keplrData.rpc);
+          const uri = createUri(keplrData.rpc, providerName);
+          console.log('Created RPC URI:', uri);
+          return [uri];
+        }
+        console.log('Using existing RPC URIs:', chainInfo.rpc_uris);
+        return chainInfo.rpc_uris;
+      } finally {
+        console.groupEnd();
+      }
+    })();
+
+    // Log REST URI processing
+    const restUris = (() => {
+      console.groupCollapsed('[REST URIs] Processing REST endpoints');
+      try {
+        if (typeof keplrData.rest === 'string') {
+          console.log('Processing Keplr REST:', keplrData.rest);
+          const uri = createUri(keplrData.rest, providerName);
+          console.log('Created REST URI:', uri);
+          return [uri];
+        }
+        console.log('Using existing REST URIs:', chainInfo.rest_uris);
+        return chainInfo.rest_uris;
+      } finally {
+        console.groupEnd();
+      }
+    })();
+
+    const mergedInfo = {
+      ...chainInfo,
+      rpc_uris: rpcUris,
+      rest_uris: restUris,
+      bech32_prefix: bech32Prefix,
+    };
+
+    console.log('Merged chain info:', mergedInfo);
+    return mergedInfo;
+  } catch (error) {
+    console.error('Error in mergeKeplrData:', error);
+    return chainInfo;
+  } finally {
+    console.groupEnd();
+  }
+};
 
 export const getStoredChainRegistry = (): ChainRegistryRecord | null => {
   const raw = getLocalStorageItem(REGISTRY_KEY);
@@ -83,23 +321,36 @@ export const checkChainRegistryUpdate = async (): Promise<boolean> => {
   return hasChanged;
 };
 
-function extractAssets(assetlist: any, chain: any): Record<string, any> {
-  const feeTokens = new Set(chain?.fees?.fee_tokens?.map((f: any) => f.denom));
-  const networkName = chain.pretty_name;
-  const networkID = chain.chain_id;
+function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
+  const feeTokens = new Set(
+    chain?.fees?.fee_tokens?.map((f: any) => f.denom) ||
+      chain?.feeCurrencies?.map((f: any) => f.coinMinimalDenom) ||
+      [],
+  );
+  const networkName = chain.pretty_name || chain.chainName || 'Unknown';
+  const networkID = chain.chain_id || chain.chainId || 'Unknown';
 
-  const result: Record<string, any> = {};
+  const result: Record<string, Asset> = {};
   for (const asset of assetlist.assets || []) {
-    const base = asset.base;
-    const displayUnit = asset.denom_units?.find((d: any) => d.denom === asset.symbol.toLowerCase());
+    // Handle both Cosmos registry and Keplr currency formats
+    const isKeplrFormat = !!asset.coinMinimalDenom;
+    const base = isKeplrFormat ? asset.coinMinimalDenom : asset.base;
+    const symbol = isKeplrFormat ? asset.coinDenom : asset.symbol;
+    const name = isKeplrFormat ? asset.coinDenom : asset.name || asset.symbol || 'Unknown';
+    const logo = isKeplrFormat ? asset.coinImageUrl || '' : asset.logo_URIs?.png || '';
+    const exponent = isKeplrFormat
+      ? asset.coinDecimals ?? 6
+      : asset.denom_units?.find((d: any) => d.denom === asset.display)?.exponent ?? 6;
+
     result[base] = {
       denom: base,
-      amount: '1',
+      amount: '0',
+      exchangeRate: '-',
       isIbc: false,
-      logo: asset.logo_URIs?.png,
-      symbol: asset.symbol,
-      name: asset.name,
-      exponent: displayUnit?.exponent ?? 0,
+      logo,
+      symbol,
+      name,
+      exponent,
       isFeeToken: feeTokens.has(base),
       networkName,
       networkID,
@@ -113,7 +364,11 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
   try {
     console.log('[ChainRegistry] Starting full fetch & store');
 
-    const commit = await fetchLatestChainRegistryCommit();
+    const [commit, keplrData] = await Promise.all([
+      fetchLatestChainRegistryCommit(),
+      fetchKeplrRegistryData(),
+    ]);
+
     if (!commit) throw new Error('Could not resolve latest commit');
 
     const archiveUrl = `https://codeload.github.com/Orchestra-Labs/cosmos-chain-registry/tar.gz/${commit}`;
@@ -132,11 +387,9 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
     const decoder = new TextDecoder();
 
     let offset = 0;
-    const chainFiles: Record<
-      string,
-      { 'chain.json'?: any; 'assetlist.json'?: any; assets?: Record<string, any> }
-    > = {};
-    const simplifiedRegistry: LocalChainRegistry = {};
+    const chainFiles: Record<string, ChainRegistryFiles> = {};
+    const mainnetRegistry: LocalChainRegistry = {};
+    const testnetRegistry: LocalChainRegistry = {};
 
     while (offset + 512 <= decompressed.length) {
       const name = decoder.decode(decompressed.slice(offset, offset + 100)).replace(/\0.*$/, '');
@@ -152,39 +405,98 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
       offset += totalSize;
 
       if (!name.endsWith('.json')) continue;
+
       const parts = name.split('/');
-      const chainName = parts[1];
-      const file = parts[2] as 'chain.json' | 'assetlist.json';
+      let chainName, file;
+
+      if (parts[1] === 'testnets') {
+        chainName = parts[2];
+        file = parts[3] as 'chain.json' | 'assetlist.json';
+      } else {
+        chainName = parts[1];
+        file = parts[2] as 'chain.json' | 'assetlist.json';
+      }
+
       if (!chainName || !file || !['chain.json', 'assetlist.json'].includes(file)) continue;
 
       try {
         const content = JSON.parse(decoder.decode(decompressed.slice(contentStart, contentEnd)));
-        if (!chainFiles[chainName]) chainFiles[chainName] = {};
-        chainFiles[chainName][file] = content;
+        const registryKey = parts[1] === 'testnets' ? `testnets/${chainName}` : chainName;
+
+        if (!chainFiles[registryKey]) chainFiles[registryKey] = {};
+        chainFiles[registryKey][file] = content;
       } catch (err) {
         console.warn(`Invalid JSON in ${name}`);
       }
     }
 
-    for (const chainName of Object.keys(chainFiles)) {
-      const entry = chainFiles[chainName];
-      if (entry['chain.json'] && entry['assetlist.json']) {
-        entry.assets = extractAssets(entry['assetlist.json'], entry['chain.json']);
-      }
+    const keplrDataMap = new Map<string, any>();
+    if (keplrData && Array.isArray(keplrData)) {
+      keplrData.forEach(chain => {
+        keplrDataMap.set(chain.chainId, chain);
+      });
+    }
 
+    // Fetch Keplr assets as fallback
+    const keplrAssetsMap = new Map<string, Record<string, Asset>>();
+    for (const chain of keplrData) {
+      if (chain.currencies && Array.isArray(chain.currencies)) {
+        const assets = extractAssets({ assets: chain.currencies }, chain);
+        keplrAssetsMap.set(chain.chainId, assets);
+      }
+    }
+
+    for (const registryKey of Object.keys(chainFiles)) {
+      const entry = chainFiles[registryKey];
       if (entry['chain.json']) {
-        simplifiedRegistry[chainName] = extractChainInfo(entry['chain.json'], entry.assets ?? {});
+        // Try to get assets from GitHub chain registry first
+        let assets: Record<string, Asset> = {};
+        if (entry['assetlist.json']) {
+          assets = extractAssets(entry['assetlist.json'], entry['chain.json']);
+        } else {
+          // Fallback to Keplr assets if GitHub assets are not available
+          const chainId = entry['chain.json'].chain_id;
+          assets = keplrAssetsMap.get(chainId) || {};
+          console.log(
+            `[ChainRegistry] No assets found in GitHub for ${chainId}, using Keplr assets:`,
+            Object.keys(assets).length > 0 ? 'Found' : 'None',
+          );
+        }
+
+        let info = extractChainInfo(entry['chain.json'], assets);
+
+        const keplrChainData = keplrDataMap.get(info.chain_id);
+        if (keplrChainData) {
+          info = mergeKeplrData(info, keplrChainData);
+        }
+
+        const isTestnet = registryKey.startsWith('testnets/');
+        const targetRegistry = isTestnet ? testnetRegistry : mainnetRegistry;
+
+        targetRegistry[info.chain_id] = info;
       }
     }
 
     const payload: ChainRegistryRecord = {
       sha: commit,
       lastUpdated: new Date().toISOString(),
-      data: simplifiedRegistry,
+      data: {
+        mainnet: mainnetRegistry,
+        testnet: testnetRegistry,
+      },
     };
 
     setLocalStorageItem(REGISTRY_KEY, JSON.stringify(payload));
-    console.log('Stored flattened registry:', Object.keys(simplifiedRegistry).length, 'chains');
+    console.log(
+      '[ChainRegistry] Stored flattened mainnet registry:',
+      Object.keys(mainnetRegistry).length,
+      'chains',
+    );
+    console.log(
+      '[ChainRegistry] Stored flattened testnet registry:',
+      Object.keys(testnetRegistry).length,
+      'chains',
+    );
   } catch (err) {
     console.error('Failed to fetch and store full registry:', err);
   }
@@ -222,38 +534,62 @@ export const filterChainRegistryToSubscriptions = (
 ): LocalChainRegistry => {
   const subscriptions = account.settings.subscribedTo;
   console.log('[ChainRegistry] account subscriptions:', subscriptions);
+  console.log('[ChainRegistry] registry chains:', Object.keys(registry));
 
   const result: LocalChainRegistry = {};
 
   for (const chainID in subscriptions) {
     const assets = subscriptions[chainID];
-    console.log(`[ChainRegistry] assets: for ${chainID}: ${assets}`);
+    console.log(`[ChainRegistry] Processing chainID: ${chainID}`);
+    console.log(`[ChainRegistry] Looking for assets:`, assets);
 
-    // TODO: seems this is only matching mainnets, not testnets.  pull in testnets as well
-    const match = Object.values(registry).find(
-      c => c.chain_id.trim().toLowerCase() === chainID.trim().toLowerCase(),
-    );
-    console.log(
-      '[ChainRegistry] registry chain_ids:',
-      Object.values(registry).map(c => c.chain_id),
-    );
-    console.log(`[ChainRegistry] match?: ${JSON.stringify(match)}}`);
+    // Case-insensitive search
+    const match = Object.values(registry).find(c => {
+      const matchFound = c.chain_id.trim().toLowerCase() === chainID.trim().toLowerCase();
+      // console.log(`[ChainRegistry] Comparing:
+      //   Registry chain_id: ${c.chain_id}
+      //   Looking for: ${chainID}
+      //   Match: ${matchFound}`);
+      return matchFound;
+    });
 
     if (match) {
-      result[match.chain_name] = {
+      console.log(`[ChainRegistry] Found match for ${chainID}:`, match.chain_id);
+      // console.log(`[ChainRegistry] Available assets in match:`, Object.keys(match.assets || {}));
+
+      const filteredAssets = Object.fromEntries(
+        Object.entries(match.assets || {}).filter(([denom]) => {
+          const included = assets.includes(denom);
+          // console.log(`[ChainRegistry] Checking asset ${denom}: ${included}`);
+          return included;
+        }),
+      );
+
+      // console.log(`[ChainRegistry] Filtered assets:`, Object.keys(filteredAssets));
+
+      result[match.chain_id] = {
         ...match,
-        assets: Object.fromEntries(
-          Object.entries(match.assets || {}).filter(([k]) => assets.includes(k)),
-        ),
+        assets: filteredAssets,
       };
+    } else {
+      console.warn(`[ChainRegistry] No match found for chainID: ${chainID}`);
+      console.log(
+        `[ChainRegistry] Available chain_ids:`,
+        Object.values(registry).map(c => c.chain_id),
+      );
     }
   }
 
   return result;
 };
 
-export const extractChainInfo = (raw: any, assets?: Record<string, any>): SimplifiedChainInfo => {
+export const extractChainInfo = (raw: any, assets?: Record<string, Asset>): SimplifiedChainInfo => {
   const networkLevel = raw.network_type === 'mainnet' ? NetworkLevel.MAINNET : NetworkLevel.TESTNET;
+
+  const createUriFromApi = (endpoint: any): Uri => ({
+    address: endpoint.address,
+    provider: endpoint.provider || 'Unknown',
+  });
 
   return {
     chain_name: raw.chain_name,
@@ -265,8 +601,8 @@ export const extractChainInfo = (raw: any, assets?: Record<string, any>): Simpli
     bech32_prefix: raw.bech32_prefix,
     fees: raw.fees,
     staking: raw.staking,
-    rpc_uris: raw.apis?.rpc ?? [],
-    rest_uris: raw.apis?.rest ?? [],
+    rpc_uris: raw.apis?.rpc?.map(createUriFromApi) || [],
+    rest_uris: raw.apis?.rest?.map(createUriFromApi) || [],
     logo_uri: raw.logo_URIs?.png || raw.images?.find((img: any) => !!img.png)?.png || null,
     assets: assets ?? {},
   };

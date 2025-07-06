@@ -2,12 +2,12 @@ import { Input } from '@/ui-kit';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   addressVerifiedAtom,
+  chainWalletAtom,
   receiveStateAtom,
   recipientAddressAtom,
-  walletStateAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
-import { InputStatus } from '@/constants';
+import { SYMPHONY_MAINNET_ID, InputStatus } from '@/constants';
 import { cn, fetchBech32Prefixes } from '@/helpers';
 import { QRCodeScannerDialog } from '@/components';
 import { Asset, ChainData } from '@/types';
@@ -28,7 +28,8 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const setRecipientAddress = useSetAtom(recipientAddressAtom);
   const setAddressVerified = useSetAtom(addressVerifiedAtom);
   const setReceiveState = useSetAtom(receiveStateAtom);
-  const walletState = useAtomValue(walletStateAtom);
+  // TODO: pass in chain ID
+  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
 
   const [addressStatus, setAddressStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
   const [messageText, setMessageText] = useState<string>('');

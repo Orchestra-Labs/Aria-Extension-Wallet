@@ -1,8 +1,8 @@
 import { Secp256k1HdWallet } from '@cosmjs/amino';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 
-import { WALLET_PREFIX } from '@/constants';
-import { WalletRecord } from '@/types';
+import { SYMPHONY_PREFIX } from '@/constants';
+import { SubscriptionRecord, WalletRecord } from '@/types';
 
 import { generateUUID } from '../uuid';
 import { encryptMnemonic } from './crypto';
@@ -16,7 +16,7 @@ export const createWallet = async (
     const walletID = generateUUID();
 
     const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
-      prefix: WALLET_PREFIX,
+      prefix: SYMPHONY_PREFIX,
     });
     console.log(
       'Wallet created successfully with address:',
@@ -43,32 +43,83 @@ export const createWallet = async (
 };
 
 export const getWallet = async (mnemonic: string): Promise<Secp256k1HdWallet> => {
-  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix: WALLET_PREFIX });
+  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix: SYMPHONY_PREFIX });
   console.log('Wallet retrieved successfully:', wallet);
   return wallet;
 };
 
-export async function createOfflineSignerFromMnemonic(
+export const getWalletByPrefix = async (
   mnemonic: string,
-): Promise<DirectSecp256k1HdWallet> {
-  const hdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
-    prefix: WALLET_PREFIX,
-  });
-  console.log('Offline signer created successfully');
-  return hdWallet;
-}
-
-export async function createAminoSignerFromMnemonic(mnemonic: string) {
-  const hdWallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
-    prefix: WALLET_PREFIX,
-  });
-  console.log('Amino signer created successfully');
-  return hdWallet;
-}
-
-export const getAddress = async (mnemonic: string): Promise<string> => {
-  const wallet = await getWallet(mnemonic);
-  const [account] = await wallet.getAccounts();
-  console.log('Address retrieved:', account.address);
-  return account.address;
+  prefix: string,
+): Promise<Secp256k1HdWallet> => {
+  return await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
 };
+
+// export async function createOfflineSigner(
+//   mnemonic: string,
+// ): Promise<DirectSecp256k1HdWallet> {
+//   const hdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
+//     prefix: WALLET_PREFIX,
+//   });
+//   console.log('Offline signer created successfully');
+//   return hdWallet;
+// }
+
+export async function createOfflineSignerByPrefix(
+  mnemonic: string,
+  prefix: string,
+): Promise<DirectSecp256k1HdWallet> {
+  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
+  console.log(`Offline signer created with prefix "${prefix}"`);
+  return wallet;
+}
+
+// export async function createAminoSigner(mnemonic: string) {
+//   const hdWallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
+//     prefix: WALLET_PREFIX,
+//   });
+//   console.log('Amino signer created successfully');
+//   return hdWallet;
+// }
+
+export async function createAminoSignerByPrefix(
+  mnemonic: string,
+  prefix: string,
+): Promise<Secp256k1HdWallet> {
+  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
+  console.log(`Amino signer created with prefix "${prefix}"`);
+  return wallet;
+}
+
+// export const getAddress = async (mnemonic: string): Promise<string> => {
+//   const wallet = await getWallet(mnemonic);
+//   const [account] = await wallet.getAccounts();
+//   console.log('Address retrieved:', account.address);
+//   return account.address;
+// };
+
+export async function getAddressesByChainPrefix(
+  mnemonic: string,
+  subscriptions: SubscriptionRecord,
+  chainPrefixes: Record<string, string>,
+): Promise<Record<string, string>> {
+  const addressMap: Record<string, string> = {};
+
+  for (const chainId of Object.keys(subscriptions)) {
+    console.log('[Wallet] Passed prefixes', chainPrefixes);
+    const prefix = chainPrefixes[chainId];
+    if (!prefix) continue;
+
+    const address = await getAddressByChainPrefix(mnemonic, prefix);
+    console.log('[Wallet] Created address', address, 'for chain', chainId, 'with prefix', prefix);
+    addressMap[chainId] = address;
+  }
+
+  return addressMap;
+}
+
+export async function getAddressByChainPrefix(mnemonic: string, prefix: string): Promise<string> {
+  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
+  const [account] = await wallet.getAccounts();
+  return account.address;
+}

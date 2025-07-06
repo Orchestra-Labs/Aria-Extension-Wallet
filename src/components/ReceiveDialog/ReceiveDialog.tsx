@@ -2,8 +2,7 @@ import { useAtomValue } from 'jotai';
 import React, { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
-import { walletStateAtom } from '@/atoms';
-import { WALLET_PREFIX } from '@/constants';
+import { SYMPHONY_MAINNET_ID, SYMPHONY_PREFIX } from '@/constants';
 import { truncateWalletAddress } from '@/helpers';
 import { useDebounce } from '@/hooks';
 import { Asset } from '@/types';
@@ -11,6 +10,7 @@ import { Button, CopyTextField, SlideTray } from '@/ui-kit';
 import { AssetInput } from '@/components';
 
 import { QRCodeContainer } from '../QRCodeContainer';
+import { chainWalletAtom } from '@/atoms';
 
 interface ReceiveDialogProps {
   buttonSize?: 'default' | 'medium' | 'small' | 'xsmall';
@@ -18,14 +18,15 @@ interface ReceiveDialogProps {
 }
 
 export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
-  const walletState = useAtomValue(walletStateAtom);
+  // TODO: pass in chain ID
+  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const [amount, setAmount] = useState<number>(0);
   const [showPreferenceInput, setShowPreferenceInput] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset>(asset);
   const debouncedAmount = useDebounce(amount);
 
   const walletDisplayAddress = useMemo(
-    () => truncateWalletAddress(WALLET_PREFIX, walletState.address),
+    () => truncateWalletAddress(SYMPHONY_PREFIX, walletState.address),
     [walletState.address],
   );
 

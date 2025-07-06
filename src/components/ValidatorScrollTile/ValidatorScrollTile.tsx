@@ -17,20 +17,20 @@ import {
 } from '@/helpers';
 import {
   BondStatus,
-  DEFAULT_ASSET,
-  DEFAULT_CHAIN_ID,
+  DEFAULT_MAINNET_ASSET,
   defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
-  LOCAL_ASSET_REGISTRY,
+  LOCAL_MAINNET_ASSET_REGISTRY,
+  SYMPHONY_MAINNET_ID,
   TextFieldStatus,
   TransactionType,
 } from '@/constants';
 import { useAtomValue } from 'jotai';
 import {
   chainRegistryAtom,
+  chainWalletAtom,
   filteredValidatorsAtom,
   showCurrentValidatorsAtom,
-  walletStateAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -55,7 +55,8 @@ export const ValidatorScrollTile = ({
   const { refreshData } = useRefreshData();
 
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
-  const walletState = useAtomValue(walletStateAtom);
+  // TODO: pass in chain ID
+  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
 
@@ -79,14 +80,16 @@ export const ValidatorScrollTile = ({
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
 
   // TODO: need to be able to change chain to stake to other chains
-  const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
-  const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
+  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+  const rpcUris = chain.rpc_uris;
 
   const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
     combinedStakingInfo;
   const delegationResponse = { delegation, balance };
 
-  const symbol = LOCAL_ASSET_REGISTRY.note.symbol || DEFAULT_ASSET.symbol || 'MLD';
+  const symbol = LOCAL_MAINNET_ASSET_REGISTRY.note.symbol;
 
   // Aggregating the rewards (sum all reward amounts for this validator)
   const rewardAmount = rewards
@@ -229,7 +232,7 @@ export const ValidatorScrollTile = ({
 
   const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
     const walletAssets = walletState?.assets || [];
-    const walletAsset = walletAssets.find(asset => asset.denom === sendAsset.denom);
+    const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
     if (!walletAsset) return 0;
 
     const maxAmount = parseFloat(walletAsset.amount || '0');
@@ -301,13 +304,14 @@ export const ValidatorScrollTile = ({
 
     const txType = TransactionType.STAKE;
     try {
-      const maxAvailable = calculateMaxAvailable(DEFAULT_ASSET, Number(amount));
+      const maxAvailable = calculateMaxAvailable(DEFAULT_MAINNET_ASSET, Number(amount));
 
       const result = await stakeToValidator(
         isSimulation && amount === '0' ? `${maxAvailable}` : amount,
-        LOCAL_ASSET_REGISTRY.note.denom,
+        LOCAL_MAINNET_ASSET_REGISTRY.note.denom,
         walletState.address,
         validator.operator_address,
+        prefix,
         rpcUris,
         isSimulation,
       );
@@ -336,6 +340,7 @@ export const ValidatorScrollTile = ({
     const txType = TransactionType.UNSTAKE;
     try {
       const result = await claimAndUnstake({
+        prefix,
         rpcUris,
         amount,
         delegations: delegationResponse,
@@ -368,6 +373,7 @@ export const ValidatorScrollTile = ({
       const result = await claimRewards(
         walletState.address,
         validator.operator_address,
+        prefix,
         rpcUris,
         isSimulation,
       );
@@ -400,6 +406,7 @@ export const ValidatorScrollTile = ({
     const txType = TransactionType.CLAIM_TO_RESTAKE;
     try {
       const result = await claimAndRestake(
+        prefix,
         restUris,
         rpcUris,
         delegationResponse,
@@ -437,7 +444,7 @@ export const ValidatorScrollTile = ({
 
     setFeeState(prevState => ({
       ...prevState,
-      asset: DEFAULT_ASSET,
+      asset: DEFAULT_MAINNET_ASSET,
       amount: feeInGreaterUnit,
     }));
   };
@@ -468,7 +475,7 @@ export const ValidatorScrollTile = ({
   };
 
   const setMaxAmount = () => {
-    const asset = DEFAULT_ASSET;
+    const asset = DEFAULT_MAINNET_ASSET;
 
     const maxAvailable = calculateMaxAvailable(asset);
     setAmount(maxAvailable);
@@ -478,7 +485,7 @@ export const ValidatorScrollTile = ({
     setAmount(0);
     setFeeState(prevState => ({
       ...prevState,
-      asset: DEFAULT_ASSET,
+      asset: DEFAULT_MAINNET_ASSET,
       amount: 0,
     }));
     setSimulatedFee({ fee: '0 MLD', textClass: 'text-blue' });
@@ -487,7 +494,7 @@ export const ValidatorScrollTile = ({
   };
 
   useEffect(() => {
-    const exponent = DEFAULT_ASSET.exponent || GREATER_EXPONENT_DEFAULT;
+    const exponent = DEFAULT_MAINNET_ASSET.exponent || GREATER_EXPONENT_DEFAULT;
     const symbol = feeState.asset;
     const feeAmount = feeState.amount;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
@@ -660,7 +667,7 @@ export const ValidatorScrollTile = ({
                   <AssetInput
                     placeholder={`Enter ${selectedAction} amount`}
                     variant="stake"
-                    assetState={DEFAULT_ASSET}
+                    assetState={DEFAULT_MAINNET_ASSET}
                     amountState={amount}
                     updateAmount={newAmount => setAmount(newAmount)}
                     reducedHeight

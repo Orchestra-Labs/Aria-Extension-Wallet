@@ -1,8 +1,8 @@
 import {
   COSMOS_CHAIN_ENDPOINTS,
-  DEFAULT_ASSET,
+  DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
-  LOCAL_ASSET_REGISTRY,
+  LOCAL_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRpcNode } from './queryNodes';
 import { DelegationResponse, TransactionResult, Uri } from '@/types';
@@ -62,6 +62,7 @@ export const buildStakingMessage = ({
 export const claimRewards = async (
   delegatorAddress: string,
   validatorAddress: string | string[],
+  prefix: string,
   rpcUris: Uri[],
   simulateOnly = false,
 ): Promise<TransactionResult> => {
@@ -78,6 +79,7 @@ export const claimRewards = async (
   try {
     const response = await queryRpcNode({
       endpoint,
+      prefix,
       rpcUris,
       messages,
       simulateOnly,
@@ -109,6 +111,7 @@ export const claimRewards = async (
 // TOOD: this properly handles mass messages.  expand the solution to the others
 // TODO: ensure this sends back a sum of all batches when simulating
 export const claimAndRestake = async (
+  prefix: string,
   restUris: Uri[],
   rpcUris: Uri[],
   delegations: DelegationResponse | DelegationResponse[],
@@ -124,6 +127,7 @@ export const claimAndRestake = async (
     const validatorRewards =
       rewards ||
       (await fetchRewards(
+        prefix,
         restUris,
         delegatorAddress,
         validatorAddresses.map(addr => ({ validator_address: addr })),
@@ -158,6 +162,7 @@ export const claimAndRestake = async (
     if (simulateOnly) {
       const simulation = await queryRpcNode({
         endpoint: delegateEndpoint,
+        prefix,
         rpcUris,
         messages: messageChunks[0],
         simulateOnly: true,
@@ -173,6 +178,7 @@ export const claimAndRestake = async (
     for (const messages of messageChunks) {
       const simulation = await queryRpcNode({
         endpoint: delegateEndpoint,
+        prefix,
         rpcUris,
         messages,
         simulateOnly: true,
@@ -191,11 +197,12 @@ export const claimAndRestake = async (
 
       const result = await queryRpcNode({
         endpoint: delegateEndpoint,
+        prefix,
         rpcUris,
         messages,
         simulateOnly: false,
         fee: {
-          amount: [{ denom: DEFAULT_ASSET.denom, amount: feeAmount.toFixed(0) }],
+          amount: [{ denom: DEFAULT_MAINNET_ASSET.denom, amount: feeAmount.toFixed(0) }],
           gas: estimatedGas.toFixed(0),
         },
       });
@@ -229,13 +236,14 @@ export const stakeToValidator = async (
   denom: string,
   walletAddress: string,
   validatorAddress: string,
+  prefix: string,
   rpcUris: Uri[],
   simulateOnly = false,
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
   const formattedAmount = (
     parseFloat(amount) *
-    Math.pow(10, LOCAL_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
+    Math.pow(10, LOCAL_MAINNET_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
   ).toFixed(0);
 
   const messages = buildStakingMessage({
@@ -249,6 +257,7 @@ export const stakeToValidator = async (
   try {
     const response = await queryRpcNode({
       endpoint,
+      prefix,
       rpcUris,
       messages,
       simulateOnly,
@@ -278,11 +287,13 @@ export const stakeToValidator = async (
 
 // NOTE: Cosmos unstaking automatically claims rewards
 export const claimAndUnstake = async ({
+  prefix,
   rpcUris,
   delegations,
   amount,
   simulateOnly = false,
 }: {
+  prefix: string;
   rpcUris: Uri[];
   delegations: DelegationResponse | DelegationResponse[];
   amount?: string;
@@ -303,7 +314,7 @@ export const claimAndUnstake = async ({
           parseFloat(amount) *
           Math.pow(
             10,
-            LOCAL_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
+            LOCAL_MAINNET_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
               GREATER_EXPONENT_DEFAULT,
           )
         ).toFixed(0),
@@ -317,6 +328,7 @@ export const claimAndUnstake = async ({
   // Simulate first
   const simulationResult = await queryRpcNode({
     endpoint,
+    prefix,
     rpcUris,
     messages,
     simulateOnly: true,
@@ -344,11 +356,12 @@ export const claimAndUnstake = async ({
   // Execute transaction
   const executionResult = await queryRpcNode({
     endpoint,
+    prefix,
     rpcUris,
     messages,
     simulateOnly: false,
     fee: {
-      amount: [{ denom: DEFAULT_ASSET.denom, amount: feeAmount.toFixed(0) }],
+      amount: [{ denom: DEFAULT_MAINNET_ASSET.denom, amount: feeAmount.toFixed(0) }],
       gas: estimatedGas.toFixed(0),
     },
   });

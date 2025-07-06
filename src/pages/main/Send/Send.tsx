@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Spinner, Swap } from '@/assets/icons';
 import {
-  DEFAULT_ASSET,
-  DEFAULT_CHAIN_NAME,
+  DEFAULT_MAINNET_ASSET,
+  SYMPHONY_MAINNET_NAME,
+  SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
   defaultReceiveState,
   defaultSendState,
   GREATER_EXPONENT_DEFAULT,
   InputStatus,
   LOCAL_CHAIN_REGISTRY,
+  NetworkLevel,
   ROUTES,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
@@ -19,12 +22,12 @@ import {
   recipientAddressAtom,
   receiveStateAtom,
   sendStateAtom,
-  walletStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
   symphonyAssetsAtom,
   feeStateAtom,
   chainRegistryAtom,
+  chainWalletAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
 import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
@@ -75,7 +78,8 @@ export const Send = () => {
   const [addressVerified, setAddressVerified] = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
-  const walletState = useAtomValue(walletStateAtom);
+  // TODO: pull in all chains, cycle between them as needed
+  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const walletAssets = walletState?.assets || [];
 
   // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
@@ -149,7 +153,8 @@ export const Send = () => {
     sendObject: any;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    const sendChain = chainRegistry[sendState.chainID];
+    const sendChain = chainRegistry.mainnet[sendState.chainID];
+    const prefix = sendChain.bech32_prefix;
     const rpcUris = sendChain.rpc_uris;
 
     console.log('Executing sendTransaction');
@@ -157,6 +162,7 @@ export const Send = () => {
       walletState.address,
       sendObject,
       simulateTransaction,
+      prefix,
       rpcUris,
     );
     console.log('sendTransaction result:', result);
@@ -182,8 +188,8 @@ export const Send = () => {
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     const fromAddress = walletState.address;
-    const sendChain = chainRegistry[sendState.chainID];
-    const receiveChain = chainRegistry[receiveState.chainID];
+    const sendChain = chainRegistry.mainnet[sendState.chainID];
+    const receiveChain = chainRegistry.mainnet[receiveState.chainID];
 
     const sendChainName = sendChain.chain_name;
     const receiveChainName = receiveChain.chain_name;
@@ -196,11 +202,12 @@ export const Send = () => {
       receiveChain: receiveChainName,
       networkLevel: sendChainLevel,
     };
+    const prefix = sendChain.bech32_prefix;
     const restUris = sendChain.rest_uris;
     const rpcUris = sendChain.rpc_uris;
 
     if (sendChainLevel === receiveChainLevel) {
-      const result = await sendIBC({ ibcObject, restUris, rpcUris, simulateTransaction });
+      const result = await sendIBC({ ibcObject, prefix, restUris, rpcUris, simulateTransaction });
       console.log('IBC Transaction Result:', result);
 
       setTransactionLog({
@@ -234,7 +241,18 @@ export const Send = () => {
   }): Promise<TransactionResult> => {
     const swapObject = { sendObject, resultDenom: receiveAsset.denom };
     console.log('Executing swapTransaction with swapObject:', swapObject);
-    const result = await swapTransaction(walletState.address, swapObject, simulateTransaction);
+
+    const sendChain = chainRegistry.mainnet[sendState.chainID];
+    const isMainnet = sendChain.network_level === NetworkLevel.MAINNET;
+    const symphonyChainID = isMainnet ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+    const rpcUris = chainRegistry.mainnet[symphonyChainID].rest_uris;
+
+    const result = await swapTransaction(
+      walletState.address,
+      swapObject,
+      rpcUris,
+      simulateTransaction,
+    );
     console.log('swapTransaction result:', result);
 
     setTransactionLog({
@@ -265,7 +283,7 @@ export const Send = () => {
 
     if (!sendAsset || !receiveAsset) return;
 
-    const assetToSend = walletAssets.find(a => a.denom === sendAsset.denom);
+    const assetToSend = walletAssets.find((a: Asset) => a.denom === sendAsset.denom);
     if (!assetToSend) return;
 
     if (simulateTransaction && sendAmount === 0) {
@@ -331,7 +349,7 @@ export const Send = () => {
   };
 
   const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
-    const walletAsset = walletAssets.find(asset => asset.denom === sendAsset.denom);
+    const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
     if (!walletAsset) return 0;
 
     const maxAmount = parseFloat(walletAsset.amount || '0');
@@ -450,8 +468,8 @@ export const Send = () => {
     sendStateOverride?: TransactionState;
     receiveStateOverride?: TransactionState;
   } = {}) => {
-    const sendChain = chainRegistry[sendState.chainID];
-    const receiveChain = chainRegistry[receiveState.chainID];
+    const sendChain = chainRegistry.mainnet[sendState.chainID];
+    const receiveChain = chainRegistry.mainnet[receiveState.chainID];
     const sendAsset = sendStateOverride.asset;
     const receiveAsset = receiveStateOverride.asset;
     const sendChainLevel = sendChain.network_level;
@@ -469,6 +487,7 @@ export const Send = () => {
         sendAddress: walletState.address,
         recipientAddress,
         network: sendChainLevel,
+        prefix: sendChain.bech32_prefix,
         restUris,
       });
 
@@ -662,7 +681,7 @@ export const Send = () => {
     setSendState(defaultSendState);
     setReceiveState(defaultReceiveState);
     setRecipientAddress('');
-    setSelectedAsset(DEFAULT_ASSET);
+    setSelectedAsset(DEFAULT_MAINNET_ASSET);
     setFeeState(prev => ({
       ...prev,
       asset: defaultSendState.asset,
@@ -929,8 +948,8 @@ export const Send = () => {
             transactionLog.entries.map((entry, index) => {
               const { sendObject } = entry;
 
-              const sendChain = chainRegistry[sendState.chainID];
-              const receiveChain = chainRegistry[receiveState.chainID];
+              const sendChain = chainRegistry.mainnet[sendState.chainID];
+              const receiveChain = chainRegistry.mainnet[receiveState.chainID];
               const sendChainName = sendChain.chain_name;
               const receiveChainName = receiveChain.chain_name;
 
@@ -938,7 +957,7 @@ export const Send = () => {
               const isSwap = sendState.asset?.denom !== receiveState.asset?.denom;
 
               const sendAssetSymbol =
-                (sendChainName === DEFAULT_CHAIN_NAME
+                (sendChainName === SYMPHONY_MAINNET_NAME
                   ? symphonyAssets.find(asset => asset.denom === sendState.asset?.denom)?.symbol
                   : sendState.asset?.symbol) || 'MLD';
               const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
@@ -947,7 +966,7 @@ export const Send = () => {
                 sendAssetSymbol,
               );
               const receiveChainPrefix =
-                Object.values(LOCAL_CHAIN_REGISTRY).find(
+                Object.values(LOCAL_CHAIN_REGISTRY.mainnet).find(
                   entry => entry.chain_name?.toLowerCase() === receiveChainName.toLowerCase(),
                 )?.bech32_prefix || '';
 

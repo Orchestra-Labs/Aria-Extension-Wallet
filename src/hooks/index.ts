@@ -14,4 +14,5 @@ export * from './useSupportedWCNamespaces';
 export * from './useToast';
 export * from './useUpdateWalletTimer';
 export * from './useValidatorDataRefresh';
+export * from './useWalletConnectEventsManager';
 export * from './useWalletDataRefresh';

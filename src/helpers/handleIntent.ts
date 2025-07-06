@@ -22,6 +22,7 @@ export const handleIntent = async (
     walletAssets,
     validators,
     symphonyAssets,
+    prefix,
     restUris,
     rpcUris,
   }: {
@@ -29,6 +30,7 @@ export const handleIntent = async (
     walletAssets: Asset[];
     validators: CombinedStakingInfo[];
     symphonyAssets: Asset[];
+    prefix: string;
     restUris: Uri[];
     rpcUris: Uri[];
   },
@@ -103,13 +105,13 @@ export const handleIntent = async (
       );
 
       const ops = targets.map(v => v.validator.operator_address);
-      const fee = await simulateFee(() => claimRewards(address, ops, rpcUris, true));
+      const fee = await simulateFee(() => claimRewards(address, ops, prefix, rpcUris, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claim fee');
         return;
       }
 
-      return await claimRewards(address, ops, rpcUris);
+      return await claimRewards(address, ops, prefix, rpcUris);
     }
 
     case 'claimAndRestake': {
@@ -123,14 +125,14 @@ export const handleIntent = async (
       }));
 
       const fee = await simulateFee(() =>
-        claimAndRestake(restUris, rpcUris, targets, rewards, true),
+        claimAndRestake(prefix, restUris, rpcUris, targets, rewards, true),
       );
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claimAndRestake fee');
         return;
       }
 
-      return await claimAndRestake(restUris, rpcUris, targets, rewards);
+      return await claimAndRestake(prefix, restUris, rpcUris, targets, rewards);
     }
 
     case 'unstake': {
@@ -143,6 +145,7 @@ export const handleIntent = async (
 
       const fee = await simulateFee(() =>
         claimAndUnstake({
+          prefix,
           rpcUris,
           delegations: targets,
           amount: amount?.toString(),
@@ -154,7 +157,12 @@ export const handleIntent = async (
         return;
       }
 
-      return await claimAndUnstake({ rpcUris, delegations: targets, amount: amount?.toString() });
+      return await claimAndUnstake({
+        prefix,
+        rpcUris,
+        delegations: targets,
+        amount: amount?.toString(),
+      });
     }
 
     case 'stake': {
@@ -175,6 +183,7 @@ export const handleIntent = async (
           resolvedDenom,
           address,
           validator.validator.operator_address,
+          prefix,
           rpcUris,
           true,
         ),
@@ -216,6 +225,7 @@ export const handleIntent = async (
         resolvedDenom,
         address,
         validator.validator.operator_address,
+        prefix,
         rpcUris,
       );
 

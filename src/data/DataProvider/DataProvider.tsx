@@ -4,39 +4,49 @@ import {
   isInitialDataLoadAtom,
   sendStateAtom,
   userAccountAtom,
-  userWalletAtom,
   validatorDataAtom,
-  walletAssetsAtom,
   chainRegistryAtom,
+  allWalletAssetsAtom,
+  isFetchingValidatorDataAtom,
+  updateChainWalletAtom,
+  walletAddressesAtom,
+  networkLevelAtom,
+  sessionWalletAtom,
 } from '@/atoms';
+
 import { LOCAL_CHAIN_REGISTRY } from '@/constants';
 import {
-  getWalletByID,
   checkChainRegistryUpdate,
   shouldUpdateChainRegistry,
   fetchAndStoreChainRegistry,
-  ensureChainRegistryExists,
   getStoredChainRegistry,
   filterChainRegistryToSubscriptions,
+  getSessionToken,
+  getAddressesByChainPrefix,
 } from '@/helpers';
-import { useExchangeAssets } from '@/hooks';
+
+import { useExchangeAssets, useRefreshData } from '@/hooks';
+import { Asset } from '@/types';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
 export const DataProvider: React.FC = () => {
-  const [walletAssets] = useAtom(walletAssetsAtom);
+  const { refreshData } = useRefreshData();
+  const { refetch } = useExchangeAssets();
+
   const [isInitialDataLoad, setIsInitialDataLoad] = useAtom(isInitialDataLoadAtom);
-  const isFetchingWalletData = useAtomValue(isFetchingWalletDataAtom);
-  const validatorData = useAtomValue(validatorDataAtom);
-  const isFetchingValidatorData = useAtomValue(isFetchingWalletDataAtom);
-  const userAccount = useAtomValue(userAccountAtom);
-  const setUserWallet = useSetAtom(userWalletAtom);
-  const setChainRegistry = useSetAtom(chainRegistryAtom);
-
-  const { availableAssets, refetch } = useExchangeAssets();
+  const [chainRegistry, setChainRegistry] = useAtom(chainRegistryAtom);
+  const updateChainWallet = useSetAtom(updateChainWalletAtom);
   const setExchangeAssets = useSetAtom(symphonyAssetsAtom);
-
+  const isFetchingWalletData = useAtomValue(isFetchingWalletDataAtom);
+  const isFetchingValidatorData = useAtomValue(isFetchingValidatorDataAtom);
+  const validatorData = useAtomValue(validatorDataAtom);
+  const userAccount = useAtomValue(userAccountAtom);
   const sendState = useAtomValue(sendStateAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const chainWallets = useAtomValue(sessionWalletAtom);
+  const walletAssets = useAtomValue(allWalletAssetsAtom);
+  const walletAddresses = useAtomValue(walletAddressesAtom);
 
   useEffect(() => {
     if (isInitialDataLoad) {
@@ -58,16 +68,128 @@ export const DataProvider: React.FC = () => {
   ]);
 
   useEffect(() => {
-    if (userAccount) {
-      const wallet = getWalletByID(userAccount, userAccount.settings.activeWalletID);
-      if (wallet) setUserWallet(wallet);
+    const initData = async () => {
+      console.log('[DataProvider] Triggering data refresh after address update');
+      refreshData();
+    };
+
+    const hasAllAddresses = Object.keys(userAccount?.settings.subscribedTo || {}).every(
+      chainId => walletAddresses[chainId],
+    );
+    console.log('[DataProvider] Wallet has addresses?', hasAllAddresses);
+    const hasRegistryData = Object.keys(chainRegistry.mainnet).length > 0;
+    console.log('[DataProvider] Wallet has registryData?', hasRegistryData);
+
+    if (hasAllAddresses && hasRegistryData && isInitialDataLoad) {
+      initData();
     }
-  }, [userAccount]);
+  }, [walletAddresses]);
 
   useEffect(() => {
-    console.log('[DataProvider] available assets / symphony assets set to:', availableAssets);
-    setExchangeAssets(availableAssets);
-  }, [availableAssets]);
+    // TODO: save IBC data for testnet and mainnet chains
+    const updateChainRegistry = async () => {
+      // 1. First try to get the stored registry
+      let storedRegistry = getStoredChainRegistry();
+      let registryToUse = LOCAL_CHAIN_REGISTRY; // Default to local
+
+      // 2. If we have a stored registry, use it (filtered by subscriptions)
+      if (storedRegistry) {
+        console.log('[DataProvider] Using stored registry data');
+
+        const filteredMainnet = userAccount
+          ? filterChainRegistryToSubscriptions(storedRegistry.data.mainnet, userAccount)
+          : storedRegistry.data.mainnet;
+
+        const filteredTestnet = userAccount
+          ? filterChainRegistryToSubscriptions(storedRegistry.data.testnet, userAccount)
+          : storedRegistry.data.testnet;
+
+        registryToUse = {
+          mainnet: filteredMainnet,
+          testnet: filteredTestnet,
+        };
+      } else {
+        console.log('[DataProvider] No stored registry found, using LOCAL_CHAIN_REGISTRY');
+      }
+
+      // Set the initial registry (either stored or local)
+      setChainRegistry(registryToUse);
+
+      // 3. Check if we need to update (either no stored registry or it's stale)
+      if (shouldUpdateChainRegistry()) {
+        try {
+          console.log('[DataProvider] Checking for registry updates...');
+          const needsUpdate = !storedRegistry || (await checkChainRegistryUpdate());
+
+          if (needsUpdate) {
+            console.log('[DataProvider] Update needed, fetching fresh data...');
+            await fetchAndStoreChainRegistry();
+
+            // After successful update, get the new registry
+            const updatedRegistry = getStoredChainRegistry();
+            if (updatedRegistry) {
+              console.log('[DataProvider] Using updated registry data');
+
+              const filteredMainnet = userAccount
+                ? filterChainRegistryToSubscriptions(updatedRegistry.data.mainnet, userAccount)
+                : updatedRegistry.data.mainnet;
+
+              const filteredTestnet = userAccount
+                ? filterChainRegistryToSubscriptions(updatedRegistry.data.testnet, userAccount)
+                : updatedRegistry.data.testnet;
+
+              registryToUse = {
+                mainnet: filteredMainnet,
+                testnet: filteredTestnet,
+              };
+
+              setChainRegistry(registryToUse);
+            }
+          }
+        } catch (error) {
+          console.error('[DataProvider] Error updating registry:', error);
+          // Continue with whatever registry we already have
+        }
+      }
+
+      return registryToUse;
+    };
+
+    const setWalletAddresses = async () => {
+      const sessionToken = getSessionToken();
+      if (!sessionToken?.mnemonic || !userAccount) return;
+
+      const mnemonic = sessionToken.mnemonic;
+      const chainPrefixes: Record<string, string> = {};
+      for (const chainId of Object.keys(userAccount.settings.subscribedTo)) {
+        const chainInfo = chainRegistry.mainnet[chainId] || chainRegistry.testnet[chainId];
+        if (chainInfo?.bech32_prefix) {
+          chainPrefixes[chainId] = chainInfo.bech32_prefix;
+        }
+      }
+
+      const addressMap = await getAddressesByChainPrefix(
+        mnemonic,
+        userAccount.settings.subscribedTo,
+        chainPrefixes,
+      );
+      console.log('[DataProvider] Received addresses:', addressMap);
+
+      const updates = Object.entries(addressMap).map(([chainId, address]) => {
+        return updateChainWallet({ chainId, address });
+      });
+      await Promise.all(updates);
+    };
+
+    const sync = async () => {
+      await updateChainRegistry();
+      await setWalletAddresses();
+    };
+
+    if (userAccount) {
+      sync();
+    }
+  }, [userAccount]);
 
   useEffect(() => {
     const fetchExchangeAssets = async () => {
@@ -82,40 +204,48 @@ export const DataProvider: React.FC = () => {
   }, [userAccount, sendState, walletAssets]);
 
   useEffect(() => {
-    const maybeUpdateChainRegistry = async () => {
-      if (shouldUpdateChainRegistry()) {
-        const updated = await checkChainRegistryUpdate();
-        if (updated) {
-          console.log('[DataProvider] Update detected, fetching new registry...');
-          await fetchAndStoreChainRegistry();
-        } else {
-          await ensureChainRegistryExists();
-        }
+    if (!userAccount) return;
+
+    console.log('[DataProvider] Building assets for network level:', networkLevel);
+    console.log('[DataProvider] Wallet assets shown to be:', walletAssets);
+    console.log('[DataProvider] Full chain registry:', chainRegistry);
+    console.log('[DataProvider] User subscriptions:', userAccount.settings.subscribedTo);
+
+    const subscribedAssets: Asset[] = [];
+    const currentChains = chainRegistry[networkLevel];
+    const existingAssets = new Map(walletAssets.map(asset => [asset.denom, asset]));
+    console.log('[DataProvider] Current wallet assets shown to be:', existingAssets);
+
+    for (const [networkID, denoms] of Object.entries(userAccount.settings.subscribedTo)) {
+      const chainRecord = currentChains[networkID];
+      if (!chainRecord) {
+        console.log(`[DataProvider] ${networkID} not found in ${networkLevel}, skipping`);
+        continue;
       }
 
-      // TODO: check through both mainnet and testnet chains
-      const stored = getStoredChainRegistry();
-      const registry =
-        userAccount && stored?.data
-          ? (() => {
-              const filteredChains = filterChainRegistryToSubscriptions(stored.data, userAccount);
-              return Object.keys(filteredChains).length > 0 ? filteredChains : LOCAL_CHAIN_REGISTRY;
-            })()
-          : LOCAL_CHAIN_REGISTRY;
+      const chainAssets = Object.values(chainRecord.assets || {});
+      const walletAssetsForChain = chainWallets.chainWallets[networkID]?.assets || [];
 
-      console.log('[DataProvider] stored data set to:', stored?.data);
-      console.log(`[DataProvider] local registry data set to: ${JSON.stringify(registry)}`);
       console.log(
-        '[DataProvider] Setting saved chains to:',
-        Object.keys(registry).length,
-        'chains',
+        `[DataProvider] Processing ${networkID} with ${walletAssetsForChain.length} wallet assets`,
       );
 
-      setChainRegistry(registry);
-    };
+      chainAssets.forEach(asset => {
+        if (denoms.includes(asset.denom)) {
+          const matched = walletAssetsForChain.find(a => a.denom === asset.denom);
+          subscribedAssets.push({
+            ...asset,
+            amount: matched?.amount || '0', // Use wallet balance if available
+            networkID: chainRecord.chain_id,
+            networkName: chainRecord.chain_name,
+          });
+        }
+      });
+    }
 
-    maybeUpdateChainRegistry();
-  }, []);
+    console.log('[DataProvider] Final subscribed assets:', subscribedAssets);
+    setExchangeAssets(subscribedAssets);
+  }, [chainRegistry, networkLevel]);
 
   return null;
 };

@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DEFAULT_ASSET, LOCAL_ASSET_REGISTRY, ROUTES } from '@/constants';
+import { DEFAULT_MAINNET_ASSET, LOCAL_MAINNET_ASSET_REGISTRY, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -43,11 +43,11 @@ export const AssetScrollTile = ({
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  const symbol = asset.symbol || DEFAULT_ASSET.symbol || 'MLD';
+  const symbol = asset.symbol || DEFAULT_MAINNET_ASSET.symbol || 'MLD';
   const denom = asset.denom || 'Unknown Denom';
-  const logo = asset.logo || LOCAL_ASSET_REGISTRY.note.logo;
+  const logo = asset.logo || LOCAL_MAINNET_ASSET_REGISTRY.note.logo;
 
-  const subtitle = isEditPage ? denom : 'Symphony';
+  const subtitle = isEditPage ? denom : asset.networkName || 'Unknown Network';
 
   let value = '';
   if (isEditPage) {

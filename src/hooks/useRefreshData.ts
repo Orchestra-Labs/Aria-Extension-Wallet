@@ -1,25 +1,23 @@
-import { useAtom } from 'jotai';
 import { useValidatorDataRefresh } from './useValidatorDataRefresh';
-import { useWalletAssetsRefresh } from './useWalletDataRefresh';
-import { walletAddressAtom } from '@/atoms';
+import { useWalletDataRefresh } from './useWalletDataRefresh';
 
 export function useRefreshData() {
-  const [walletAddress] = useAtom(walletAddressAtom);
-  const { triggerWalletDataRefresh } = useWalletAssetsRefresh();
+  const { triggerWalletDataRefresh } = useWalletDataRefresh();
   const { triggerValidatorDataRefresh } = useValidatorDataRefresh();
 
   const refreshData = async ({
     wallet = true,
     validator = true,
-    address,
   }: { wallet?: boolean; validator?: boolean; address?: string } = {}) => {
-    const targetAddress = address || walletAddress;
+    console.log('[useRefreshData] Refreshing data', { wallet, validator });
 
     if (wallet) {
-      triggerWalletDataRefresh(targetAddress);
+      console.log('[useRefreshData] Triggering wallet refresh');
+      triggerWalletDataRefresh();
     }
     if (validator) {
-      triggerValidatorDataRefresh(targetAddress);
+      console.log('[useRefreshData] Triggering validator refresh');
+      triggerValidatorDataRefresh();
     }
   };
 

@@ -36,6 +36,7 @@ export const AssetTiles: React.FC<AssetTilesProps> = ({
         : filteredAssetsAtom,
   );
 
+  console.log('[AssetTiles] Rendering assets:', filteredAssets);
   return (
     <>
       {filteredAssets.map(asset => (

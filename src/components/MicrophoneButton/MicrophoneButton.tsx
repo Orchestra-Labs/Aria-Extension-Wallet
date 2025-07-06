@@ -6,16 +6,16 @@ import { openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
-import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom, chainRegistryAtom } from '@/atoms';
+import { validatorDataAtom, symphonyAssetsAtom, chainRegistryAtom, chainWalletAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
-import { DEFAULT_CHAIN_ID } from '@/constants';
+import { SYMPHONY_MAINNET_ID } from '@/constants';
 
 export const MicrophoneButton: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { refreshData } = useRefreshData();
 
-  const wallet = useAtomValue(walletStateAtom);
+  const wallet = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const validators = useAtomValue(validatorDataAtom);
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
@@ -45,8 +45,10 @@ export const MicrophoneButton: React.FC = () => {
     console.log('Sending audio to intent-parser', audioBlob);
 
     // TODO: get chain ID from asset sending, from audio, or from managed state
-    const restUris = chainRegistry[DEFAULT_CHAIN_ID].rest_uris;
-    const rpcUris = chainRegistry[DEFAULT_CHAIN_ID].rpc_uris;
+    const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+    const prefix = chain.bech32_prefix;
+    const restUris = chain.rest_uris;
+    const rpcUris = chain.rpc_uris;
 
     const formData = new FormData();
     formData.append('file', audioBlob, 'recording.webm');
@@ -73,6 +75,7 @@ export const MicrophoneButton: React.FC = () => {
             walletAssets: wallet?.assets || [],
             validators: validators || [],
             symphonyAssets: symphonyAssets || [],
+            prefix,
             restUris: restUris,
             rpcUris,
           });
