@@ -30,14 +30,14 @@ export const AssetScrollTile = ({
   multiSelectEnabled = false,
   onClick,
 }: AssetScrollTileProps) => {
+  const navigate = useNavigate();
+  const pathname = useLocation().pathname;
+
+  const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
-  const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
-
-  const navigate = useNavigate();
-  const pathname = useLocation().pathname;
 
   const isEditPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;

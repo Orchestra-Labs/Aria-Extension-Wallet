@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
-import { Button } from '@/ui-kit';
 import { useAtomValue } from 'jotai';
-import { allWalletAssetsAtom, isInitialDataLoadAtom, validatorDataAtom } from '@/atoms';
-import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
-import {
-  ROUTES,
-  DEFAULT_MAINNET_ASSET,
-  GREATER_EXPONENT_DEFAULT,
-  LOCAL_MAINNET_ASSET_REGISTRY,
-} from '@/constants';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
+
+import {
+  allWalletAssetsAtom,
+  isInitialDataLoadAtom,
+  networkLevelAtom,
+  validatorDataAtom,
+  chainRegistryAtom,
+} from '@/atoms';
+import { Button } from '@/ui-kit';
+import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
+import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
+import { ROUTES, DEFAULT_MAINNET_ASSET, NetworkLevel, DEFAULT_TESTNET_ASSET } from '@/constants';
 import { useExchangeRate } from '@/hooks';
 
 interface BalanceCardProps {
@@ -25,33 +27,34 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const chainRegistry = useAtomValue(chainRegistryAtom);
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
-  const symbol = LOCAL_MAINNET_ASSET_REGISTRY.note.symbol || DEFAULT_MAINNET_ASSET.symbol || 'MLD';
-  const currentExponent = LOCAL_MAINNET_ASSET_REGISTRY.note.exponent || GREATER_EXPONENT_DEFAULT;
+  const balanceDisplayUnit = NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
+  const symbol = balanceDisplayUnit.symbol;
+  const currentExponent = balanceDisplayUnit.exponent;
+
+  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
+  const networkWalletAssets = walletAssets.filter(asset => validChainIDs.includes(asset.networkID));
 
   let title = '';
   let primaryText = '';
   let secondaryText;
 
   const totalMLD = useMemo(() => {
-    return walletAssets.reduce((sum, asset) => {
-      const denom = asset.denom;
-      const amount = new BigNumber(asset.amount || 0);
-
-      // Use exchangeRate from hook if available, otherwise assume 1 for same denom
-      const rate = denom === LOCAL_MAINNET_ASSET_REGISTRY.note.denom ? 1 : exchangeRate;
-
+    return networkWalletAssets.reduce((sum, asset) => {
+      const amount = new BigNumber(asset.amount || '0');
+      const rate = asset.denom === balanceDisplayUnit?.denom ? 1 : exchangeRate;
       return sum.plus(amount.multipliedBy(rate || 0));
     }, new BigNumber(0));
-  }, [walletAssets, exchangeRate]);
+  }, [networkWalletAssets, exchangeRate, balanceDisplayUnit?.denom]);
 
   if (currentStep === 0) {
     title = 'Total Available Balance';
-
-    primaryText = formatBalanceDisplay(totalMLD.toFixed(GREATER_EXPONENT_DEFAULT), symbol);
+    primaryText = formatBalanceDisplay(totalMLD.toFixed(currentExponent), symbol);
   } else if (currentStep === 1) {
     title = 'Total Staking Rewards';
 
@@ -69,7 +72,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     );
 
     const totalStakedMLD = validatorData
-      .filter(item => item.balance?.denom === LOCAL_MAINNET_ASSET_REGISTRY.note.denom)
+      .filter(item => item.balance?.denom === balanceDisplayUnit?.denom)
       .reduce((sum, item) => sum + parseFloat(item.balance?.amount || '0'), 0);
 
     secondaryText = formatBalanceDisplay(
@@ -88,7 +91,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   return (
     <div className="h-44 border rounded-xl border-neutral-4 flex relative overflow-hidden">
-      {/* Left-Side Panel Button */}
       <Button
         variant="blank"
         size="blank"
@@ -105,93 +107,86 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
         <PoolStatusBlock onBack={() => setShowReserveStatus(false)} />
       )}
 
-      {/* Data Block */}
       {!showReserveStatus && (
-        <>
-          <div className="py-4 flex flex-grow flex-col items-center relative">
-            {/* Data Section */}
-            <div className="flex flex-grow flex-col items-center text-center w-full">
-              <div className="flex justify-between items-center w-full px-4">
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                <div className="flex">
-                  <p className="text-base text-neutral-1">{title}</p>
-                </div>
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                {currentStep === 0 ? (
-                  <div className="flex flex-1 justify-center">
-                    <Button
-                      variant="selectedEnabled"
-                      size="xsmall"
-                      className="px-1 rounded text-xs"
-                      onClick={() => setShowReserveStatus(!showReserveStatus)}
-                    >
-                      Reserve
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-1">
-                    <span>&nbsp;</span>
-                  </div>
-                )}
+        <div className="py-4 flex flex-grow flex-col items-center relative">
+          <div className="flex flex-grow flex-col items-center text-center w-full">
+            <div className="flex justify-between items-center w-full px-4">
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
               </div>
-
-              {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
-                <Loader scaledHeight />
-              ) : (
-                <>
-                  <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
-                  <p className="text-sm text-neutral-1 line-clamp-1">
-                    {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Buttons Section */}
-            <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
+              </div>
+              <div className="flex">
+                <p className="text-base text-neutral-1">{title}</p>
+              </div>
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
+              </div>
               {currentStep === 0 ? (
-                <>
-                  <Button className="w-full" asChild>
-                    <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                <div className="flex flex-1 justify-center">
+                  <Button
+                    variant="selectedEnabled"
+                    size="xsmall"
+                    className="px-1 rounded text-xs"
+                    onClick={() => setShowReserveStatus(!showReserveStatus)}
+                  >
+                    Reserve
                   </Button>
-                  <ReceiveDialog asset={DEFAULT_MAINNET_ASSET} />
-                </>
+                </div>
               ) : (
-                <>
-                  <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
-                  <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
-                </>
+                <div className="flex flex-1">
+                  <span>&nbsp;</span>
+                </div>
               )}
             </div>
 
-            {/* Pagination Dots */}
-            <div className="flex justify-center space-x-2 mt-2">
-              {[...Array(totalSteps)].map((_, index) =>
-                index === currentStep ? (
-                  <span key={index} className="w-2 h-2 rounded-full bg-blue" />
-                ) : (
-                  <Button
-                    key={index}
-                    variant="unselected"
-                    size="blank"
-                    onClick={() => swipeTo(index)}
-                    className="w-2 h-2 rounded-full bg-neutral-4"
-                  />
-                ),
-              )}
-            </div>
+            {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
+              <Loader scaledHeight />
+            ) : (
+              <>
+                <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
+                <p className="text-sm text-neutral-1 line-clamp-1">
+                  {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
+                </p>
+              </>
+            )}
           </div>
-        </>
+
+          <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
+            {currentStep === 0 ? (
+              <>
+                <Button className="w-full" asChild>
+                  <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                </Button>
+                <ReceiveDialog asset={balanceDisplayUnit} />
+              </>
+            ) : (
+              <>
+                <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
+                <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-center space-x-2 mt-2">
+            {[...Array(totalSteps)].map((_, index) =>
+              index === currentStep ? (
+                <span key={index} className="w-2 h-2 rounded-full bg-blue" />
+              ) : (
+                <Button
+                  key={index}
+                  variant="unselected"
+                  size="blank"
+                  onClick={() => swipeTo(index)}
+                  className="w-2 h-2 rounded-full bg-neutral-4"
+                />
+              ),
+            )}
+          </div>
+        </div>
       )}
 
-      {/* Right-Side Panel Button */}
       <Button
         variant="selected"
         size="blank"
