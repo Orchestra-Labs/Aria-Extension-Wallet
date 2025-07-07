@@ -73,7 +73,7 @@ export const DataProvider: React.FC = () => {
       refreshData();
     };
 
-    const hasAllAddresses = Object.keys(userAccount?.settings.subscribedTo || {}).every(
+    const hasAllAddresses = Object.keys(userAccount?.settings.chainSubscriptions || {}).every(
       chainId => walletAddresses[chainId],
     );
     console.log('[DataProvider] Wallet has addresses?', hasAllAddresses);
@@ -161,7 +161,7 @@ export const DataProvider: React.FC = () => {
 
       const mnemonic = sessionToken.mnemonic;
       const chainPrefixes: Record<string, string> = {};
-      for (const chainId of Object.keys(userAccount.settings.subscribedTo)) {
+      for (const chainId of Object.keys(userAccount.settings.chainSubscriptions)) {
         const chainInfo = chainRegistry.mainnet[chainId] || chainRegistry.testnet[chainId];
         if (chainInfo?.bech32_prefix) {
           chainPrefixes[chainId] = chainInfo.bech32_prefix;
@@ -170,10 +170,10 @@ export const DataProvider: React.FC = () => {
 
       const addressMap = await getAddressesByChainPrefix(
         mnemonic,
-        userAccount.settings.subscribedTo,
+        userAccount.settings.chainSubscriptions,
         chainPrefixes,
       );
-      console.log('[DataProvider] Received addresses:', addressMap);
+      console.log('[DataProvider] Received addresses:', JSON.stringify(addressMap));
 
       const updates = Object.entries(addressMap).map(([chainId, address]) => {
         return updateChainWallet({ chainId, address });
@@ -209,14 +209,14 @@ export const DataProvider: React.FC = () => {
     console.log('[DataProvider] Building assets for network level:', networkLevel);
     console.log('[DataProvider] Wallet assets shown to be:', walletAssets);
     console.log('[DataProvider] Full chain registry:', chainRegistry);
-    console.log('[DataProvider] User subscriptions:', userAccount.settings.subscribedTo);
+    console.log('[DataProvider] User subscriptions:', userAccount.settings.chainSubscriptions);
 
     const subscribedAssets: Asset[] = [];
     const currentChains = chainRegistry[networkLevel];
     const existingAssets = new Map(walletAssets.map(asset => [asset.denom, asset]));
     console.log('[DataProvider] Current wallet assets shown to be:', existingAssets);
 
-    for (const [networkID, denoms] of Object.entries(userAccount.settings.subscribedTo)) {
+    for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
       const chainRecord = currentChains[networkID];
       if (!chainRecord) {
         console.log(`[DataProvider] ${networkID} not found in ${networkLevel}, skipping`);
@@ -246,6 +246,15 @@ export const DataProvider: React.FC = () => {
     console.log('[DataProvider] Final subscribed assets:', subscribedAssets);
     setExchangeAssets(subscribedAssets);
   }, [chainRegistry, networkLevel]);
+
+  // TODO: add some atom here that updates only on login/wallet creation.  maybe isLoggedIn?
+  // CONT: would accountAtom !== null count as a check for isLoggedIn?
+  useEffect(() => {
+    if (!userAccount) return;
+
+    // NOTE: also trigger this if the user updates subscriptions
+    refreshData();
+  }, [networkLevel]);
 
   return null;
 };

@@ -25,11 +25,11 @@ export const subscribedAssetsAtom = atom(get => {
 
   console.log(`[subscribedAssetsAtom] Building for ${networkLevel}`);
 
-  if (!userAccount?.settings.subscribedTo) return [];
+  if (!userAccount?.settings.chainSubscriptions) return [];
 
   const visibleAssets: Asset[] = [];
 
-  for (const [networkID, denoms] of Object.entries(userAccount.settings.subscribedTo)) {
+  for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
     const registryEntry = chainRegistry[networkLevel][networkID];
     console.log(`[subscribedAssetsAtom] Checking ${networkLevel} entry for ${networkID}`);
     if (!registryEntry) {

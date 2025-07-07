@@ -391,11 +391,11 @@ export const LOCAL_CHAIN_REGISTRY: {
 
 export const DEFAULT_SUBSCRIPTION: SubscriptionRecord = {
   // NOTE: 2 mainnet
-  [SYMPHONY_MAINNET_ID]: ['note'],
+  [SYMPHONY_MAINNET_ID]: [DEFAULT_MAINNET_ASSET.denom],
   ['stargaze-1']: ['ustars'],
 
   // NOTE: 3 testnet
-  [SYMPHONY_TESTNET_ID]: ['note'],
+  [SYMPHONY_TESTNET_ID]: [DEFAULT_TESTNET_ASSET.denom],
   ['osmo-test-5']: ['uosmo'],
   ['elgafar-1']: ['ustars'],
 };

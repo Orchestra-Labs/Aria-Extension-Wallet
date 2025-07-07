@@ -22,7 +22,6 @@ interface EditCoinListScreenProps {}
 
 const PAGE_TITLE = 'Select Visible Coins';
 
-// TODO: make registry, add github action to auto-update entries based on items in pull request. then sort?
 export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const navigate = useNavigate();
 
@@ -43,9 +42,9 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const initialSettings = {
     hasSetCoinList: true,
     subscribedTo:
-      userAccount?.settings.subscribedTo &&
-      Object.keys(userAccount.settings.subscribedTo).length > 0
-        ? userAccount.settings.subscribedTo
+      userAccount?.settings.chainSubscriptions &&
+      Object.keys(userAccount.settings.chainSubscriptions).length > 0
+        ? userAccount.settings.chainSubscriptions
         : DEFAULT_SUBSCRIPTION,
   };
 
@@ -92,7 +91,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       const networkCoinDenoms = unfilteredAssets.map(asset => asset.denom);
       const selectedNetworkCoins = selectedCoins.map(coin => coin.denom);
 
-      console.log('saving selected coins', selectedNetworkCoins);
+      console.log('[EditCoinListScreen] Saving selected coins', selectedNetworkCoins);
       // TODO: elect Symphony (and Melody) as default if nothing is selected
       if (selectedNetworkCoins.length === networkCoinDenoms.length) {
         updatedSubscriptions[networkID] = [];
@@ -109,23 +108,24 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
         },
       };
 
-      console.log('updated user account', updatedUserAccount);
+      console.log('[EditCoinListScreen] Saving account as:', updatedUserAccount);
 
       // Update state and save to local storage
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
     } else {
-      console.warn('userAccount is undefined');
+      console.warn('[EditCoinListScreen] UserAccount is undefined');
     }
 
     closeAndReturn();
   };
 
   const cancel = () => {
+    console.log('[EditCoinListScreen] Cancelling with account set to:', userAccount);
     if (userAccount) {
       // Restore the initial settings
       userAccount.settings.hasSetCoinList = initialSettings.hasSetCoinList;
-      userAccount.settings.subscribedTo = initialSettings.subscribedTo;
+      userAccount.settings.chainSubscriptions = initialSettings.subscribedTo;
       saveAccountByID(userAccount);
     }
 
@@ -134,10 +134,10 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
 
   useEffect(() => {
     if (userAccount) {
-      console.log('subscribed assets', subscribedAssets);
+      console.log('[EditCoinListScreen] Subscribed assets', subscribedAssets);
       setSelectedCoins(subscribedAssets);
     } else {
-      console.warn('userAccount is undefined');
+      console.warn('[EditCoinListScreen] UserAccount is undefined');
     }
   }, []);
 

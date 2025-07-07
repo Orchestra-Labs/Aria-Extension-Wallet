@@ -5,9 +5,9 @@ export interface SubscriptionRecord {
 }
 
 export interface SettingsRecord {
-  defaultNetworkID: string;
+  defaultChainID: string;
   defaultCoinDenom: string;
-  subscribedTo: SubscriptionRecord;
+  chainSubscriptions: SubscriptionRecord;
   activeWalletID: string;
   [SettingsOption.STABLECOIN_FEE]: boolean;
   [SettingsOption.VALIDATOR_STATUS]: boolean;

@@ -4,7 +4,7 @@ import { getPasswordRecords, hashPassword, savePasswordHash, updatePassword } fr
 import { createWallet } from './wallet';
 import { saveSessionData } from './session';
 import { generateUUID } from '../uuid';
-import { SettingsOption } from '@/constants';
+import { DEFAULT_SUBSCRIPTION, SettingsOption } from '@/constants';
 import { decryptMnemonic, encryptMnemonic } from './crypto';
 
 const ACCOUNTS_KEY = 'accountsToken';
@@ -87,15 +87,15 @@ export const createAccount = async (
   console.log('Wallet created and wallet record generated:', walletRecord);
 
   // Set default network and coin denom based on the first entry in subscriptions, if available
-  const defaultNetworkID = Object.keys(subscriptions)[0] || '';
-  const defaultCoinDenom = subscriptions[defaultNetworkID]?.[0] || '';
+  const defaultChainID = Object.keys(subscriptions)[0] || '';
+  const defaultCoinDenom = subscriptions[defaultChainID]?.[0] || '';
 
   const newAccount: AccountRecord = {
     id: accountID,
     settings: {
-      defaultNetworkID,
+      defaultChainID,
       defaultCoinDenom,
-      subscribedTo: subscriptions,
+      chainSubscriptions: DEFAULT_SUBSCRIPTION,
       activeWalletID: walletRecord.id,
       [SettingsOption.STABLECOIN_FEE]: false,
       [SettingsOption.VALIDATOR_STATUS]: false,

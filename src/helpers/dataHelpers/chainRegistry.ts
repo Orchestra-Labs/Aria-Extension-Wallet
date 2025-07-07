@@ -532,8 +532,8 @@ export const filterChainRegistryToSubscriptions = (
   registry: LocalChainRegistry,
   account: AccountRecord,
 ): LocalChainRegistry => {
-  const subscriptions = account.settings.subscribedTo;
-  console.log('[ChainRegistry] account subscriptions:', subscriptions);
+  const subscriptions = account.settings.chainSubscriptions;
+  console.log('[ChainRegistry] account subscriptions:', JSON.stringify(subscriptions));
   console.log('[ChainRegistry] registry chains:', Object.keys(registry));
 
   const result: LocalChainRegistry = {};
