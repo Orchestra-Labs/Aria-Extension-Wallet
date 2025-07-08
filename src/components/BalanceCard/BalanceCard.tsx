@@ -48,7 +48,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
     primaryText = formatBalanceDisplay(totalMLD.toFixed(GREATER_EXPONENT_DEFAULT), symbol);
   } else if (currentStep === 1) {
-    title = 'Staked Balance';
+    title = 'Total Staking Rewards';
 
     const totalStakedRewards = validatorData.reduce((sum, item) => {
       const rewardSum = item.rewards?.reduce(
