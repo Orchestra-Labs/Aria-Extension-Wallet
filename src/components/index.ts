@@ -1,5 +1,5 @@
 export * from './AssetInput';
-export * from './AssetScrollTile';
+export * from './AssetTile';
 export * from './AssetSelectDialog';
 export * from './BalanceCard';
 export * from './ConnectedServicesDialog';
@@ -23,7 +23,7 @@ export * from './Toast';
 export * from './Tooltip';
 export * from './TransactionResultsTile';
 export * from './TutorialDisplay';
-export * from './ValidatorScrollTile';
+export * from './ValidatorTile';
 export * from './ValidatorSelectDialog';
 export * from './WalletSuccessScreen';
 export * from './WCProposalButtons';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AssetScrollTile } from '../AssetScrollTile';
+import { AssetTile } from '../AssetTile';
 import { useAtomValue } from 'jotai';
 import {
   coinListAssetsAtom,
@@ -105,7 +105,7 @@ export const AssetTiles: React.FC<AssetTilesProps> = ({
   return (
     <>
       {filteredAssets.map((asset, index) => (
-        <AssetScrollTile
+        <AssetTile
           key={assetKeys[index]}
           asset={asset}
           isSelectable={isSelectable}

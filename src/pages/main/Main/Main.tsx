@@ -11,7 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Button } from '@/ui-kit';
 import { userAccountAtom } from '@/atoms/accountAtom';
-import { ChainSubscriptionsScreen } from '../ChainSubscriptions';
+import { ChainSubscriptions } from '../ChainSubscriptions';
 import { SwapTutorial } from '../SwapTutorial';
 
 export const Main = () => {
@@ -62,7 +62,7 @@ export const Main = () => {
   }
 
   if (routeToVisibilitySelection) {
-    return <ChainSubscriptionsScreen />;
+    return <ChainSubscriptions />;
   }
   return (
     <div className="h-full flex flex-col overflow-hidden">

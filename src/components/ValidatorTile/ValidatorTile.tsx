@@ -39,17 +39,17 @@ import { TransactionResultsTile } from '../TransactionResultsTile';
 import { AlertCircleIcon } from 'lucide-react';
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
-interface ValidatorScrollTileProps {
+interface ValidatorTileProps {
   combinedStakingInfo: CombinedStakingInfo;
   isSelectable?: boolean;
   onClick?: (validator: CombinedStakingInfo) => void;
 }
 
-export const ValidatorScrollTile = ({
+export const ValidatorTile = ({
   combinedStakingInfo,
   isSelectable = false,
   onClick,
-}: ValidatorScrollTileProps) => {
+}: ValidatorTileProps) => {
   const { toast } = useToast();
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
   const { refreshData } = useRefreshData();

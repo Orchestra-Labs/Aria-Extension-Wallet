@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAtomValue } from 'jotai';
-import { ValidatorScrollTile } from '../ValidatorScrollTile';
+import { ValidatorTile } from '../ValidatorTile';
 import { filteredValidatorsAtom, filteredDialogValidatorsAtom } from '@/atoms';
 import { CombinedStakingInfo } from '@/types';
 
@@ -28,7 +28,7 @@ export const ValidatorTiles: React.FC<ValidatorTilesProps> = ({
   return (
     <>
       {filteredValidators.map(combinedStakingInfo => (
-        <ValidatorScrollTile
+        <ValidatorTile
           key={`${combinedStakingInfo.validator.operator_address}`}
           combinedStakingInfo={combinedStakingInfo}
           isSelectable={isSelectable}

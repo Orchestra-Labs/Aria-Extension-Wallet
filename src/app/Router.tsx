@@ -8,7 +8,7 @@ import {
   AddNewNetwork,
   ChangePassword,
   CreateWallet,
-  ChainSubscriptionsScreen,
+  ChainSubscriptions,
   ImportWallet,
   Login,
   Main,
@@ -89,7 +89,7 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         },
         {
           path: ROUTES.APP.EDIT_COIN_LIST,
-          element: <ChainSubscriptionsScreen />,
+          element: <ChainSubscriptions />,
         },
         {
           path: ROUTES.APP.SETTINGS,

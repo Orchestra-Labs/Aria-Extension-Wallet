@@ -15,7 +15,7 @@ import {
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
 
-interface AssetScrollTileProps {
+interface AssetTileProps {
   asset: Asset;
   isSelectable?: boolean;
   isReceiveDialog?: boolean;
@@ -23,13 +23,13 @@ interface AssetScrollTileProps {
   onClick?: (asset: Asset) => void;
 }
 
-export const AssetScrollTile = ({
+export const AssetTile = ({
   asset,
   isSelectable = false,
   isReceiveDialog = false,
   multiSelectEnabled = false,
   onClick,
-}: AssetScrollTileProps) => {
+}: AssetTileProps) => {
   const navigate = useNavigate();
   const pathname = useLocation().pathname;
 
