@@ -1,6 +1,6 @@
 export * from './AddNewNetwork';
 export * from './ChangePassword';
-export * from './EditCoinListScreen';
+export * from './ChainSubscriptionsScreen';
 export * from './Main';
 export * from './MediaOnboarding';
 export * from './Send';

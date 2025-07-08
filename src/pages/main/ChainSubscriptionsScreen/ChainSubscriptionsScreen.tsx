@@ -22,7 +22,7 @@ interface EditCoinListScreenProps {}
 
 const PAGE_TITLE = 'Select Visible Coins';
 
-export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
+export const ChainSubscriptionsScreen: React.FC<EditCoinListScreenProps> = ({}) => {
   const navigate = useNavigate();
 
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
@@ -197,7 +197,7 @@ export const EditCoinListScreen: React.FC<EditCoinListScreenProps> = ({}) => {
       <div className="flex justify-center mb-4">
         <Button
           className="w-[56%] text-center"
-          disabled={selectedCoins.length === 0}
+          disabled={!userAccount && selectedCoins.length === 0}
           onClick={() => confirmSelection()}
         >
           Confirm
