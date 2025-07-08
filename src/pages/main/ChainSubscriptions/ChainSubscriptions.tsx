@@ -18,11 +18,11 @@ import { Asset, SubscriptionRecord } from '@/types';
 import { saveAccountByID } from '@/helpers/dataHelpers/account';
 import { userAccountAtom } from '@/atoms/accountAtom';
 
-interface EditCoinListScreenProps {}
+interface ChainSubscriptionsProps {}
 
 const PAGE_TITLE = 'Select Visible Coins';
 
-export const ChainSubscriptionsScreen: React.FC<EditCoinListScreenProps> = ({}) => {
+export const ChainSubscriptionsScreen: React.FC<ChainSubscriptionsProps> = ({}) => {
   const navigate = useNavigate();
 
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);

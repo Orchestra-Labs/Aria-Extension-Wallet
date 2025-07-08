@@ -7,7 +7,7 @@ import { saveAccountByID } from '@/helpers';
 import { userAccountAtom } from '@/atoms';
 import { Header } from '@/components';
 
-interface SettingsScreenProps {}
+interface SettingsProps {}
 
 const DEFAULT_CONFIG = {
   // [SettingsOptions.STABLECOIN_FEE]: false,
@@ -17,7 +17,7 @@ const DEFAULT_CONFIG = {
 
 const PAGE_TITLE = 'Change Settings';
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
+export const Settings: React.FC<SettingsProps> = () => {
   const navigate = useNavigate();
 
   const [userAccount, setUserAccount] = useAtom(userAccountAtom);

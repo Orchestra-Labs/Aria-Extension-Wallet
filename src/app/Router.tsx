@@ -15,7 +15,7 @@ import {
   MediaOnboardingScreen,
   NewWallet,
   Send,
-  SettingsScreen,
+  Settings,
   SwapTutorial,
   Transaction,
   TransactionsHistory,
@@ -93,7 +93,7 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
         },
         {
           path: ROUTES.APP.SETTINGS,
-          element: <SettingsScreen />,
+          element: <Settings />,
         },
         {
           path: ROUTES.APP.VIEW_PASSPHRASE,

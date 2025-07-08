@@ -11,7 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Button } from '@/ui-kit';
 import { userAccountAtom } from '@/atoms/accountAtom';
-import { ChainSubscriptionsScreen } from '../ChainSubscriptionsScreen';
+import { ChainSubscriptionsScreen } from '../ChainSubscriptions';
 import { SwapTutorial } from '../SwapTutorial';
 
 export const Main = () => {
