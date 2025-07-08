@@ -67,4 +67,5 @@ export enum Position {
 export enum SettingsOption {
   STABLECOIN_FEE = 'stablecoinFeeElection',
   VALIDATOR_STATUS = 'viewValidatorsByStatus',
+  TESTNET_ACCESS = 'enableTestnetAccess',
 }

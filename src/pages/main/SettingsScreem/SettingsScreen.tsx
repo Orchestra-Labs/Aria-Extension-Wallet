@@ -13,6 +13,7 @@ interface SettingsScreenProps {}
 const DEFAULT_CONFIG = {
   // [SettingsOptions.STABLECOIN_FEE]: false,
   [SettingsOption.VALIDATOR_STATUS]: false,
+  [SettingsOption.TESTNET_ACCESS]: false,
 };
 
 const PAGE_TITLE = 'Change Settings';
@@ -90,6 +91,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
               className="form-checkbox h-5 w-5 text-blue-600"
             />
             <span className="text-left flex">View Validators by Activity Status</span>
+          </label>
+
+          <label className="flex flex-grow gap-4">
+            <input
+              type="checkbox"
+              checked={
+                (tempSettings && tempSettings[SettingsOption.TESTNET_ACCESS]) ||
+                DEFAULT_CONFIG[SettingsOption.TESTNET_ACCESS]
+              }
+              onChange={() => toggleOption(SettingsOption.TESTNET_ACCESS)}
+              className="form-checkbox h-5 w-5 text-blue-600"
+            />
+            <span className="text-left flex">Enable Testnet Access</span>
           </label>
         </div>
       </div>

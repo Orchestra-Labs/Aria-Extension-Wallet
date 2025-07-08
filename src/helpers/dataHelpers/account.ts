@@ -97,8 +97,12 @@ export const createAccount = async (
       defaultCoinDenom,
       chainSubscriptions: DEFAULT_SUBSCRIPTION,
       activeWalletID: walletRecord.id,
+
+      // feature access settings
       [SettingsOption.STABLECOIN_FEE]: false,
       [SettingsOption.VALIDATOR_STATUS]: false,
+      [SettingsOption.TESTNET_ACCESS]: false,
+
       // initialization settings:
       hasSetCoinList: false,
       hasViewedTutorial: false,

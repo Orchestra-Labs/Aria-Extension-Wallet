@@ -4,18 +4,21 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 import { LogoIcon } from '@/assets/icons';
 import { OptionsDialog } from '@/components';
-import { NetworkLevel, ROUTES } from '@/constants';
-import { networkLevelAtom, sessionWalletAtom } from '@/atoms';
+import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
+import { networkLevelAtom, sessionWalletAtom, userAccountAtom } from '@/atoms';
 
 const MainLayout: React.FC = () => {
   const [networkLevel, setNetworkLevel] = useAtom(networkLevelAtom);
   const userWallet = useAtomValue(sessionWalletAtom);
+  const userAccount = useAtomValue(userAccountAtom);
 
   const toggleNetworkLevel = () => {
     setNetworkLevel(prev =>
       prev === NetworkLevel.MAINNET ? NetworkLevel.TESTNET : NetworkLevel.MAINNET,
     );
   };
+
+  const showTestnetButton = userAccount?.settings[SettingsOption.TESTNET_ACCESS] ?? false;
 
   return (
     <div className="max-w-full bg-background-dark-grey flex flex-col w-[420px] h-[600px]">
@@ -43,16 +46,18 @@ const MainLayout: React.FC = () => {
             <History width="100%" height="100%" />
           </NavLink>
         </Button> */}
-          <button
-            onClick={toggleNetworkLevel}
-            className="px-3 py-1 rounded-md text-sm"
-            style={{
-              backgroundColor: networkLevel === NetworkLevel.MAINNET ? '#4CAF50' : '#F44336',
-              color: 'white',
-            }}
-          >
-            {networkLevel === NetworkLevel.MAINNET ? 'Mainnet' : 'Testnet'}
-          </button>
+          {showTestnetButton && (
+            <button
+              onClick={toggleNetworkLevel}
+              className="px-3 py-1 rounded-md text-sm"
+              style={{
+                backgroundColor: networkLevel === NetworkLevel.MAINNET ? '#4CAF50' : '#F44336',
+                color: 'white',
+              }}
+            >
+              {networkLevel === NetworkLevel.MAINNET ? 'Mainnet' : 'Testnet'}
+            </button>
+          )}
 
           <OptionsDialog />
         </div>
