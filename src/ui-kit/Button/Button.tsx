@@ -56,7 +56,20 @@ const buttonVariants = cva<ButtonConfig>(
           'disabled:border-neutral-3 disabled:text-neutral-3 disabled:bg-transparent',
         ],
         icon: ['rounded-full bg-neutral-2 text-white', ''],
+        reactiveIcon: [
+          'rounded-full bg-neutral-2 text-white',
+          'hover:bg-neutral-4 hover:text-white',
+          'active:bg-neutral-3 active:text-neutral-1',
+          'disabled:bg-neutral-3 disabled:text-neutral-1',
+        ],
         link: ['text-blue text-sm hover:text-blue-dark bg-transparent'],
+        dialogOption: [
+          'w-full text-sm text-white font-normal py-3 px-2',
+          'bg-transparent text-left justify-start rounded-none',
+          'hover:bg-neutral-4 hover:text-white',
+          'active:bg-neutral-3 active:text-neutral-1',
+          'not-last:border-b not-last:border-neutral-4',
+        ],
       },
       size: {
         default: 'h-10 p-2.5',

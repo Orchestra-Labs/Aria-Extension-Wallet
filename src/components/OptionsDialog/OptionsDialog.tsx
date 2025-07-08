@@ -80,32 +80,34 @@ export const OptionsDialog: React.FC = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="p-[7px]" variant="icon" size="rounded-default">
+        <Button className="p-[7px]" variant="reactiveIcon" size="rounded-default">
           <DotsVertical width="100%" height="100%" />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="gap-0 pb-0">
         <h3 className="text-h5 font-bold">Options</h3>
         <div className="grid">
           {OPTIONS.map(option => (
-            <Link
-              key={option.id}
-              to={option.to}
-              target={option.target}
-              onClick={() => setOpen(false)}
-              className="flex items-center text-sm text-white font-normal py-3 not-last:border-b not-last:border-neutral-4 hover:text-white"
-            >
-              <div className="h-8 w-8 bg-blue rounded-full flex items-center justify-center p-1.5 mr-2.5 text-black">
-                {option.icon}
-              </div>
-              {option.name}
-              <div className="flex-1" />
-              <ArrowLeft className="rotate-180 h-3 w-3" />
-            </Link>
+            <Button key={option.id} variant="dialogOption" size={'blank'} asChild>
+              <Link
+                to={option.to}
+                target={option.target}
+                onClick={() => setOpen(false)}
+                className="flex items-center"
+              >
+                <div className="h-8 w-8 bg-blue rounded-full flex items-center justify-center p-1.5 mr-2.5 text-black">
+                  {option.icon}
+                </div>
+                {option.name}
+                <div className="flex-1" />
+                <ArrowLeft className="rotate-180 h-3 w-3" />
+              </Link>
+            </Button>
           ))}
           <Button
-            variant="transparent"
-            className="flex items-center text-sm text-white font-normal py-3 px-0 h-auto rounded-none hover:text-white"
+            variant="dialogOption"
+            size={'blank'}
+            className="flex items-center"
             onClick={handleLogOut}
           >
             <div className="h-8 w-8 bg-blue rounded-full flex items-center justify-center p-1.5 mr-2.5 text-black">

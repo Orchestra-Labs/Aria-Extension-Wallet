@@ -6,6 +6,7 @@ import { LogoIcon } from '@/assets/icons';
 import { OptionsDialog } from '@/components';
 import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
 import { networkLevelAtom, sessionWalletAtom, userAccountAtom } from '@/atoms';
+import { Button } from '@/ui-kit';
 
 const MainLayout: React.FC = () => {
   const [networkLevel, setNetworkLevel] = useAtom(networkLevelAtom);
@@ -47,16 +48,14 @@ const MainLayout: React.FC = () => {
           </NavLink>
         </Button> */}
           {showTestnetButton && (
-            <button
+            <Button
+              variant={networkLevel === NetworkLevel.MAINNET ? 'default' : 'secondary'}
+              size="medium"
               onClick={toggleNetworkLevel}
-              className="px-3 py-1 rounded-md text-sm"
-              style={{
-                backgroundColor: networkLevel === NetworkLevel.MAINNET ? '#4CAF50' : '#F44336',
-                color: 'white',
-              }}
+              className="px-3 py-1 rounded-md font-medium"
             >
               {networkLevel === NetworkLevel.MAINNET ? 'Mainnet' : 'Testnet'}
-            </button>
+            </Button>
           )}
 
           <OptionsDialog />
