@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { isInitialDataLoadAtom } from '@/atoms';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES, SettingsOption } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { saveAccountByID } from '@/helpers/dataHelpers/account';
-import { userAccountAtom } from '@/atoms/accountAtom';
+import { saveAccountByID } from '@/helpers';
+import { userAccountAtom } from '@/atoms';
 import { Header } from '@/components';
 
 interface SettingsScreenProps {}
@@ -21,7 +20,6 @@ const PAGE_TITLE = 'Change Settings';
 export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
   const navigate = useNavigate();
 
-  const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const [userAccount, setUserAccount] = useAtom(userAccountAtom);
 
   const [tempSettings, setTempSettings] = useState(userAccount?.settings);
@@ -110,11 +108,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = () => {
 
       <Separator variant="top" />
       <div className="flex justify-center mb-4">
-        <Button
-          className="w-[56%] text-center"
-          disabled={isInitialDataLoad}
-          onClick={confirmSelection}
-        >
+        <Button className="w-[56%] text-center" disabled={!userAccount} onClick={confirmSelection}>
           Confirm
         </Button>
       </div>
