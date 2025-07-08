@@ -11,7 +11,6 @@ import {
   updateChainWalletAtom,
   walletAddressesAtom,
   networkLevelAtom,
-  sessionWalletAtom,
 } from '@/atoms';
 
 import { LOCAL_CHAIN_REGISTRY } from '@/constants';
@@ -44,7 +43,6 @@ export const DataProvider: React.FC = () => {
   const userAccount = useAtomValue(userAccountAtom);
   const sendState = useAtomValue(sendStateAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
-  const chainWallets = useAtomValue(sessionWalletAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const walletAddresses = useAtomValue(walletAddressesAtom);
 
@@ -88,11 +86,9 @@ export const DataProvider: React.FC = () => {
   useEffect(() => {
     // TODO: save IBC data for testnet and mainnet chains
     const updateChainRegistry = async () => {
-      // 1. First try to get the stored registry
       let storedRegistry = getStoredChainRegistry();
-      let registryToUse = LOCAL_CHAIN_REGISTRY; // Default to local
+      let registryToUse = LOCAL_CHAIN_REGISTRY;
 
-      // 2. If we have a stored registry, use it (filtered by subscriptions)
       if (storedRegistry) {
         console.log('[DataProvider] Using stored registry data');
 
@@ -112,10 +108,8 @@ export const DataProvider: React.FC = () => {
         console.log('[DataProvider] No stored registry found, using LOCAL_CHAIN_REGISTRY');
       }
 
-      // Set the initial registry (either stored or local)
       setChainRegistry(registryToUse);
 
-      // 3. Check if we need to update (either no stored registry or it's stale)
       if (shouldUpdateChainRegistry()) {
         try {
           console.log('[DataProvider] Checking for registry updates...');
@@ -125,7 +119,6 @@ export const DataProvider: React.FC = () => {
             console.log('[DataProvider] Update needed, fetching fresh data...');
             await fetchAndStoreChainRegistry();
 
-            // After successful update, get the new registry
             const updatedRegistry = getStoredChainRegistry();
             if (updatedRegistry) {
               console.log('[DataProvider] Using updated registry data');
@@ -148,7 +141,6 @@ export const DataProvider: React.FC = () => {
           }
         } catch (error) {
           console.error('[DataProvider] Error updating registry:', error);
-          // Continue with whatever registry we already have
         }
       }
 
@@ -212,47 +204,22 @@ export const DataProvider: React.FC = () => {
     console.log('[DataProvider] User subscriptions:', userAccount.settings.chainSubscriptions);
 
     const subscribedAssets: Asset[] = [];
-    const currentChains = chainRegistry[networkLevel];
-    const existingAssets = new Map(walletAssets.map(asset => [asset.denom, asset]));
-    console.log('[DataProvider] Current wallet assets shown to be:', existingAssets);
 
-    for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
-      const chainRecord = currentChains[networkID];
-      if (!chainRecord) {
-        console.log(`[DataProvider] ${networkID} not found in ${networkLevel}, skipping`);
-        continue;
+    for (const asset of walletAssets) {
+      const chainSubscriptions = userAccount.settings.chainSubscriptions[asset.networkID] || [];
+      console.log('[DataProvider] Checking subscriptions for:', asset.denom);
+      if (chainSubscriptions.includes(asset.denom)) {
+        subscribedAssets.push(asset);
       }
-
-      const chainAssets = Object.values(chainRecord.assets || {});
-      const walletAssetsForChain = chainWallets.chainWallets[networkID]?.assets || [];
-
-      console.log(
-        `[DataProvider] Processing ${networkID} with ${walletAssetsForChain.length} wallet assets`,
-      );
-
-      chainAssets.forEach(asset => {
-        if (denoms.includes(asset.denom)) {
-          const matched = walletAssetsForChain.find(a => a.denom === asset.denom);
-          subscribedAssets.push({
-            ...asset,
-            amount: matched?.amount || '0', // Use wallet balance if available
-            networkID: chainRecord.chain_id,
-            networkName: chainRecord.chain_name,
-          });
-        }
-      });
     }
 
     console.log('[DataProvider] Final subscribed assets:', subscribedAssets);
     setExchangeAssets(subscribedAssets);
   }, [chainRegistry, networkLevel]);
 
-  // TODO: add some atom here that updates only on login/wallet creation.  maybe isLoggedIn?
-  // CONT: would accountAtom !== null count as a check for isLoggedIn?
   useEffect(() => {
     if (!userAccount) return;
 
-    // NOTE: also trigger this if the user updates subscriptions
     refreshData();
   }, [networkLevel]);
 

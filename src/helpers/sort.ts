@@ -9,69 +9,87 @@ export function filterAndSortAssets(
   sortOrder: 'Asc' | 'Desc',
   showAllAssets: boolean = true,
 ): typeof assets {
-  console.log('[sort] input assets:', assets);
-  console.log('[sort] searchTerm:', searchTerm);
+  console.groupCollapsed('[filterAndSortAssets] Processing assets');
+  console.log('[filterAndSortAssets] Input assets count:', assets.length);
 
-  const lowercasedSearchTerm = searchTerm.toLowerCase();
+  // Create a new array for filtering
+  let filteredAssets = [...assets];
 
-  const filteredAssets = assets.filter(asset => {
-    const searchFields = [
-      asset.denom.toLowerCase(),
-      asset.symbol?.toLowerCase(),
-      asset.name?.toLowerCase(),
-      asset.networkName.toLowerCase(),
-      asset.networkID.toLowerCase(),
-    ].filter(Boolean);
-    return searchFields.some(field => field.includes(lowercasedSearchTerm));
-  });
+  // Filter by search term if provided
+  if (searchTerm) {
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    filteredAssets = filteredAssets.filter(asset => {
+      const matches = [
+        asset.denom.toLowerCase(),
+        asset.symbol?.toLowerCase(),
+        asset.name?.toLowerCase(),
+        asset.networkName.toLowerCase(),
+        asset.networkID.toLowerCase(),
+      ].some(field => field?.includes(lowercasedSearchTerm));
 
-  // Filter for non-zero values if required
-  console.log('[sort] filtered assets:', filteredAssets);
+      if (!matches) {
+        console.log(`[filterAndSortAssets] Filtering out ${asset.denom} - no search match`);
+      }
+      return matches;
+    });
+  }
 
-  const finalAssets = showAllAssets
-    ? filteredAssets
-    : filteredAssets.filter(asset => parseFloat(asset.amount) > 0);
+  // Filter by non-zero amounts if required
+  if (!showAllAssets) {
+    filteredAssets = filteredAssets.filter(asset => {
+      const hasBalance = parseFloat(asset.amount) > 0;
+      if (!hasBalance) {
+        console.log(`[filterAndSortAssets] Filtering out ${asset.denom} - zero balance`);
+      }
+      return hasBalance;
+    });
+  }
 
-  // Sort the assets based on type and order
-  console.log('[sort] final assets to sort:', finalAssets);
-
-  return finalAssets.sort((a, b) => {
+  // Create a new array for sorting
+  const sortedAssets = [...filteredAssets].sort((a, b) => {
     if (sortType === 'name') {
-      // NOTE: if putting name before symbol, change it here
-      const getPriorityFields = (asset: Asset) =>
-        [
-          asset.symbol.toLowerCase(),
-          asset.name.toLowerCase(),
-          asset.networkName.toLowerCase(),
-          asset.denom.toLowerCase(),
-          asset.networkID.toLowerCase(),
-        ].map(val => stripNonAlphanumerics(val || ''));
+      const aFields = [
+        a.symbol?.toLowerCase(),
+        a.name?.toLowerCase(),
+        a.networkName.toLowerCase(),
+        a.denom.toLowerCase(),
+        a.networkID.toLowerCase(),
+      ].map(f => stripNonAlphanumerics(f || ''));
 
-      const [a1, a2, a3, a4, a5] = getPriorityFields(a);
-      const [b1, b2, b3, b4, b5] = getPriorityFields(b);
+      const bFields = [
+        b.symbol?.toLowerCase(),
+        b.name?.toLowerCase(),
+        b.networkName.toLowerCase(),
+        b.denom.toLowerCase(),
+        b.networkID.toLowerCase(),
+      ].map(f => stripNonAlphanumerics(f || ''));
 
-      console.log('[sort] comparing A:', [a1, a2, a3, a4, a5]);
-      console.log('[sort] comparing B:', [b1, b2, b3, b4, b5]);
+      const comparison =
+        aFields
+          .map((val, idx) => val.localeCompare(bFields[idx], undefined, { sensitivity: 'base' }))
+          .find(res => res !== 0) || 0;
 
-      const compareChain = [a1, a2, a3, a4, a5].map((val, idx) => {
-        return val.localeCompare([b1, b2, b3, b4, b5][idx], undefined, { sensitivity: 'base' });
-      });
-
-      const result = compareChain.find(res => res !== 0) ?? 0;
-      console.log('[sort] name sort result:', result);
-      return sortOrder === 'Asc' ? result : -result;
+      return sortOrder === 'Asc' ? comparison : -comparison;
     } else {
       const valueA = parseFloat(a.amount);
       const valueB = parseFloat(b.amount);
-      console.log('[sort] amount sort values:', valueA, valueB);
-
-      if (sortOrder === 'Asc') {
-        return valueA > valueB ? 1 : -1;
-      } else {
-        return valueA < valueB ? 1 : -1;
-      }
+      return sortOrder === 'Asc' ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
     }
   });
+
+  console.log('[filterAndSortAssets] Final count:', sortedAssets.length);
+  console.table(
+    sortedAssets.map(a => ({
+      denom: a.denom,
+      symbol: a.symbol,
+      amount: a.amount,
+      isIbc: a.isIbc,
+      network: a.networkName,
+    })),
+  );
+  console.groupEnd();
+
+  return sortedAssets;
 }
 
 const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStatusFilter) => {

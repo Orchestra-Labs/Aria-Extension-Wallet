@@ -9,10 +9,9 @@ const adjustAmountByExponent = (amount: string, exponent: number): string => {
 
 const resolveIbcDenom = async (
   ibcDenom: string,
-  chainAssets: Record<string, any> | undefined,
   prefix: string,
   restUris: Uri[],
-): Promise<{ denom: string; symbol: string; logo?: string; exponent: number }> => {
+): Promise<string> => {
   try {
     const denomHash = ibcDenom.slice(4); // Remove the "ibc/" prefix
     const getIBCInfoEndpoint = COSMOS_CHAIN_ENDPOINTS.getIBCInfo;
@@ -22,22 +21,14 @@ const resolveIbcDenom = async (
       endpoint: `${getIBCInfoEndpoint}${denomHash}`,
       restUris,
     });
-    const baseDenom = response.denom_trace?.base_denom;
+    const denom = response.denom_trace?.base_denom;
 
-    if (!baseDenom) {
+    if (!denom) {
       // TODO: show error to user
       throw new Error(`Failed to resolve IBC denom: ${ibcDenom}`);
     }
 
-    const registryAsset = chainAssets?.[baseDenom];
-    if (!registryAsset) return Promise.reject(null);
-
-    return {
-      denom: baseDenom,
-      symbol: registryAsset.symbol,
-      logo: registryAsset.logo,
-      exponent: registryAsset.exponent,
-    };
+    return denom;
   } catch (error) {
     console.error(`Error resolving IBC denom ${ibcDenom}:`, error);
     throw error;
@@ -83,7 +74,7 @@ const getBalances = async (
 export async function fetchWalletAssets(
   walletAddress: string,
   networkID: string,
-  coinDenoms: string[],
+  subscribedDenoms: string[],
   chainRegistry: Record<string, SimplifiedChainInfo>,
 ): Promise<Asset[]> {
   if (!walletAddress) {
@@ -103,65 +94,67 @@ export async function fetchWalletAssets(
 
     const prefix = chainInfo.bech32_prefix;
     const restUris = chainInfo.rest_uris;
+    const networkName = chainInfo.pretty_name || chainInfo.chain_name || networkID;
 
-    if (!restUris || restUris.length === 0) {
+    if (!restUris?.length) {
       console.warn(`[fetchWalletAssets] No REST endpoints for ${networkID}`);
       return [];
     }
 
     console.log(`[fetchWalletAssets] Fetching balances for ${walletAddress} on ${networkID}`);
-    const coins: Asset[] = await getBalances(walletAddress, prefix, restUris);
-    console.log(`[fetchWalletAssets] Raw balances for ${networkID}:`, coins);
+    const rawCoins: Asset[] = await getBalances(walletAddress, prefix, restUris);
+    console.log(`[fetchWalletAssets] Raw balances for ${networkID}:`, rawCoins);
 
-    const networkName = chainInfo.pretty_name || chainInfo.chain_name || networkID;
-    const chainAssets = chainInfo.assets;
-    console.log(`[fetchWalletAssets] Available assets for ${networkID}:`, chainAssets);
+    const resolvedAssets = await Promise.all(
+      rawCoins.map(async coin => {
+        let baseDenom = coin.denom;
+        let isIbc = false;
 
-    // Filter and process assets
-    const filteredCoins =
-      coinDenoms.length > 0 ? coins.filter(coin => coinDenoms.includes(coin.denom)) : coins;
-
-    const walletAssets = await Promise.all(
-      filteredCoins.map(async (coin: Asset) => {
-        try {
-          const registryAsset = chainAssets?.[coin.denom];
-          if (!registryAsset) {
-            console.warn(`[fetchWalletAssets] No registry asset for ${coin.denom} on ${networkID}`);
+        if (coin.denom.startsWith(IBC_PREFIX)) {
+          try {
+            baseDenom = await resolveIbcDenom(coin.denom, prefix, restUris);
+            isIbc = true;
+          } catch (err) {
+            console.warn(`Could not resolve IBC denom ${coin.denom}, skipping`);
             return null;
           }
+        }
 
-          if (coin.denom.startsWith(IBC_PREFIX)) {
-            const resolved = await resolveIbcDenom(coin.denom, chainAssets, prefix, restUris);
-            return {
-              ...coin,
-              ...resolved,
-              amount: adjustAmountByExponent(coin.amount, resolved.exponent),
-              isIbc: true,
-              networkID,
-              networkName,
-            };
-          }
+        // Search all chain registries for the native asset metadata
+        let metadata: Asset | undefined;
+        for (const chain of Object.values(chainRegistry)) {
+          metadata = chain.assets?.[baseDenom];
+          if (metadata) break;
+        }
 
-          return {
-            ...coin,
-            symbol: registryAsset.symbol,
-            logo: registryAsset.logo,
-            exponent: registryAsset.exponent,
-            amount: adjustAmountByExponent(coin.amount, registryAsset.exponent),
-            isIbc: false,
-            networkID,
-            networkName,
-          };
-        } catch (error) {
-          console.error(`[fetchWalletAssets] Error processing ${coin.denom}:`, error);
+        if (!metadata) {
+          console.warn(`[fetchWalletAssets] No metadata for base denom ${baseDenom}`);
           return null;
         }
+
+        const amount = adjustAmountByExponent(coin.amount, metadata.exponent);
+        return {
+          denom: baseDenom,
+          symbol: metadata.symbol,
+          logo: metadata.logo,
+          exponent: metadata.exponent,
+          amount,
+          isIbc,
+          networkID,
+          networkName,
+        };
       }),
     );
 
-    const validAssets = walletAssets.filter((a): a is Asset => a !== null);
-    console.log(`[fetchWalletAssets] Final assets for ${networkID}:`, validAssets);
-    return validAssets;
+    const validAssets = resolvedAssets.filter((a): a is Asset => a !== null);
+    console.log(`[fetchWalletAssets] Resolved assets for ${networkID}:`, validAssets);
+
+    const filteredAssets = subscribedDenoms.length
+      ? validAssets.filter(asset => subscribedDenoms.includes(asset.denom))
+      : validAssets;
+    console.log(`[fetchWalletAssets] Filtered assets for ${networkID}:`, filteredAssets);
+
+    return filteredAssets;
   } catch (error) {
     console.error(`[fetchWalletAssets] Error for ${networkID}:`, error);
     return [];

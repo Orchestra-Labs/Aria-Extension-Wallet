@@ -1,5 +1,4 @@
 import { atom } from 'jotai';
-import { Asset } from '@/types';
 import {
   searchTermAtom,
   assetSortOrderAtom,
@@ -15,6 +14,7 @@ import {
 } from '@/atoms';
 import { userAccountAtom } from './accountAtom';
 import { filterAndSortAssets } from '@/helpers';
+import { Asset } from '@/types';
 
 // Subscribed and merged wallet assets with balances
 export const subscribedAssetsAtom = atom(get => {
@@ -25,55 +25,98 @@ export const subscribedAssetsAtom = atom(get => {
 
   console.log(`[subscribedAssetsAtom] Building for ${networkLevel}`);
 
-  if (!userAccount?.settings.chainSubscriptions) return [];
-
-  const visibleAssets: Asset[] = [];
-
-  for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
-    const registryEntry = chainRegistry[networkLevel][networkID];
-    console.log(`[subscribedAssetsAtom] Checking ${networkLevel} entry for ${networkID}`);
-    if (!registryEntry) {
-      console.warn(`[subscribedAssetsAtom] No ${networkLevel} entry for ${networkID}`);
-      continue;
-    } else {
-      console.log(`[subscribedAssetsAtom] Found ${networkLevel} entry for ${networkID}`);
-    }
-
-    const chainAssets = Object.values(registryEntry?.assets || []);
-    const walletAssets = chainWallets[networkID]?.assets || [];
-
-    const assetsToShow =
-      denoms.length > 0 ? chainAssets.filter(asset => denoms.includes(asset.denom)) : chainAssets;
-
-    assetsToShow.forEach(asset => {
-      const matched = walletAssets.find(
-        wAsset => wAsset.denom === asset.denom && wAsset.networkID === networkID,
-      );
-      visibleAssets.push({
-        ...asset,
-        networkID,
-        amount: matched?.amount || '0',
-      });
-    });
+  if (!userAccount?.settings.chainSubscriptions) {
+    console.log('[subscribedAssetsAtom] No chain subscriptions found');
+    return [];
   }
 
-  console.log(`[subscribedAssetsAtom] Final assets for ${networkLevel}:`, visibleAssets);
-  return visibleAssets;
+  // Create wallet assets map for quick lookup (includes IBC assets)
+  const walletAssets = Object.values(chainWallets)
+    .flatMap(wallet => wallet.assets)
+    .filter(asset => {
+      const chainInfo = chainRegistry[networkLevel][asset.networkID];
+      return chainInfo !== undefined;
+    });
+
+  const walletAssetsMap = walletAssets.reduce(
+    (map, asset) => {
+      if (!map[asset.networkID]) map[asset.networkID] = {};
+      map[asset.networkID][asset.denom] = asset;
+      return map;
+    },
+    {} as Record<string, Record<string, Asset>>,
+  );
+
+  // Create Set of subscribed denoms for IBC checking
+  const subscribedDenoms = new Set(
+    Object.values(userAccount.settings.chainSubscriptions).flatMap(denoms => denoms),
+  );
+
+  const subscribedAssets: Asset[] = [];
+  const currentChains = chainRegistry[networkLevel];
+
+  // Process 1: Registry assets (for zero-balance native assets)
+  for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
+    const chainInfo = currentChains[networkID];
+    if (!chainInfo) continue;
+
+    const chainAssets = Object.values(chainInfo.assets || {});
+
+    for (const denom of denoms) {
+      const assetFromRegistry = chainAssets.find(a => a.denom === denom);
+      if (!assetFromRegistry) continue;
+
+      const walletAsset = walletAssetsMap[networkID]?.[denom];
+
+      subscribedAssets.push({
+        ...assetFromRegistry,
+        amount: walletAsset?.amount || '0',
+        networkID: chainInfo.chain_id,
+        networkName: chainInfo.chain_name,
+        isIbc: walletAsset?.isIbc || false,
+      });
+    }
+  }
+
+  // Process 2: Wallet assets (for IBC assets and any additional balances)
+  for (const asset of walletAssets) {
+    // Skip if already included from registry processing
+    if (subscribedAssets.some(a => a.denom === asset.denom && a.networkID === asset.networkID))
+      continue;
+
+    // Check if IBC asset with subscribed base denom
+    const isSubscribedIbc = asset.isIbc && asset.denom && subscribedDenoms.has(asset.denom);
+
+    if (subscribedDenoms.has(asset.denom) || isSubscribedIbc) {
+      subscribedAssets.push(asset);
+    }
+  }
+
+  console.log(`[subscribedAssetsAtom] Final assets for ${networkLevel}:`, subscribedAssets);
+  return subscribedAssets;
 });
 
 // Filtered assets for main UI list
 export const filteredAssetsAtom = atom(get => {
   const assets = get(subscribedAssetsAtom);
+  const searchTerm = get(searchTermAtom);
+  const sortType = get(assetSortTypeAtom);
+  const sortOrder = get(assetSortOrderAtom);
+  const showAllAssets = get(showAllAssetsAtom);
 
-  const filtered = filterAndSortAssets(
-    assets,
-    get(searchTermAtom),
-    get(assetSortTypeAtom),
-    get(assetSortOrderAtom),
-    get(showAllAssetsAtom),
-  );
+  console.groupCollapsed('[filteredAssetsAtom] Filtering assets');
+  console.log('[filteredAssetsAtom] Input assets:', assets);
+  console.log('[filteredAssetsAtom] Filter parameters:', {
+    searchTerm,
+    sortType,
+    sortOrder,
+    showAllAssets,
+  });
 
-  console.log('[filteredAssetsAtom] Result:', filtered);
+  const filtered = filterAndSortAssets(assets, searchTerm, sortType, sortOrder, showAllAssets);
+
+  console.log('[filteredAssetsAtom] Result count:', filtered.length);
+  console.groupEnd();
   return filtered;
 });
 
