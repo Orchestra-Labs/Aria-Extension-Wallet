@@ -39,18 +39,24 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
         amount: adjustedAmount,
         denom: asset.denom,
       },
-    }).then(() => {
-      toast({
-        title: `Stablecoin stake success!`,
-        description: `You staked ${amount} ${asset.symbol}`,
-        duration: 5000,
+    })
+      .then(() => {
+        toast({
+          title: `Stablecoin stake success!`,
+          description: `You staked ${amount} ${asset.symbol}`,
+          duration: 5000,
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        toast({
+          title: `Stablecoin stake failed!`,
+          description: err ?? 'Something went wrong',
+        });
       });
-    });
 
     setAmount(DEFAULT_AMOUNT);
   };
-
-  console.log('selectedAction', selectedAction);
 
   const handleStablecoinUnstake = async () => {
     const adjustedAmount = (
@@ -63,13 +69,21 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
         amount: adjustedAmount,
         denom: asset.denom,
       },
-    }).then(() => {
-      toast({
-        title: `Stablecoin unstake success!`,
-        description: `You unstaked ${amount} ${asset.symbol}`,
-        duration: 5000,
+    })
+      .then(() => {
+        toast({
+          title: `Stablecoin unstake success!`,
+          description: `You unstaked ${amount} ${asset.symbol}`,
+          duration: 5000,
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        toast({
+          title: `Stablecoin unstake failed!`,
+          description: err ?? 'Something went wrong',
+        });
       });
-    });
 
     setAmount(DEFAULT_AMOUNT);
   };
@@ -110,7 +124,7 @@ export const StablecoinStakeDialog: React.FC<StablecoinStakeDialog> = ({ asset }
       title="Stake"
       showBottomBorder
       reducedTopMargin
-      height="85%"
+      height="70%"
     >
       <div className="flex flex-col items-center">
         <p className="text-base text-neutral-1 my-1">Staked Balance</p>

@@ -10,8 +10,8 @@ import {
   StablecoinStakingUserTotalUnbondings,
   StablecoinStakingUserUnbonding,
 } from '@/types/stablecoin-staking';
-import { querySymphony } from './querySymphonyNodes';
-import { queryRestNode } from './queryNodes';
+
+import { queryRestNode, queryRpcNode } from './queryNodes';
 
 export const fetchStablecoinStakingParams = async () => {
   try {
@@ -143,7 +143,7 @@ export const stakeStablecoin = async ({
   ];
 
   try {
-    const response = await querySymphony({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint,
       walletAddress: body.staker,
       messages: messages,
@@ -175,7 +175,7 @@ export const unstakeStablecoin = async ({
   ];
 
   try {
-    const response = await querySymphony({
+    const response = await queryRpcNode<RPCResponse>({
       endpoint: CHAIN_ENDPOINTS.stablecoinUnstake,
       walletAddress: body.staker,
       messages,

@@ -20,7 +20,6 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       buffer: 'buffer/',
-      'symphonyjs-local': path.resolve(__dirname, './symphonyjs-local/esm'),
     },
   },
   plugins: [react(), viteTsconfigPaths()],
@@ -64,6 +63,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/cogwheel-rest/, ''),
       },
+      // Test local node (stablestaking) proxies
       '/testlocal-rpc': {
         target: 'http://34.67.182.102:26657',
         changeOrigin: true,

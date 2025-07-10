@@ -1,14 +1,17 @@
+import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
+import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
+
 import {
   CHAIN_NODES,
   DELAY_BETWEEN_NODE_ATTEMPTS,
   LOCAL_ASSET_REGISTRY,
   MAX_NODES_PER_QUERY,
 } from '@/constants';
-import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
+import { RPCResponse } from '@/types';
+
+import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
-import { RPCResponse } from '@/types';
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 
@@ -168,6 +171,7 @@ const queryWithRetry = async <T>({
   simulateOnly = false,
   fee,
   body,
+  walletAddress,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -180,6 +184,7 @@ const queryWithRetry = async <T>({
     gas: string;
   };
   body?: BodyInit;
+  walletAddress?: string;
 }): Promise<T> => {
   console.log('Querying with retry...');
   console.log('Endpoint:', endpoint);
@@ -203,13 +208,19 @@ const queryWithRetry = async <T>({
 
         if (useRPC) {
           const sessionToken = getSessionToken();
+
           if (!sessionToken) {
             throw new Error("Session token doesn't exist");
           }
+
           const mnemonic = sessionToken.mnemonic;
-          const address = await getAddress(mnemonic);
+          const address = walletAddress ?? (await getAddress(mnemonic));
           const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
+
+          const client = await getSigningSymphonyClient({
+            rpcEndpoint: queryMethod,
+            signer: offlineSigner,
+          });
 
           const result = await performRpcQuery(
             client,
@@ -219,6 +230,7 @@ const queryWithRetry = async <T>({
             simulateOnly,
             fee,
           );
+
           return result as T;
         } else {
           const result = await performRestQuery(endpoint, queryMethod, queryType, body);
@@ -279,6 +291,7 @@ export const queryRpcNode = async <T>({
   feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
   simulateOnly = false,
   fee,
+  walletAddress,
 }: {
   endpoint: string;
   messages?: any[];
@@ -288,6 +301,7 @@ export const queryRpcNode = async <T>({
     amount: { denom: string; amount: string }[];
     gas: string;
   };
+  walletAddress?: string;
 }) =>
   queryWithRetry<T>({
     endpoint,
@@ -296,4 +310,5 @@ export const queryRpcNode = async <T>({
     feeDenom,
     simulateOnly,
     fee,
+    walletAddress,
   });

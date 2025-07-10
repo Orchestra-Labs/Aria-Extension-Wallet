@@ -27,7 +27,7 @@ export const MAX_NODES_PER_QUERY = 3;
 
 // const isDev = import.meta.env.DEV;
 
-// const DEV_PROXY = 'http://localhost:5173';
+const DEV_PROXY = 'http://localhost:5173';
 
 // Define the shape of the local asset registry
 type AssetRegistry = {
@@ -87,21 +87,16 @@ export const DEFAULT_ASSET = LOCAL_ASSET_REGISTRY.note;
 
 export const CHAIN_NODES = {
   symphonytestnet: [
-    {
-      rpc: `http://34.67.182.102:26657`,
-      rest: `http://34.67.182.102:1317`,
-      provider: 'localtest',
-    },
     // {
     //   rpc: 'https://symphony-rpc.kleomedes.network',
     //   rest: 'https://symphony-api.kleomedes.network',
     //   provider: 'Kleomedes',
     // },
-    // {
-    //   rpc: `${DEV_PROXY}/testlocal-rpc`,
-    //   rest: `${DEV_PROXY}/testlocal-rest`,
-    //   provider: 'localtest',
-    // },
+    {
+      rpc: `${DEV_PROXY}/testlocal-rpc`,
+      rest: `${DEV_PROXY}/testlocal-rest`,
+      provider: 'localtest',
+    },
     // {
     //   rpc: isDev ? `${DEV_PROXY}/kleomedes-rpc` : 'https://symphony-rpc.kleomedes.network',
     //   rest: isDev ? `${DEV_PROXY}/kleomedes-rest` : 'https://symphony-api.kleomedes.network',

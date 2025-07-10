@@ -1,8 +1,10 @@
-import { SwapObject, TransactionResult, RPCResponse, Asset } from '@/types';
-import { CHAIN_ENDPOINTS } from '@/constants';
-import { getValidFeeDenom } from './feeDenom';
 import { symphony } from '@orchestra-labs/symphonyjs';
-import { querySymphony } from './querySymphonyNodes';
+
+import { CHAIN_ENDPOINTS } from '@/constants';
+import { queryRpcNode } from '@/helpers/queryNodes';
+import { Asset, RPCResponse, SwapObject, TransactionResult, TransactionRPCResponse } from '@/types';
+
+import { getValidFeeDenom } from './feeDenom';
 
 const { swapSend } = symphony.market.v1beta1.MessageComposer.withTypeUrl;
 
@@ -44,7 +46,7 @@ export const swapTransaction = async (
       swapObject.sendObject.symphonyAssets,
     );
     console.log('Swap fee denom:', feeDenom);
-    const response = await querySymphony({
+    const response = await queryRpcNode<TransactionRPCResponse>({
       endpoint,
       walletAddress: fromAddress,
       messages,
@@ -108,7 +110,7 @@ export const multiSwapTransaction = async (
       swapObjects[0].sendObject.denom,
       swapObjects[0].sendObject.symphonyAssets,
     );
-    const response = await querySymphony({
+    const response = await queryRpcNode<TransactionRPCResponse>({
       endpoint,
       walletAddress: fromAddress,
       messages,
