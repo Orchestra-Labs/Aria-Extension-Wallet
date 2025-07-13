@@ -20,20 +20,34 @@ export const IconContainer: React.FC<IconContainerProps> = ({
     setError(true);
   };
 
+  const containerStyle = {
+    borderRadius: '50%',
+    overflow: 'hidden',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
   if (icon) {
-    return <div className={`${className}`}>{icon}</div>;
+    <div style={containerStyle} className={className}>
+      {icon}
+    </div>;
   }
 
   if (error || !src) {
-    return <NotFoundIcon className={className} />;
+    <div style={containerStyle} className={className}>
+      <NotFoundIcon className={className} />
+    </div>;
   }
 
   return (
-    <img
-      src={src}
-      alt={alt}
-      onError={handleImageError}
-      className={`w-full h-full object-contain ${className}`}
-    />
+    <div style={containerStyle} className={className}>
+      <img
+        src={src}
+        alt={alt}
+        onError={handleImageError}
+        className={`object-contain ${className}`}
+      />
+    </div>
   );
 };

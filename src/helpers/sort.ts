@@ -123,10 +123,30 @@ const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStat
 };
 
 const hasUserActivity = (validator: CombinedStakingInfo) => {
+  console.log('[Sort Validators] Checking validator activity:', {
+    validatorAddress: validator.validator.operator_address,
+    moniker: validator.validator.description.moniker,
+    balanceAmount: validator.balance.amount,
+    unbondingBalance: validator.unbondingBalance?.balance || '0',
+  });
+
   const isDelegatedTo = parseFloat(validator.balance.amount) > 0;
+  console.log('[Sort Validators] isDelegatedTo:', isDelegatedTo, {
+    amount: validator.balance.amount,
+    parsedAmount: parseFloat(validator.balance.amount),
+  });
+
   const isUnbondingFrom =
     validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
+  console.log('[Sort Validators] isUnbondingFrom:', isUnbondingFrom, {
+    unbondingBalance: validator.unbondingBalance?.balance || '0',
+    parsedUnbondingBalance: validator.unbondingBalance
+      ? parseFloat(validator.unbondingBalance.balance)
+      : 0,
+  });
+
   const userEngaged = isDelegatedTo || isUnbondingFrom;
+  console.log('[Sort Validators] Final userEngaged result:', userEngaged);
 
   return userEngaged;
 };
@@ -140,27 +160,35 @@ export function filterAndSortValidators(
   statusFilter: ValidatorStatusFilter,
 ): typeof validators {
   const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
+  console.log('[filterAndSortValidators] searchTerm:', lowercasedSearchTerm);
+  console.log('[filterAndSortValidators] sortType:', sortType);
+  console.log('[filterAndSortValidators] sortOrder:', sortOrder);
+  console.log('[filterAndSortValidators] showCurrentValidators:', showCurrentValidators);
+  console.log('[filterAndSortValidators] statusFilter:', statusFilter);
+  console.log('[filterAndSortValidators] initial count:', validators.length);
 
   const filteredByStatus = validators.filter(validator => {
-    const shouldIncludeValidator =
-      statusMatch(validator, statusFilter) || hasUserActivity(validator);
-
-    return shouldIncludeValidator;
+    const match = statusMatch(validator, statusFilter);
+    const hasActivity = hasUserActivity(validator);
+    return match || hasActivity;
   });
+  console.log('[filterAndSortValidators] after status filter:', filteredByStatus.length);
 
   const filteredValidators = filteredByStatus.filter(validator => {
-    const matchesSearch = safeTrimLowerCase(validator.validator.description.moniker).includes(
-      lowercasedSearchTerm,
-    );
-    return matchesSearch;
+    const moniker = safeTrimLowerCase(validator.validator.description.moniker);
+    return moniker.includes(lowercasedSearchTerm);
   });
+  console.log('[filterAndSortValidators] after search filter:', filteredValidators.length);
 
+  console.log('[filterAndSortValidators] show current validators?:', showCurrentValidators);
   const finalValidators = showCurrentValidators
     ? filteredValidators.filter(validator => hasUserActivity(validator))
     : filteredValidators;
+  console.log('[filterAndSortValidators] after current validator filter:', finalValidators.length);
 
-  return finalValidators.sort((a, b) => {
-    let valueA, valueB;
+  const sorted = finalValidators.sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
 
     switch (sortType) {
       case ValidatorSortType.NAME:
@@ -168,9 +196,11 @@ export function filterAndSortValidators(
         const monikerB = safeTrimLowerCase(b.validator.description.moniker);
         valueA = stripNonAlphanumerics(monikerA);
         valueB = stripNonAlphanumerics(monikerB);
-        return sortOrder === SortOrder.ASC
-          ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-          : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
+        const result =
+          sortOrder === SortOrder.ASC
+            ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
+            : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
+        return result;
 
       case ValidatorSortType.DELEGATION:
         valueA = parseFloat(a.delegation.shares);
@@ -198,8 +228,13 @@ export function filterAndSortValidators(
         break;
     }
 
-    return sortOrder === SortOrder.ASC ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
+    const result =
+      sortOrder === SortOrder.ASC ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
+    return result;
   });
+
+  console.log('[filterAndSortValidators] final sorted count:', sorted.length);
+  return sorted;
 }
 
 export function filterAndSortChains(

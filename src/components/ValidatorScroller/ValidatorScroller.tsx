@@ -10,17 +10,20 @@ interface ValidatorScrollerProps {
   validators: CombinedStakingInfo[];
   onClick?: (asset: CombinedStakingInfo) => void;
   isSelectable?: boolean;
+  lazyLoad?: boolean;
 }
 
 export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
   validators,
   isSelectable = false,
   onClick,
+  lazyLoad = true,
 }) => {
   const tileScrollerRef = useRef<TileScrollerHandle>(null);
   const { refreshData } = useRefreshData();
   const isFetching = useAtomValue(isFetchingValidatorDataAtom);
 
+  console.log('[ValidatorScroller] Received validators:', validators);
   const handleRefresh = useCallback(() => {
     refreshData({ validator: true, wallet: false });
   }, [refreshData]);
@@ -34,17 +37,26 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
   };
 
   return (
-    <TileScroller ref={tileScrollerRef} isRefreshing={isFetching} onRefresh={handleRefresh}>
+    <TileScroller
+      ref={tileScrollerRef}
+      isRefreshing={isFetching}
+      onRefresh={handleRefresh}
+      lazyLoad={lazyLoad}
+    >
       {validators.length === 0 ? (
         <p className="text-base text-neutral-1">No validators found</p>
       ) : (
         validators.map(combinedStakingInfo => (
-          <ValidatorTile
+          <div
             key={`${combinedStakingInfo.validator.operator_address}`}
-            combinedStakingInfo={combinedStakingInfo}
-            isSelectable={isSelectable}
-            onClick={handleClick}
-          />
+            className="tile-item" // NOTE: Important for lazy loading
+          >
+            <ValidatorTile
+              combinedStakingInfo={combinedStakingInfo}
+              isSelectable={isSelectable}
+              onClick={handleClick}
+            />
+          </div>
         ))
       )}
     </TileScroller>

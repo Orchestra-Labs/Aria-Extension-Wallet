@@ -104,8 +104,6 @@ export const CreateWallet = () => {
     setRandomHiddenIndexes(getRandomIndexes());
   }, [use24Words]);
 
-  /* ******************************************************************************************* */
-  /* David Current TODOs */
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
 
@@ -137,7 +135,6 @@ export const CreateWallet = () => {
   // TODO: add toggle option for ultra-secure mode, using password auth for on every transaction like with hardware wallets.  in that mode, no session storage is used.
 
   // TODO: check browser compatibility (edge is the coloring issue)
-  /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */
   // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there

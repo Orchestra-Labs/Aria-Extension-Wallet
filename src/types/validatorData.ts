@@ -12,6 +12,7 @@ export interface ValidatorInfo {
     moniker: string;
     website: string;
     details: string;
+    identity?: string;
   };
   commission: {
     commission_rates: {

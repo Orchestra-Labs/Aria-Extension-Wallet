@@ -21,4 +21,5 @@ export * from './timer';
 export * from './truncateString';
 export * from './utils';
 export * from './uuid';
+export * from './validatorUtils';
 export * from './walletConnect';

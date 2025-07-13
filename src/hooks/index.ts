@@ -8,6 +8,7 @@ export * from './useGetModuleAccountsQuery';
 export * from './useGetTobinTaxRateQuery';
 export * from './useInactivityCheck';
 export * from './useInitializeWalletConnect';
+export * from './useIntersectionObserver';
 export * from './useLogout';
 export * from './useRefreshData';
 export * from './useRegistryDataRefresh';

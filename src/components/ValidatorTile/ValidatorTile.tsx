@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Asset, CombinedStakingInfo, TransactionResult, Uri } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
-import { IconContainer, LogoIcon } from '@/assets/icons';
+import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
 import {
   calculateRemainingTime,
@@ -14,14 +14,18 @@ import {
   stakeToValidator,
   truncateWalletAddress,
   claimAndUnstake,
+  getFallbackValidatorLogo,
+  getValidatorLogoUrl,
 } from '@/helpers';
 import {
   BondStatus,
   DEFAULT_MAINNET_ASSET,
   defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
+  NetworkLevel,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
   SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
   TextFieldStatus,
   TransactionType,
 } from '@/constants';
@@ -30,6 +34,7 @@ import {
   chainRegistryAtom,
   chainWalletAtom,
   filteredValidatorsAtom,
+  networkLevelAtom,
   showCurrentValidatorsAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
@@ -45,7 +50,7 @@ interface ValidatorTileProps {
   onClick?: (validator: CombinedStakingInfo) => void;
 }
 
-export const ValidatorTile = ({
+const ValidatorTileComponent = ({
   combinedStakingInfo,
   isSelectable = false,
   onClick,
@@ -54,11 +59,33 @@ export const ValidatorTile = ({
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
   const { refreshData } = useRefreshData();
 
+  const networkLevel = useAtomValue(networkLevelAtom);
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
-  // TODO: pass in chain ID
-  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
+  // TODO: On page load set current chain id for validators to user default, then change via button
+  const chainId = networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+  const walletState = useAtomValue(chainWalletAtom(chainId));
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
+
+  const chain = chainRegistry[networkLevel][chainId];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+  const rpcUris = chain.rpc_uris;
+
+  const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
+    combinedStakingInfo;
+  const delegationResponse = { delegation, balance };
+
+  console.log('[ValidatorTile] Building Validator Tile:', validator.description.moniker);
+
+  // TODO: if no staking denom, disable staking features
+  const stakingDenom = chain.staking_denoms[0];
+  const asset = chain.assets?.[stakingDenom];
+  const symbol = asset?.symbol || 'MLD';
+  const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
+
+  const chainFees = chain.fees || [];
+  const defaultGasPrice = chainFees[0].gasPriceStep.average || 0.025;
 
   const [amount, setAmount] = useState(0);
   const [feeState, setFeeState] = useState(defaultFeeState);
@@ -77,34 +104,20 @@ export const ValidatorTile = ({
   const [simulatedFee, setSimulatedFee] = useState<{
     fee: string;
     textClass: 'text-error' | 'text-warn' | 'text-blue';
-  } | null>({ fee: '0 MLD', textClass: 'text-blue' });
-
-  // TODO: need to be able to change chain to stake to other chains
-  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
-  const prefix = chain.bech32_prefix;
-  const restUris = chain.rest_uris;
-  const rpcUris = chain.rpc_uris;
-
-  const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
-    combinedStakingInfo;
-  const delegationResponse = { delegation, balance };
-
-  const symbol = SYMPHONY_MAINNET_ASSET_REGISTRY.note.symbol;
+  } | null>({ fee: `0 ${asset?.symbol || DEFAULT_MAINNET_ASSET.symbol}`, textClass: 'text-blue' });
+  const [validatorLogoUrl, setValidatorLogoUrl] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
 
   // Aggregating the rewards (sum all reward amounts for this validator)
   const rewardAmount = rewards
     .reduce((sum, reward) => sum + parseFloat(reward.amount), 0)
     .toString();
-  const strippedRewardAmount = `${convertToGreaterUnit(
-    parseFloat(rewardAmount),
-    GREATER_EXPONENT_DEFAULT,
-  ).toFixed(GREATER_EXPONENT_DEFAULT)}`;
+  const strippedRewardAmount = `${convertToGreaterUnit(parseFloat(rewardAmount), exponent).toFixed(
+    exponent,
+  )}`;
   const userHasUnbonding = unbondingBalance && parseFloat(unbondingBalance?.balance || '') > 0;
   const formattedRewardAmount = formatBalanceDisplay(strippedRewardAmount, symbol);
-  const delegatedAmount = convertToGreaterUnit(
-    parseFloat(delegation.shares || '0'),
-    GREATER_EXPONENT_DEFAULT,
-  );
+  const delegatedAmount = convertToGreaterUnit(parseFloat(delegation.shares || '0'), exponent);
   const userIsFullyUnstaking = userHasUnbonding && delegatedAmount === 0;
 
   const title = validator.description.moniker || 'Unknown Validator';
@@ -174,11 +187,8 @@ export const ValidatorTile = ({
   let value = formattedRewardAmount;
   let subtitleStatus = TextFieldStatus.GOOD;
   let amountUnstaking = formatBalanceDisplay(
-    convertToGreaterUnit(
-      parseFloat(unbondingBalance?.balance || '0'),
-      GREATER_EXPONENT_DEFAULT,
-    ).toFixed(GREATER_EXPONENT_DEFAULT),
-    'MLD',
+    convertToGreaterUnit(parseFloat(unbondingBalance?.balance || '0'), exponent).toFixed(exponent),
+    symbol,
   );
 
   if (showCurrentValidators) {
@@ -226,12 +236,13 @@ export const ValidatorTile = ({
   const validatorIcon = (
     <IconContainer
       alt={title}
+      src={validatorLogoUrl || undefined}
       icon={
         validator.jailed || validator.status === BondStatus.UNBONDED ? (
           <AlertCircleIcon className="text-error h-8 w-8" />
-        ) : (
-          <LogoIcon className="w-full h-full" />
-        )
+        ) : logoError ? (
+          <NotFoundIcon className="w-full h-full" />
+        ) : undefined
       }
     />
   );
@@ -443,8 +454,7 @@ export const ValidatorTile = ({
   };
 
   const formatFee = (gasWanted: number) => {
-    const defaultGasPrice = 0.025;
-    const exponent = GREATER_EXPONENT_DEFAULT;
+    const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
     const feeAmount = gasWanted * defaultGasPrice;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 
@@ -494,14 +504,17 @@ export const ValidatorTile = ({
       asset: DEFAULT_MAINNET_ASSET,
       amount: 0,
     }));
-    setSimulatedFee({ fee: '0 MLD', textClass: 'text-blue' });
+    setSimulatedFee({
+      fee: `0 ${asset?.symbol || DEFAULT_MAINNET_ASSET.symbol}`,
+      textClass: 'text-blue',
+    });
     setIsClaimToRestake(false);
     setSelectedAction(null);
   };
 
   useEffect(() => {
-    const exponent = DEFAULT_MAINNET_ASSET.exponent || GREATER_EXPONENT_DEFAULT;
-    const symbol = feeState.asset;
+    const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
+    const symbol = feeState.asset.symbol;
     const feeAmount = feeState.amount;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
 
@@ -509,7 +522,7 @@ export const ValidatorTile = ({
       amount === 0 ? 0 : feeInGreaterUnit ? (feeInGreaterUnit / amount) * 100 : 0;
 
     setSimulatedFee({
-      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol.symbol || 'MLD'),
+      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol),
       textClass:
         feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
     });
@@ -524,6 +537,45 @@ export const ValidatorTile = ({
       refreshData();
     }
   }, [transactionSuccess.success]);
+
+  useEffect(() => {
+    const fetchValidatorLogo = async () => {
+      try {
+        // First try to get logo URL from validator description
+        const logoUrl = getValidatorLogoUrl(validator.description);
+
+        if (logoUrl) {
+          // If we have a Keybase URL, fetch the actual image URL
+          if (logoUrl.includes('keybase.io')) {
+            const response = await fetch(logoUrl);
+            const data = await response.json();
+
+            if (data?.them?.[0]?.pictures?.primary?.url) {
+              setValidatorLogoUrl(data.them[0].pictures.primary.url);
+              return;
+            }
+          } else {
+            // Direct image URL case
+            setValidatorLogoUrl(logoUrl);
+            return;
+          }
+        }
+
+        // If Keybase fails or not available, try chain logo
+        const chainLogo = getFallbackValidatorLogo(chainId, chainRegistry);
+        if (chainLogo) {
+          setValidatorLogoUrl(chainLogo);
+        } else {
+          setLogoError(true);
+        }
+      } catch (error) {
+        console.error('Error fetching validator logo:', error);
+        setLogoError(true);
+      }
+    };
+
+    fetchValidatorLogo();
+  }, []);
 
   return (
     <>
@@ -673,7 +725,7 @@ export const ValidatorTile = ({
                   <AssetInput
                     placeholder={`Enter ${selectedAction} amount`}
                     variant="stake"
-                    assetState={DEFAULT_MAINNET_ASSET}
+                    assetState={asset || DEFAULT_MAINNET_ASSET}
                     amountState={amount}
                     updateAmount={newAmount => setAmount(newAmount)}
                     reducedHeight
@@ -758,3 +810,5 @@ export const ValidatorTile = ({
     </>
   );
 };
+
+export const ValidatorTile = memo(ValidatorTileComponent);

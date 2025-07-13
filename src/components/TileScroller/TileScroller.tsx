@@ -1,13 +1,24 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { ScrollArea } from '@/ui-kit';
 import { useDrag } from '@use-gesture/react';
 import { animated, useSpring } from 'react-spring';
 import { Loader } from '../Loader';
+import { useIntersectionObserver } from '@/hooks';
 
 interface TileScrollerProps {
   children: React.ReactNode;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  lazyLoad?: boolean;
+  batchSize?: number;
+  debounceDelay?: number;
 }
 
 export interface TileScrollerHandle {
@@ -15,12 +26,114 @@ export interface TileScrollerHandle {
 }
 
 export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
-  ({ children, isRefreshing = false, onRefresh }, ref) => {
+  (
+    {
+      children,
+      isRefreshing = false,
+      onRefresh,
+      lazyLoad = true,
+      batchSize = 7,
+      debounceDelay = 300,
+    },
+    ref,
+  ) => {
     const viewportRef = useRef<HTMLDivElement>(null);
+    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const [visibleCount, setVisibleCount] = useState(
+      lazyLoad ? batchSize : React.Children.count(children),
+    );
     const [isMouseDown, setIsMouseDown] = useState(false);
     const [dragStarted, setDragStarted] = useState(false);
     const [isRefreshTriggered, setIsRefreshTriggered] = useState(false);
     const [isRefreshComplete, setIsRefreshComplete] = useState(true);
+
+    const { observe, unobserve } = useIntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            // Clear any pending debounce timeout
+            if (debounceTimeoutRef.current) {
+              clearTimeout(debounceTimeoutRef.current);
+            }
+
+            // Set new debounce timeout
+            debounceTimeoutRef.current = setTimeout(() => {
+              setVisibleCount(prev => Math.min(prev + batchSize, React.Children.count(children)));
+              unobserve(entry.target);
+            }, debounceDelay);
+          }
+        });
+      },
+      { root: viewportRef.current, threshold: 0.1 },
+    );
+
+    // Scroll handler with debounce
+    const handleScroll = useCallback(() => {
+      const viewport = viewportRef.current;
+      if (!viewport || !lazyLoad) return;
+
+      const scrollPosition = viewport.scrollTop + viewport.clientHeight;
+      const scrollHeight = viewport.scrollHeight;
+      const threshold = 100; // pixels from bottom
+
+      if (scrollPosition > scrollHeight - threshold) {
+        // Clear any pending debounce timeout
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
+
+        // Set new debounce timeout
+        debounceTimeoutRef.current = setTimeout(() => {
+          setVisibleCount(prev => Math.min(prev + batchSize, React.Children.count(children)));
+        }, debounceDelay);
+      }
+    }, [lazyLoad, batchSize, children, debounceDelay]);
+
+    // Update visible items when children change
+    useEffect(() => {
+      if (!lazyLoad) {
+        setVisibleCount(React.Children.count(children));
+        return;
+      }
+
+      if (visibleCount <= batchSize) {
+        setVisibleCount(batchSize);
+      }
+
+      // Set up observers for the last few items
+      const items = viewportRef.current?.querySelectorAll('.tile-item');
+      if (items && items.length > 0) {
+        const itemsToObserve = Array.from(items).slice(-3);
+        itemsToObserve.forEach(item => observe(item));
+      }
+    }, [children, lazyLoad, batchSize, visibleCount, observe]);
+
+    // Setup scroll listener with cleanup
+    useEffect(() => {
+      if (!lazyLoad) return;
+
+      const viewport = viewportRef.current;
+      if (viewport) {
+        viewport.addEventListener('scroll', handleScroll);
+        return () => {
+          viewport.removeEventListener('scroll', handleScroll);
+          // Clean up any pending debounce timeouts
+          if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+          }
+        };
+      }
+    }, [lazyLoad, handleScroll]);
+
+    // Clean up debounce timeout on unmount
+    useEffect(() => {
+      return () => {
+        if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+        }
+      };
+    }, []);
 
     useImperativeHandle(ref, () => ({
       shouldPreventClick: () => dragStarted || isRefreshTriggered,
@@ -158,7 +271,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
             <Loader isSpinning={isRefreshTriggered || isRefreshing} />
           </animated.div>
 
-          {children}
+          {React.Children.toArray(children).slice(0, visibleCount)}
         </animated.div>
       </ScrollArea>
     );
