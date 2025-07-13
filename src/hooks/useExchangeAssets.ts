@@ -10,7 +10,7 @@ import {
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { allWalletAssetsAtom, chainRegistryAtom, sendStateAtom } from '@/atoms';
+import { allWalletAssetsAtom, subscribedChainRegistryAtom, sendStateAtom } from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -31,7 +31,7 @@ export const useExchangeAssets = () => {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const sendState = useAtomValue(sendStateAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

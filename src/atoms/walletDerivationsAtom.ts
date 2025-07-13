@@ -8,7 +8,7 @@ import {
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
   symphonyAssetsAtom,
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   sessionWalletAtom,
   networkLevelAtom,
 } from '@/atoms';
@@ -20,7 +20,7 @@ import { Asset } from '@/types';
 export const subscribedAssetsAtom = atom(get => {
   const { chainWallets } = get(sessionWalletAtom);
   const userAccount = get(userAccountAtom);
-  const chainRegistry = get(chainRegistryAtom);
+  const chainRegistry = get(subscribedChainRegistryAtom);
   const networkLevel = get(networkLevelAtom);
 
   console.log(`[subscribedAssetsAtom] Building for ${networkLevel}`);

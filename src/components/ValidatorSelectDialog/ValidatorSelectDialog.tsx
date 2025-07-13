@@ -3,7 +3,7 @@ import { Button, SlideTray } from '@/ui-kit';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   dialogSearchTermAtom,
   filteredDialogValidatorsAtom,
   selectedValidatorsAtom,
@@ -53,7 +53,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');

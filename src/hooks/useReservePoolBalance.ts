@@ -1,13 +1,14 @@
 import { useAtomValue } from 'jotai';
 import { useGetBalances } from './useGetBalances';
 import { useGetModuleAccountsQuery } from './useGetModuleAccountsQuery';
-import { chainRegistryAtom } from '@/atoms';
+import { subscribedChainRegistryAtom } from '@/atoms';
 import { SYMPHONY_MAINNET_ID } from '@/constants';
 
 const RESERVE_POOL_NAME = 'treasury';
 
+// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export const useReservePoolBalance = () => {
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
   const prefix = chain.bech32_prefix;

@@ -9,7 +9,7 @@ import {
   isInitialDataLoadAtom,
   networkLevelAtom,
   validatorDataAtom,
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
@@ -28,7 +28,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
@@ -125,6 +125,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                 <span>&nbsp;</span>
               </div>
               {currentStep === 0 ? (
+                // TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
                 <div className="flex flex-1 justify-center">
                   <Button
                     variant="selectedEnabled"

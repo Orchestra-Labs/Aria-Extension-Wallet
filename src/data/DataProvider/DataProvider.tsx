@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 export const DataProvider: React.FC = () => {
   const { refreshData } = useRefreshData();
-  const { refreshRegistry, chainRegistry } = useRegistryDataRefresh();
+  const { refreshRegistry, subscribedChainRegistry } = useRegistryDataRefresh();
   const { generateAddresses } = useAddressGeneration();
 
   const [isInitialDataLoad, setIsInitialDataLoad] = useAtom(isInitialDataLoadAtom);
@@ -37,11 +37,11 @@ export const DataProvider: React.FC = () => {
   const isReadyToLoadInitial = useMemo(() => {
     return (
       !!userAccount &&
-      Object.keys(chainRegistry?.mainnet || {}).length > 0 &&
+      Object.keys(subscribedChainRegistry?.mainnet || {}).length > 0 &&
       Object.keys(walletAddresses).length > 0 &&
       !isGeneratingAddresses
     );
-  }, [chainRegistry, userAccount, walletAddresses, isGeneratingAddresses]);
+  }, [subscribedChainRegistry, userAccount, walletAddresses, isGeneratingAddresses]);
 
   // Initialize registry data when user account changes
   // Replace the current useEffect for address generation with this:

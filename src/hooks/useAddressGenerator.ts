@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   userAccountAtom,
   updateChainWalletAtom,
   isGeneratingAddressesAtom,
@@ -9,7 +9,7 @@ import { getAddressesByChainPrefix, getSessionToken } from '@/helpers';
 import { NetworkLevel } from '@/constants';
 
 export function useAddressGeneration() {
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const userAccount = useAtomValue(userAccountAtom);
   const setIsGenerating = useSetAtom(isGeneratingAddressesAtom);
   const updateChainWallet = useSetAtom(updateChainWalletAtom);

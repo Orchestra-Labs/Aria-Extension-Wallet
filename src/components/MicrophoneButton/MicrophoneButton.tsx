@@ -6,7 +6,12 @@ import { openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
-import { validatorDataAtom, symphonyAssetsAtom, chainRegistryAtom, chainWalletAtom } from '@/atoms';
+import {
+  validatorDataAtom,
+  symphonyAssetsAtom,
+  subscribedChainRegistryAtom,
+  chainWalletAtom,
+} from '@/atoms';
 import { useRefreshData } from '@/hooks';
 import { SYMPHONY_MAINNET_ID } from '@/constants';
 
@@ -18,7 +23,7 @@ export const MicrophoneButton: React.FC = () => {
   const wallet = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const validators = useAtomValue(validatorDataAtom);
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const [micStatus, setMicStatus] = useState<'neutral' | 'granted' | 'denied'>('neutral');
   const [isRecording, setIsRecording] = useState(false);

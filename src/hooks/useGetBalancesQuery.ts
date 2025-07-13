@@ -4,7 +4,7 @@ import { COSMOS_CHAIN_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { Asset, CustomQueryOptions } from '@/types';
 import { useAtomValue } from 'jotai';
-import { chainRegistryAtom } from '@/atoms';
+import { subscribedChainRegistryAtom } from '@/atoms';
 
 type BalancesResponseDto = {
   balances: Asset[];
@@ -19,7 +19,7 @@ const getBalancesRequest = async ({ walletAddress, chainID }: RequestParams) => 
   console.log('[getBalancesRequest] walletAddress:', walletAddress);
   console.log('[getBalancesRequest] chainID:', chainID);
 
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const chain = chainRegistry.mainnet[chainID];
   const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;

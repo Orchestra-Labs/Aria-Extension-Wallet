@@ -1,5 +1,5 @@
 import {
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   isFetchingValidatorDataAtom,
   networkLevelAtom,
   validatorDataAtom,
@@ -10,7 +10,7 @@ import { sessionWalletAtom } from '@/atoms/walletAtom';
 import { NetworkLevel, SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID } from '@/constants';
 
 export function useValidatorDataRefresh() {
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const setValidatorState = useSetAtom(validatorDataAtom);
   const setIsFetchingData = useSetAtom(isFetchingValidatorDataAtom);
   const { chainWallets } = useAtomValue(sessionWalletAtom);

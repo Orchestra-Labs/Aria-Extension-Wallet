@@ -13,7 +13,7 @@ import { userAccountAtom } from './accountAtom';
 
 const EMPTY_CHAIN_REGISTRY = { mainnet: {}, testnet: {} };
 
-export const chainRegistryAtom = atom<{
+export const subscribedChainRegistryAtom = atom<{
   mainnet: LocalChainRegistry;
   testnet: LocalChainRegistry;
 }>(LOCAL_CHAIN_REGISTRY);

@@ -31,7 +31,7 @@ import {
 } from '@/constants';
 import { useAtomValue } from 'jotai';
 import {
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   chainWalletAtom,
   filteredValidatorsAtom,
   networkLevelAtom,
@@ -65,7 +65,7 @@ const ValidatorTileComponent = ({
   const chainId = networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
   const walletState = useAtomValue(chainWalletAtom(chainId));
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   const chain = chainRegistry[networkLevel][chainId];
   const prefix = chain.bech32_prefix;

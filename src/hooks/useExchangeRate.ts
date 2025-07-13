@@ -10,13 +10,14 @@ import {
   SYMPHONY_MAINNET_ID,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import { chainRegistryAtom, receiveStateAtom, sendStateAtom } from '@/atoms';
+import { subscribedChainRegistryAtom, receiveStateAtom, sendStateAtom } from '@/atoms';
 import { isValidSwap, queryRestNode } from '@/helpers';
 
+// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
 
   // Safely get chain info with fallback to DEFAULT_CHAIN_ID
   const getChainInfo = (chainId: string) => {

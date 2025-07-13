@@ -98,6 +98,8 @@ export async function fetchWalletAssets(
   console.log(`[FetchWalletAssets] Processing ${networkID} (${networkLevel})`);
   console.log(`[FetchWalletAssets] Chain info:`, chainInfo);
 
+  console.log(`[FetchWalletAssets] Network Subscriptions:`, networkSubscriptions);
+  console.log(`[FetchWalletAssets] Subscribed denoms for ${chainID}:`, thisChainSubscribedDenoms);
   // Create zero-balance assets for this chain's specific subscriptions
   const subscribedAssets = thisChainSubscribedDenoms
     .map(denom => {

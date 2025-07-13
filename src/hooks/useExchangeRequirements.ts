@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { SYMPHONY_MAINNET_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { chainRegistryAtom } from '@/atoms';
+import { subscribedChainRegistryAtom } from '@/atoms';
 
 interface ExchangeRequirementsResponse {
   total: {
@@ -11,8 +11,9 @@ interface ExchangeRequirementsResponse {
   };
 }
 
+// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export const useExchangeRequirements = () => {
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const [totalRequirement, setTotalRequirement] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

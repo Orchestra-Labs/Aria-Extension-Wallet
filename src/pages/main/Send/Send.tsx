@@ -26,7 +26,7 @@ import {
   addressVerifiedAtom,
   symphonyAssetsAtom,
   feeStateAtom,
-  chainRegistryAtom,
+  subscribedChainRegistryAtom,
   chainWalletAtom,
 } from '@/atoms';
 import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
@@ -77,7 +77,7 @@ export const Send = () => {
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const [addressVerified, setAddressVerified] = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
-  const chainRegistry = useAtomValue(chainRegistryAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   // TODO: pull in all chains, cycle between them as needed
   const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
   const walletAssets = walletState?.assets || [];

@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from 'jotai';
-import { chainRegistryAtom, isFetchingRegistryDataAtom, userAccountAtom } from '@/atoms';
+import { subscribedChainRegistryAtom, isFetchingRegistryDataAtom, userAccountAtom } from '@/atoms';
 import {
   checkChainRegistryUpdate,
   shouldUpdateChainRegistry,
@@ -10,29 +10,29 @@ import {
 import { LOCAL_CHAIN_REGISTRY, NetworkLevel } from '@/constants';
 
 export function useRegistryDataRefresh() {
-  const [chainRegistry, setChainRegistry] = useAtom(chainRegistryAtom);
+  const [chainRegistry, setChainRegistry] = useAtom(subscribedChainRegistryAtom);
   const [isFetchingRegistry, setIsFetchingRegistry] = useAtom(isFetchingRegistryDataAtom);
   const userAccount = useAtomValue(userAccountAtom);
 
   const refreshRegistry = async () => {
     console.group('[Registry] Starting registry refresh process');
-    console.log('Initial state - isFetchingRegistry:', isFetchingRegistry);
-    console.log('Initial chainRegistry:', chainRegistry);
-    console.log('User account present:', !!userAccount);
+    console.log('[Registry] Initial state - isFetchingRegistry:', isFetchingRegistry);
+    console.log('[Registry] Initial chainRegistry:', chainRegistry);
+    console.log('[Registry] User account present:', !!userAccount);
 
     setIsFetchingRegistry(true);
 
     let fallbackRegistry = LOCAL_CHAIN_REGISTRY;
-    console.log('Default fallback registry set:', fallbackRegistry);
+    console.log('[Registry] Default fallback registry set:', fallbackRegistry);
 
     try {
       console.log('[Registry] Attempting to get stored registry...');
       const storedRegistry = getStoredChainRegistry();
-      console.log('Stored registry found:', !!storedRegistry);
+      console.log('[Registry] Stored registry found:', !!storedRegistry);
 
       if (storedRegistry) {
         console.group('[Registry] Processing stored registry');
-        console.log('Raw stored registry data:', storedRegistry.data);
+        console.log('[Registry] Raw stored registry data:', storedRegistry.data);
 
         const filteredMainnet = userAccount
           ? filterChainRegistryToSubscriptions(
@@ -50,14 +50,20 @@ export function useRegistryDataRefresh() {
             )
           : storedRegistry.data.testnet;
 
-        console.log('Mainnet chains after filtering:', Object.keys(filteredMainnet).length);
-        console.log('Testnet chains after filtering:', Object.keys(filteredTestnet).length);
+        console.log(
+          '[Registry] Mainnet chains after filtering:',
+          Object.keys(filteredMainnet).length,
+        );
+        console.log(
+          '[Registry] Testnet chains after filtering:',
+          Object.keys(filteredTestnet).length,
+        );
 
         fallbackRegistry = {
           mainnet: filteredMainnet,
           testnet: filteredTestnet,
         };
-        console.log('New fallback registry:', fallbackRegistry);
+        console.log('[Registry] New fallback registry:', fallbackRegistry);
         console.groupEnd();
       } else {
         console.warn('[Registry] No stored registry found, using fallback LOCAL_CHAIN_REGISTRY');
@@ -77,7 +83,7 @@ export function useRegistryDataRefresh() {
             await fetchAndStoreChainRegistry();
 
             const updatedRegistry = getStoredChainRegistry();
-            console.log('Updated registry retrieved:', !!updatedRegistry);
+            console.log('[Registry] Updated registry retrieved:', !!updatedRegistry);
 
             if (updatedRegistry) {
               console.group('[Registry] Processing updated registry');
@@ -133,6 +139,6 @@ export function useRegistryDataRefresh() {
   return {
     refreshRegistry,
     isFetchingRegistry,
-    chainRegistry,
+    subscribedChainRegistry: chainRegistry,
   };
 }
