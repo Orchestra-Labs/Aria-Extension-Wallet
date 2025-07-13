@@ -8,7 +8,7 @@ import {
   GREATER_EXPONENT_DEFAULT,
   QueryType,
   SYMPHONY_MAINNET_ID,
-  LOCAL_MAINNET_ASSET_REGISTRY,
+  SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { chainRegistryAtom, receiveStateAtom, sendStateAtom } from '@/atoms';
 import { isValidSwap, queryRestNode } from '@/helpers';
@@ -50,7 +50,7 @@ export function useExchangeRate() {
 
       // Format the offer amount to the smallest unit
       const exponent =
-        LOCAL_MAINNET_ASSET_REGISTRY[sendAsset]?.exponent || GREATER_EXPONENT_DEFAULT;
+        SYMPHONY_MAINNET_ASSET_REGISTRY[sendAsset]?.exponent || GREATER_EXPONENT_DEFAULT;
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
 
       if (!restUris.length) {

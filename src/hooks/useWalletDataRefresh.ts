@@ -1,42 +1,54 @@
 import { isFetchingWalletDataAtom, chainRegistryAtom, networkLevelAtom } from '@/atoms';
 import { fetchWalletAssets } from '@/helpers';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { Wallet } from '@/types';
 import { sessionWalletAtom, updateChainWalletAtom } from '@/atoms/walletAtom';
+import { userAccountAtom } from '@/atoms';
 
 export function useWalletDataRefresh() {
   const setIsFetchingData = useSetAtom(isFetchingWalletDataAtom);
   const chainRegistry = useAtomValue(chainRegistryAtom);
   const updateChainWallet = useSetAtom(updateChainWalletAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
-
-  const sessionWallet = useAtomValue(sessionWalletAtom) as {
-    name: string;
-    encryptedMnemonic: string;
-    chainWallets: Record<string, Wallet>;
-  };
+  const userAccount = useAtomValue(userAccountAtom);
+  const sessionWallet = useAtomValue(sessionWalletAtom);
 
   const refreshWalletAssets = async () => {
     setIsFetchingData(true);
 
     try {
+      if (!userAccount || !sessionWallet || Object.keys(sessionWallet.chainWallets).length === 0) {
+        console.warn('[refreshWallet] Cannot refresh - missing user account or session wallet');
+        return;
+      }
+
+      const hasAddresses = Object.values(sessionWallet.chainWallets).some(w => w.address);
+      if (!hasAddresses) {
+        console.warn('[refreshWallet] Cannot refresh - no wallet addresses available');
+        return;
+      }
+
+      // Get all chains for the current network level
+      const currentNetworkChains = chainRegistry[networkLevel];
+      const chainSubscriptions = userAccount.settings.chainSubscriptions;
+      const networkSubscriptions = userAccount.settings.chainSubscriptions[networkLevel];
+
       console.log(
         `[refreshWallet] Refreshing for ${networkLevel} chains:`,
-        Object.keys(chainRegistry[networkLevel]),
+        Object.keys(currentNetworkChains),
       );
 
-      for (const [chainId, wallet] of Object.entries(sessionWallet.chainWallets)) {
-        console.log(`[refreshWallet] Checking wallet for ${chainId}`);
+      // Iterate through all chains in the current network level
+      for (const [chainId, chainInfo] of Object.entries(currentNetworkChains)) {
+        const wallet = sessionWallet.chainWallets[chainId];
+
         if (!wallet?.address) {
-          console.log(`[refreshWallet] No address for ${chainId}, skipping`);
+          // console.log(`[refreshWallet] No wallet address for ${chainId}, skipping`);
           continue;
         }
 
-        const chainInfo = chainRegistry[networkLevel][chainId];
-        if (!chainInfo) {
-          console.warn(`[refreshWallet] No chain info for ${chainId}`);
-          continue;
-        }
+        // Get subscribed denoms for this chain
+        const subscribedDenoms = networkSubscriptions[chainId] || [];
+        console.log(`[refreshWallet] Subscribed denoms for ${chainId}:`, subscribedDenoms);
 
         console.log(`[refreshWallet] Fetching assets for ${chainId}`);
         console.log(`[refreshWallet] Chain details:`, {
@@ -45,18 +57,22 @@ export function useWalletDataRefresh() {
           assets: Object.keys(chainInfo.assets || {}),
         });
 
-        const assets = await fetchWalletAssets(
-          wallet.address,
-          chainId,
-          [],
-          chainRegistry[networkLevel],
-        );
+        try {
+          const assets = await fetchWalletAssets(
+            wallet.address,
+            chainId,
+            chainSubscriptions,
+            currentNetworkChains,
+          );
 
-        if (assets.length > 0) {
-          console.log(`[refreshWallet] Found assets for ${chainId}:`, assets);
-          updateChainWallet({ chainId, assets });
-        } else {
-          console.warn(`[refreshWallet] No assets found for ${chainId}`);
+          if (assets.length > 0) {
+            console.log(`[refreshWallet] Found assets for ${chainId}:`, assets);
+            updateChainWallet({ chainId, assets });
+          } else {
+            console.log(`[refreshWallet] No assets found for ${chainId}`);
+          }
+        } catch (error) {
+          console.error(`[refreshWallet] Error fetching assets for ${chainId}:`, error);
         }
       }
     } catch (error) {

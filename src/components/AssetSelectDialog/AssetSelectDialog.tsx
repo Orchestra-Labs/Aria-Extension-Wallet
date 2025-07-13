@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
-import { LogoIcon } from '@/assets/icons';
+import { IconContainer, LogoIcon } from '@/assets/icons';
 import { Asset } from '@/types';
 import { SortDialog } from '../SortDialog';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -9,10 +8,14 @@ import {
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
   dialogSearchTermAtom,
+  filteredDialogAssetsAtom,
+  filteredExchangeAssetsAtom,
   receiveStateAtom,
   sendStateAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
+import { AssetScroller } from '../AssetScroller';
+import { AssetSortType, SearchType, SortOrder, SYMPHONY_MAINNET_ASSET_REGISTRY } from '@/constants';
 
 interface AssetSelectDialogProps {
   isReceiveDialog?: boolean;
@@ -25,17 +28,38 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
 }) => {
   const slideTrayRef = useRef<{ closeWithAnimation: () => void }>(null);
 
+  const currentStateAtomSource = isReceiveDialog ? receiveStateAtom : sendStateAtom;
+  const filteredAssetsAtomSource = isReceiveDialog
+    ? filteredExchangeAssetsAtom
+    : filteredDialogAssetsAtom;
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(assetDialogSortOrderAtom);
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
-  const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
+  const currentState = useAtomValue(currentStateAtomSource);
+  const filteredAssets = useAtomValue(filteredAssetsAtomSource);
 
   const [dialogSelectedAsset, setDialogSelectedAsset] = useState(currentState.asset);
 
+  const searchType = SearchType.ASSET;
+
+  const alt = dialogSelectedAsset.symbol || 'Unknown Asset';
+  const logo = dialogSelectedAsset.logo || SYMPHONY_MAINNET_ASSET_REGISTRY.note.logo;
+  const icon = (
+    <LogoIcon
+      className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
+      width={20}
+    />
+  );
+  const triggerComponent = logo ? (
+    <IconContainer src={logo} alt={alt} className="h-7 w-7" />
+  ) : (
+    <IconContainer icon={icon} alt={alt} className="h-7 w-7" />
+  );
+
   const resetDefaults = () => {
     setSearchTerm('');
-    setSortOrder('Desc');
-    setSortType('name');
+    setSortOrder(SortOrder.DESC);
+    setSortType(AssetSortType.NAME);
   };
 
   useEffect(() => {
@@ -50,21 +74,7 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
   return (
     <SlideTray
       ref={slideTrayRef}
-      triggerComponent={
-        dialogSelectedAsset.logo ? (
-          <img
-            src={dialogSelectedAsset.logo}
-            alt={dialogSelectedAsset.symbol || 'Unknown Asset'}
-            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
-            width={20}
-          />
-        ) : (
-          <LogoIcon
-            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
-            width={20}
-          />
-        )
-      }
+      triggerComponent={triggerComponent}
       title={isReceiveDialog ? 'Receive' : 'Send'}
       onClose={resetDefaults}
       showBottomBorder
@@ -76,19 +86,18 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
             Selected: <span className="text-blue">{dialogSelectedAsset.symbol || 'None'}</span>
           </div>
           <div className="flex justify-end w-[5rem]">
-            <SortDialog isDialog />
+            <SortDialog searchType={searchType} isDialog />
           </div>
         </div>
 
-        <TileScroller
-          activeIndex={0}
+        <AssetScroller
+          assets={filteredAssets}
           isSelectable={true}
-          onSelectAsset={handleAssetSelection}
-          isDialog={true}
+          onClick={handleAssetSelection}
           isReceiveDialog={isReceiveDialog}
         />
 
-        <SearchBar isDialog />
+        <SearchBar searchType={searchType} isDialog />
       </div>
     </SlideTray>
   );

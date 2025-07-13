@@ -1,4 +1,5 @@
-import { DEFAULT_MAINNET_ASSET, SYMPHONY_MAINNET_ID } from './default';
+import { SYMPHONY_MAINNET_ID } from './default';
+import { DEFAULT_MAINNET_ASSET } from './localRegistry';
 
 export const defaultSendState = {
   asset: DEFAULT_MAINNET_ASSET,

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
   NetworkLevel,
   STORED_DATA_TIMEOUT,
   SYMPHONY_MAINNET_ID,
@@ -13,6 +14,7 @@ import {
   LocalChainRegistry,
   Asset,
   Uri,
+  FeeToken,
 } from '@/types';
 
 // TODO: also pull IBC information
@@ -449,6 +451,11 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
     for (const registryKey of Object.keys(chainFiles)) {
       const entry = chainFiles[registryKey];
       if (entry['chain.json']) {
+        if (entry['chain.json'].status !== 'live') {
+          console.log(`[ChainRegistry] Skipping non-live chain: ${entry['chain.json'].chain_id}]`);
+          continue;
+        }
+
         // Try to get assets from GitHub chain registry first
         let assets: Record<string, Asset> = {};
         if (entry['assetlist.json']) {
@@ -531,56 +538,66 @@ export const getChainsByNetworkType = (
 export const filterChainRegistryToSubscriptions = (
   registry: LocalChainRegistry,
   account: AccountRecord,
+  networkLevel: NetworkLevel,
 ): LocalChainRegistry => {
-  const subscriptions = account.settings.chainSubscriptions;
-  console.log('[ChainRegistry] account subscriptions:', JSON.stringify(subscriptions));
-  console.log('[ChainRegistry] registry chains:', Object.keys(registry));
+  const subscriptions =
+    networkLevel === NetworkLevel.MAINNET
+      ? account.settings.chainSubscriptions.mainnet
+      : account.settings.chainSubscriptions.testnet;
 
   const result: LocalChainRegistry = {};
 
   for (const chainID in subscriptions) {
-    const assets = subscriptions[chainID];
-    console.log(`[ChainRegistry] Processing chainID: ${chainID}`);
-    console.log(`[ChainRegistry] Looking for assets:`, assets);
+    const wantedDenoms = subscriptions[chainID];
+    const match = registry[chainID];
 
-    // Case-insensitive search
-    const match = Object.values(registry).find(c => {
-      const matchFound = c.chain_id.trim().toLowerCase() === chainID.trim().toLowerCase();
-      // console.log(`[ChainRegistry] Comparing:
-      //   Registry chain_id: ${c.chain_id}
-      //   Looking for: ${chainID}
-      //   Match: ${matchFound}`);
-      return matchFound;
-    });
+    if (!match) continue;
 
-    if (match) {
-      console.log(`[ChainRegistry] Found match for ${chainID}:`, match.chain_id);
-      // console.log(`[ChainRegistry] Available assets in match:`, Object.keys(match.assets || {}));
+    const filteredAssets = Object.fromEntries(
+      Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
+    );
 
-      const filteredAssets = Object.fromEntries(
-        Object.entries(match.assets || {}).filter(([denom]) => {
-          const included = assets.includes(denom);
-          // console.log(`[ChainRegistry] Checking asset ${denom}: ${included}`);
-          return included;
-        }),
-      );
-
-      // console.log(`[ChainRegistry] Filtered assets:`, Object.keys(filteredAssets));
-
-      result[match.chain_id] = {
-        ...match,
-        assets: filteredAssets,
-      };
-    } else {
-      console.warn(`[ChainRegistry] No match found for chainID: ${chainID}`);
-      console.log(
-        `[ChainRegistry] Available chain_ids:`,
-        Object.values(registry).map(c => c.chain_id),
-      );
-    }
+    result[chainID] = {
+      ...match,
+      assets: filteredAssets,
+    };
   }
 
   return result;
+};
+
+const normalizeFeeTokens = (raw: any): FeeToken[] => {
+  if (raw.fees?.fee_tokens) {
+    return raw.fees.fee_tokens.map((t: any) => {
+      return {
+        denom: t.denom,
+        gasPriceStep: t.gasPriceStep || DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
+      };
+    });
+  }
+
+  if (raw.feeCurrencies) {
+    return raw.feeCurrencies.map((f: any) => ({
+      denom: f.coinMinimalDenom,
+      gasPriceStep: f.gasPriceStep || DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
+    }));
+  }
+
+  return [];
+};
+
+const normalizeStakingDenoms = (raw: any): string[] => {
+  // Handle Cosmos Hub format
+  if (Array.isArray(raw.staking?.staking_tokens)) {
+    return raw.staking.staking_tokens.map((t: any) => t.denom).filter(Boolean);
+  }
+
+  // Handle Keplr format
+  if (raw.stakeCurrency?.coinMinimalDenom) {
+    return [raw.stakeCurrency.coinMinimalDenom];
+  }
+
+  return [];
 };
 
 export const extractChainInfo = (raw: any, assets?: Record<string, Asset>): SimplifiedChainInfo => {
@@ -593,14 +610,14 @@ export const extractChainInfo = (raw: any, assets?: Record<string, Asset>): Simp
 
   return {
     chain_name: raw.chain_name,
-    status: raw.status,
+    status: raw.status || 'unknown',
     network_level: networkLevel,
     pretty_name: raw.pretty_name,
     chain_type: raw.chain_type,
     chain_id: raw.chain_id,
     bech32_prefix: raw.bech32_prefix,
-    fees: raw.fees,
-    staking: raw.staking,
+    fees: normalizeFeeTokens(raw),
+    staking_denoms: normalizeStakingDenoms(raw),
     rpc_uris: raw.apis?.rpc?.map(createUriFromApi) || [],
     rest_uris: raw.apis?.rest?.map(createUriFromApi) || [],
     logo_uri: raw.logo_URIs?.png || raw.images?.find((img: any) => !!img.png)?.png || null,

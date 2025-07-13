@@ -1,16 +1,3 @@
-export enum ValidatorStatusFilter {
-  STATUS_ACTIVE,
-  STATUS_NON_JAILED,
-  STATUS_ALL,
-}
-
-export enum BondStatus {
-  UNSPECIFIED = 'BOND_STATUS_UNSPECIFIED',
-  UNBONDED = 'BOND_STATUS_UNBONDED',
-  UNBONDING = 'BOND_STATUS_UNBONDING',
-  BONDED = 'BOND_STATUS_BONDED',
-}
-
 // TODO: add send and swap?  or keep as validator actions?
 export enum TransactionType {
   STAKE = 'Stake',
@@ -23,15 +10,6 @@ export enum TextFieldStatus {
   ERROR = 'error',
   WARN = 'warn',
   GOOD = 'good',
-}
-
-export enum ValidatorSortType {
-  NAME = 'name',
-  DELEGATION = 'delegation',
-  REWARDS = 'rewards',
-  APR = 'apr',
-  VOTING_POWER = 'votingPower',
-  UPTIME = 'uptime',
 }
 
 export enum IBCConnectionState {

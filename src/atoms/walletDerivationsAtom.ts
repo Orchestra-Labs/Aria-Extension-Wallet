@@ -25,7 +25,7 @@ export const subscribedAssetsAtom = atom(get => {
 
   console.log(`[subscribedAssetsAtom] Building for ${networkLevel}`);
 
-  if (!userAccount?.settings.chainSubscriptions) {
+  if (!userAccount?.settings.chainSubscriptions[networkLevel]) {
     console.log('[subscribedAssetsAtom] No chain subscriptions found');
     return [];
   }
@@ -49,14 +49,16 @@ export const subscribedAssetsAtom = atom(get => {
 
   // Create Set of subscribed denoms for IBC checking
   const subscribedDenoms = new Set(
-    Object.values(userAccount.settings.chainSubscriptions).flatMap(denoms => denoms),
+    Object.values(userAccount.settings.chainSubscriptions[networkLevel]).flatMap(denoms => denoms),
   );
 
   const subscribedAssets: Asset[] = [];
   const currentChains = chainRegistry[networkLevel];
 
   // Process 1: Registry assets (for zero-balance native assets)
-  for (const [networkID, denoms] of Object.entries(userAccount.settings.chainSubscriptions)) {
+  for (const [networkID, denoms] of Object.entries(
+    userAccount.settings.chainSubscriptions[networkLevel],
+  )) {
     const chainInfo = currentChains[networkID];
     if (!chainInfo) continue;
 

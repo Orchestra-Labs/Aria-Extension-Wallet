@@ -1,8 +1,155 @@
-import { LOCAL_CHAIN_REGISTRY } from '@/constants';
-import { LocalChainRegistry } from '@/types';
+import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, SettingsOption } from '@/constants';
+import { Asset, LocalChainRegistry, SubscriptionRecord } from '@/types';
 import { atom } from 'jotai';
+import {
+  assetSortOrderAtom,
+  assetSortTypeAtom,
+  chainSortOrderAtom,
+  searchTermAtom,
+} from './searchFilterAtom';
+import { networkLevelAtom } from './networkLevelAtom';
+import { filterAndSortAssets, filterAndSortChains, getStoredChainRegistry } from '@/helpers';
+import { userAccountAtom } from './accountAtom';
+
+const EMPTY_CHAIN_REGISTRY = { mainnet: {}, testnet: {} };
 
 export const chainRegistryAtom = atom<{
   mainnet: LocalChainRegistry;
   testnet: LocalChainRegistry;
 }>(LOCAL_CHAIN_REGISTRY);
+
+export const fullChainRegistryAtom = atom<{
+  mainnet: LocalChainRegistry;
+  testnet: LocalChainRegistry;
+}>(LOCAL_CHAIN_REGISTRY);
+
+export const loadFullRegistryAtom = atom(null, (_, set) => {
+  const storedRegistry = getStoredChainRegistry();
+  if (storedRegistry) {
+    set(fullChainRegistryAtom, storedRegistry.data);
+  }
+});
+
+export const unloadFullRegistryAtom = atom(null, (_, set) => {
+  console.log('[ChainRegistryAtom] Unloading full registry - resetting to EMPTY_CHAIN_REGISTRY');
+  set(fullChainRegistryAtom, EMPTY_CHAIN_REGISTRY);
+});
+
+export const subscriptionSelectionsAtom = atom<SubscriptionRecord>(DEFAULT_SUBSCRIPTION);
+
+// Helper atoms for derived states
+export const selectedChainIdsAtom = atom(get => {
+  const networkLevel = get(networkLevelAtom);
+  const subscriptionSelections = get(subscriptionSelectionsAtom);
+  return Object.keys(subscriptionSelections[networkLevel]);
+});
+
+export const allAssetsFromSubscribedChainsAtom = atom<Asset[]>(get => {
+  const networkLevel = get(networkLevelAtom);
+  const subscriptionSelections = get(subscriptionSelectionsAtom)[networkLevel];
+  const chainRegistry = get(fullChainRegistryAtom)[networkLevel];
+
+  const allAssets: Asset[] = [];
+
+  for (const chainId of Object.keys(subscriptionSelections)) {
+    const chain = chainRegistry[chainId];
+    if (chain?.assets) {
+      allAssets.push(...Object.values(chain.assets));
+    }
+  }
+
+  return allAssets;
+});
+
+export const selectedCoinListAtom = atom<Asset[]>(get => {
+  const networkLevel = get(networkLevelAtom);
+  const subscriptionSelections = get(subscriptionSelectionsAtom)[networkLevel];
+  const allAssets = get(allAssetsFromSubscribedChainsAtom);
+
+  return allAssets.filter(asset => {
+    const selectedDenoms = subscriptionSelections[asset.networkID] || [];
+    return selectedDenoms.includes(asset.denom);
+  });
+});
+
+export const addCoinToChainAtom = atom(null, (get, set, { chainId, denom }) => {
+  const networkLevel = get(networkLevelAtom);
+  const current = get(subscriptionSelectionsAtom);
+  const updated = {
+    ...current,
+    [networkLevel]: {
+      ...current[networkLevel],
+      [chainId]: [...(current[networkLevel][chainId] || []), denom],
+    },
+  };
+  set(subscriptionSelectionsAtom, updated);
+});
+
+export const removeCoinFromChainAtom = atom(null, (get, set, { chainId, denom }) => {
+  const networkLevel = get(networkLevelAtom);
+  const current = get(subscriptionSelectionsAtom);
+  const currentDenoms = current[networkLevel][chainId] || [];
+  const updatedDenoms = currentDenoms.filter(d => d !== denom);
+
+  const updatedChains =
+    updatedDenoms.length === 0
+      ? Object.fromEntries(Object.entries(current[networkLevel]).filter(([id]) => id !== chainId))
+      : {
+          ...current[networkLevel],
+          [chainId]: updatedDenoms,
+        };
+
+  set(subscriptionSelectionsAtom, {
+    ...current,
+    [networkLevel]: updatedChains,
+  });
+});
+
+export const setChainCoinsAtom = atom(null, (get, set, { chainId, denoms }) => {
+  const networkLevel = get(networkLevelAtom);
+  const current = get(subscriptionSelectionsAtom);
+  set(subscriptionSelectionsAtom, {
+    ...current,
+    [networkLevel]: {
+      ...current[networkLevel],
+      [chainId]: denoms,
+    },
+  });
+});
+
+export const filteredChainAssetsAtom = atom(get => {
+  const allAssets = get(allAssetsFromSubscribedChainsAtom);
+  const searchTerm = get(searchTermAtom);
+  const sortType = get(assetSortTypeAtom);
+  const sortOrder = get(assetSortOrderAtom);
+  const userAccount = get(userAccountAtom);
+  const testnetAccessEnabled = userAccount?.settings[SettingsOption.TESTNET_ACCESS] || false;
+
+  // Filter out testnet assets if testnet access is disabled
+  const filteredAssets = testnetAccessEnabled
+    ? allAssets
+    : allAssets.filter(asset => {
+        const chain = get(fullChainRegistryAtom).mainnet[asset.networkID];
+        return chain !== undefined; // Only include assets from mainnet chains
+      });
+
+  return filterAndSortAssets(filteredAssets, searchTerm, sortType, sortOrder);
+});
+
+export const filteredChainRegistryAtom = atom(get => {
+  const chainRegistry = get(fullChainRegistryAtom);
+  const searchTerm = get(searchTermAtom);
+  const sortOrder = get(chainSortOrderAtom);
+  const networkLevel = get(networkLevelAtom);
+  const subscriptionSelections = get(subscriptionSelectionsAtom);
+
+  // Get subscribed chain IDs for the current network level
+  const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
+
+  const chains = Object.values(chainRegistry[networkLevel]).map(chain => ({
+    ...chain,
+    isSubscribed: subscribedChainIds.includes(chain.chain_id),
+  }));
+
+  return filterAndSortChains(chains, searchTerm, sortOrder);
+});

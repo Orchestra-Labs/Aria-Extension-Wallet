@@ -1,3 +1,7 @@
+export const safeTrimLowerCase = (str: string | undefined): string => {
+  return (str || '').trim().toLowerCase();
+};
+
 export const removeTrailingZeroes = (num: string | number): string => {
   const numberString = String(num);
   const cleanedNumber = parseFloat(numberString).toString();

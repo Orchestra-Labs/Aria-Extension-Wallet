@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DEFAULT_MAINNET_ASSET, LOCAL_MAINNET_ASSET_REGISTRY, ROUTES } from '@/constants';
+import { DEFAULT_MAINNET_ASSET, SYMPHONY_MAINNET_ASSET_REGISTRY, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -14,6 +14,7 @@ import {
   receiveStateAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
+import { IconContainer } from '@/assets/icons';
 
 interface AssetTileProps {
   asset: Asset;
@@ -39,19 +40,21 @@ export const AssetTile = ({
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
 
-  const isEditPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
+  const isChainSubscriptionsPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
+  const title = asset.name || asset.symbol || 'Unknown Asset';
   const symbol = asset.symbol || DEFAULT_MAINNET_ASSET.symbol || 'MLD';
   const denom = asset.denom || 'Unknown Denom';
-  const logo = asset.logo || LOCAL_MAINNET_ASSET_REGISTRY.note.logo;
+  const logo = asset.logo || SYMPHONY_MAINNET_ASSET_REGISTRY.note.logo;
 
-  const subtitle = isEditPage ? denom : asset.networkName || 'Unknown Network';
+  const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);
+  const subtitle = isChainSubscriptionsPage ? symbol : network || 'Unknown Network';
 
   let value = '';
-  if (isEditPage) {
-    value = asset.networkName || 'Unknown Network';
+  if (isChainSubscriptionsPage) {
+    value = network || 'Unknown Network';
   } else if (isReceivePage) {
     const sendState = useAtomValue(sendStateAtom);
     const unitSymbol = sendState.asset.symbol || 'MLD';
@@ -82,10 +85,10 @@ export const AssetTile = ({
 
   const scrollTile = (
     <ScrollTile
-      title={symbol}
+      title={title}
       subtitle={subtitle}
       value={value}
-      icon={<img src={logo} alt={symbol} />}
+      icon={<IconContainer src={logo} alt={symbol} />}
       selected={isSelectable ? isSelected : undefined}
       onClick={isSelectable ? handleClick : undefined}
     />
@@ -94,24 +97,28 @@ export const AssetTile = ({
   return isSelectable ? (
     scrollTile
   ) : (
-    <SlideTray triggerComponent={<div>{scrollTile}</div>} title={symbol} showBottomBorder>
+    <SlideTray triggerComponent={<div>{scrollTile}</div>} title={title} showBottomBorder>
       <div className="text-center mb-2">
         <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
           Amount: <span className="text-blue">{value}</span>
         </div>
         <span className="text-grey-dark text-xs text-base">
-          Current Chain: <span className="text-blue">{asset.networkName}</span>
+          Current Chain: <span className="text-blue">{network}</span>
         </span>
       </div>
 
       <div className="mb-4 min-h-[7.5rem] max-h-[7.5rem] overflow-hidden shadow-md bg-black p-2">
         <p>
+          <strong>Name: </strong>
+          {title}
+        </p>
+        <p>
           <strong>Ticker: </strong>
-          {asset.symbol}
+          {symbol}
         </p>
         <p>
           <strong>Sub-unit: </strong>
-          {asset.denom}
+          {denom}
         </p>
       </div>
 

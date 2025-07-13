@@ -399,22 +399,40 @@ export const fetchValidatorData = async (
   chainID: string,
   delegatorAddress: string,
 ): Promise<CombinedStakingInfo[]> => {
+  console.log(`[ValidatorData] Starting fetch for chain: ${chainID}`);
+  console.log(`[ValidatorData] Delegator address: ${delegatorAddress}`);
+
   try {
+    console.log(`[ValidatorData] Chain Registry details:`, chainRegistry);
     const chain = chainRegistry[chainID];
     const { bech32_prefix: prefix, rest_uris: restUris } = chain;
-    const symphonyRestUris = chainRegistry[SYMPHONY_MAINNET_ID].rest_uris;
 
     if (!chain) {
+      console.error(`[ValidatorData] Chain ${chainID} not found in registry`);
       throw new Error(`Chain ${chainID} not found in registry`);
     }
+
+    console.log(`[ValidatorData] Chain details - prefix: ${prefix}, REST URIs:`, restUris);
+
     if (!prefix) {
+      console.error(`[ValidatorData] Missing bech32_prefix for chain ${chainID}`);
       throw new Error(`Missing bech32_prefix for chain ${chainID}`);
     }
     if (!restUris?.length) {
+      console.error(`[ValidatorData] Missing rest_uris for chain ${chainID}`);
       throw new Error(`Missing rest_uris for chain ${chainID}`);
     }
 
     const isSymphony = isSymphonyChain(chainID);
+    console.log(`[ValidatorData] Is Symphony chain: ${isSymphony}`);
+
+    if (isSymphony) {
+      const symphonyRestUris = chain.rest_uris;
+      console.log(`[ValidatorData] Symphony REST URIs:`, symphonyRestUris);
+    }
+
+    console.log(`[ValidatorData] Starting parallel queries for chain ${chainID}`);
+    const startTime = Date.now();
 
     const [
       { validators },
@@ -435,15 +453,21 @@ export const fetchValidatorData = async (
       fetchUnbondingDelegations(prefix, restUris, delegatorAddress),
       fetchCommunityTax(prefix, restUris),
       fetchBondedRatio(prefix, restUris),
-      isSymphony ? fetchSymphonyInflation(symphonyRestUris) : Promise.resolve(0),
+      isSymphony ? fetchSymphonyInflation(restUris) : Promise.resolve(0),
       isSymphony ? fetchAllSigningInfos(prefix, restUris) : Promise.resolve([]),
       isSymphony ? fetchSignedBlocksWindow(prefix, restUris) : Promise.resolve(10000),
     ]);
 
+    console.log(
+      `[ValidatorData] Completed queries for chain ${chainID} in ${Date.now() - startTime}ms`,
+    );
+    console.log(`[ValidatorData] Found ${validators.length} validators`);
+
     const totalTokens = validators.reduce((sum, v) => sum + parseFloat(v.tokens), 0);
     const uptimeMap = buildUptimeMap(validators, signingInfos, signedBlocksWindow);
 
-    return validators.map(validator => {
+    console.log(`[ValidatorData] Processing validator data for chain ${chainID}`);
+    const result = validators.map(validator => {
       const validatorAddress = validator.operator_address;
 
       const delegation = delegations.find(d => d.delegation.validator_address === validatorAddress);
@@ -485,8 +509,11 @@ export const fetchValidatorData = async (
         unbondingBalance,
       };
     });
+
+    console.log(`[ValidatorData] Successfully processed data for chain ${chainID}`);
+    return result;
   } catch (error) {
-    console.error('Error fetching validator data:', error);
+    console.error(`[ValidatorData] Error fetching data for chain ${chainID}:`, error);
     throw error;
   }
 };

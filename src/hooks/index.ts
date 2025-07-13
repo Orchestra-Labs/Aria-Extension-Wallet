@@ -1,4 +1,5 @@
 export { useDebounce } from './useDebounce';
+export * from './useAddressGenerator';
 export * from './useExchangeAssets';
 export * from './useExchangePoolBalance';
 export * from './useExchangeRate';
@@ -9,6 +10,7 @@ export * from './useInactivityCheck';
 export * from './useInitializeWalletConnect';
 export * from './useLogout';
 export * from './useRefreshData';
+export * from './useRegistryDataRefresh';
 export * from './useReservePoolBalance';
 export * from './useSupportedWCNamespaces';
 export * from './useToast';

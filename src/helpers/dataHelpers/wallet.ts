@@ -2,7 +2,7 @@ import { Secp256k1HdWallet } from '@cosmjs/amino';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 
 import { SYMPHONY_PREFIX } from '@/constants';
-import { SubscriptionRecord, WalletRecord } from '@/types';
+import { NetworkSubscriptionRecord, WalletRecord } from '@/types';
 
 import { generateUUID } from '../uuid';
 import { encryptMnemonic } from './crypto';
@@ -100,18 +100,16 @@ export async function createAminoSignerByPrefix(
 
 export async function getAddressesByChainPrefix(
   mnemonic: string,
-  subscriptions: SubscriptionRecord,
+  subscriptions: NetworkSubscriptionRecord,
   chainPrefixes: Record<string, string>,
 ): Promise<Record<string, string>> {
   const addressMap: Record<string, string> = {};
 
   for (const chainId of Object.keys(subscriptions)) {
-    console.log('[Wallet] Passed prefixes', chainPrefixes);
     const prefix = chainPrefixes[chainId];
     if (!prefix) continue;
 
     const address = await getAddressByChainPrefix(mnemonic, prefix);
-    console.log('[Wallet] Created address', address, 'for chain', chainId, 'with prefix', prefix);
     addressMap[chainId] = address;
   }
 

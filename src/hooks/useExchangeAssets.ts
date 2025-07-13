@@ -6,7 +6,7 @@ import {
   QueryType,
   SYMPHONY_MAINNET_ID,
   DEFAULT_MAINNET_ASSET,
-  LOCAL_MAINNET_ASSET_REGISTRY,
+  SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
@@ -102,7 +102,7 @@ export const useExchangeAssets = () => {
         const { denom, amount } = requirement.base_currency;
 
         const registryAsset =
-          LOCAL_MAINNET_ASSET_REGISTRY[denom] ||
+          SYMPHONY_MAINNET_ASSET_REGISTRY[denom] ||
           Object.values(chainInfo?.assets || {}).find(
             (a: Asset) => a.denom === denom || a.symbol === denom,
           );
@@ -139,14 +139,14 @@ export const useExchangeAssets = () => {
         } as Asset;
       });
 
-      console.log('exchange assets', exchangeAssets);
+      console.log('[useExchangeAssets] exchange assets', exchangeAssets);
 
       const additionalAssets = walletAssets.filter(
         (walletAsset: Asset) =>
           !exchangeAssets.some(processed => processed.denom === walletAsset.denom),
       );
 
-      console.log('additional assets', additionalAssets);
+      console.log('[useExchangeAssets] additional assets', additionalAssets);
 
       const mergedAssets = [
         ...exchangeAssets,
@@ -163,11 +163,13 @@ export const useExchangeAssets = () => {
         }),
       ];
 
-      console.log('merged assets', mergedAssets);
+      console.log('[useExchangeAssets] merged assets', mergedAssets);
       setAvailableAssets(mergedAssets);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch exchange assets');
-      console.error('Error fetching exchange assets:', err);
+      setError(
+        err instanceof Error ? err.message : '[useExchangeAssets] Failed to fetch exchange assets',
+      );
+      console.error('[useExchangeAssets] Error fetching exchange assets:', err);
     } finally {
       setIsLoading(false);
     }
@@ -175,12 +177,12 @@ export const useExchangeAssets = () => {
 
   useEffect(() => {
     fetchExchangeAssets();
-  }, []);
+  }, [sendState]);
 
   return {
     availableAssets,
     isLoading,
     error,
-    refetch: fetchExchangeAssets,
+    triggerExchangeAssetRefresh: fetchExchangeAssets,
   };
 };

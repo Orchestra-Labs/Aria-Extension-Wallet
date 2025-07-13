@@ -13,23 +13,28 @@ import {
   validatorDialogSortTypeAtom,
   validatorStatusFilterAtom,
   swiperIndexState,
+  userAccountAtom,
+  chainSortOrderAtom,
 } from '@/atoms';
-import { ValidatorSortType, ValidatorStatusFilter } from '@/constants';
-import { userAccountAtom } from '@/atoms/accountAtom';
+import {
+  AssetSortType,
+  SearchType,
+  SortOrder,
+  ValidatorSortType,
+  ValidatorStatusFilter,
+} from '@/constants';
 
 interface SortDialogProps {
-  isValidatorSort?: boolean;
+  searchType: SearchType;
   isDialog?: boolean;
 }
 
-export const SortDialog: React.FC<SortDialogProps> = ({
-  isValidatorSort = false,
-  isDialog = false,
-}) => {
+export const SortDialog: React.FC<SortDialogProps> = ({ searchType, isDialog = false }) => {
   const userAccount = useAtomValue(userAccountAtom);
   const [validatorStatusFilter, setValidatorStatusFilter] = useAtom(validatorStatusFilterAtom);
+  // TODO: move away from active index
   const activeIndex = useAtomValue(swiperIndexState);
-
+  const [chainSortOrder, setChainSortOrder] = useAtom(chainSortOrderAtom);
   const [assetSortOrder, setAssetSortOrder] = useAtom(
     isDialog ? assetDialogSortOrderAtom : assetSortOrderAtom,
   );
@@ -43,28 +48,60 @@ export const SortDialog: React.FC<SortDialogProps> = ({
     isDialog ? validatorDialogSortTypeAtom : validatorSortTypeAtom,
   );
 
-  const sortOptions = isValidatorSort ? Object.values(ValidatorSortType) : ['name', 'amount'];
+  const sortOptions =
+    searchType === SearchType.VALIDATOR
+      ? Object.values(ValidatorSortType)
+      : searchType === SearchType.ASSET
+        ? ['name', 'amount']
+        : [];
 
-  const setSortOrder = (sortOrder: 'Asc' | 'Desc') => {
-    isValidatorSort ? setValidatorSortOrder(sortOrder) : setAssetSortOrder(sortOrder);
+  const setSortOrder = (sortOrder: SortOrder) => {
+    switch (searchType) {
+      case SearchType.VALIDATOR:
+        setValidatorSortOrder(sortOrder);
+        break;
+      case SearchType.ASSET:
+        setAssetSortOrder(sortOrder);
+        break;
+      case SearchType.CHAIN:
+        setChainSortOrder(sortOrder);
+        break;
+    }
   };
 
   const setSortType = (sortType: string) => {
-    isValidatorSort ? setValidatorSortType(sortType as any) : setAssetSortType(sortType as any);
+    searchType === SearchType.VALIDATOR
+      ? setValidatorSortType(sortType as any)
+      : setAssetSortType(sortType as any);
   };
 
   const resetDefaults = () => {
-    isValidatorSort ? setValidatorSortOrder('Desc') : setAssetSortOrder('Desc');
-    isValidatorSort ? setValidatorSortType(ValidatorSortType.NAME) : setAssetSortType('name');
-    setValidatorStatusFilter(ValidatorStatusFilter.STATUS_ACTIVE);
+    setSortOrder(SortOrder.DESC);
+    if (searchType !== SearchType.CHAIN) {
+      setSortType(searchType === SearchType.ASSET ? AssetSortType.NAME : ValidatorSortType.NAME);
+    }
+    if (searchType === SearchType.VALIDATOR) {
+      setValidatorStatusFilter(ValidatorStatusFilter.STATUS_ACTIVE);
+    }
   };
 
-  const sortOrder = isValidatorSort ? validatorSortOrder : assetSortOrder;
-  const sortType = isValidatorSort ? validatorSortType : assetSortType;
+  const sortOrder =
+    searchType === SearchType.VALIDATOR
+      ? validatorSortOrder
+      : searchType === SearchType.ASSET
+        ? assetSortOrder
+        : chainSortOrder;
+  const sortType = searchType === SearchType.VALIDATOR ? validatorSortType : assetSortType;
 
   const viewValidatorsByStatus = userAccount?.settings.viewValidatorsByStatus;
   const trayHeight =
-    isValidatorSort && viewValidatorsByStatus ? '50%' : activeIndex === 0 ? '45%' : '48%';
+    searchType === SearchType.VALIDATOR && viewValidatorsByStatus
+      ? '50%'
+      : searchType === SearchType.CHAIN
+        ? '39%'
+        : activeIndex === 0
+          ? '45%'
+          : '48%';
 
   return (
     <SlideTray
@@ -87,19 +124,19 @@ export const SortDialog: React.FC<SortDialogProps> = ({
             <div className="flex-1 text-sm">Order:</div>
             <div className="flex items-center">
               <Button
-                variant={sortOrder === 'Asc' ? 'selected' : 'unselected'}
+                variant={sortOrder === SortOrder.ASC ? 'selected' : 'unselected'}
                 size="xsmall"
                 className="px-1 rounded-md text-xs"
-                onClick={() => setSortOrder('Asc')}
+                onClick={() => setSortOrder(SortOrder.ASC)}
               >
                 Asc
               </Button>
               <p className="text-sm px-1">/</p>
               <Button
-                variant={sortOrder === 'Desc' ? 'selected' : 'unselected'}
+                variant={sortOrder === SortOrder.DESC ? 'selected' : 'unselected'}
                 size="xsmall"
                 className="px-1 rounded-md text-xs"
-                onClick={() => setSortOrder('Desc')}
+                onClick={() => setSortOrder(SortOrder.DESC)}
               >
                 Desc
               </Button>
@@ -107,27 +144,29 @@ export const SortDialog: React.FC<SortDialogProps> = ({
           </div>
 
           {/* Sort Type Selection */}
-          <div className="flex justify-between items-start p-2">
-            <div className="text-sm pt-[2px] flex-none">Sort by:</div>
-            <div className="flex flex-wrap justify-center gap-y-1">
-              {sortOptions.map((option, index) => (
-                <div key={option} className="flex items-center">
-                  {index > 0 && <span className="text-sm px-0.5">/</span>}
-                  <Button
-                    variant={sortType === option ? 'selected' : 'unselected'}
-                    size="xsmall"
-                    className="px-1 rounded-md text-xs"
-                    onClick={() => setSortType(option)}
-                  >
-                    {option.charAt(0).toUpperCase() + option.slice(1)}
-                  </Button>
-                </div>
-              ))}
+          {searchType !== SearchType.CHAIN && (
+            <div className="flex justify-between items-start p-2">
+              <div className="text-sm pt-[2px] flex-none">Sort by:</div>
+              <div className="flex flex-wrap justify-center gap-y-1">
+                {sortOptions.map((option, index) => (
+                  <div key={option} className="flex items-center">
+                    {index > 0 && <span className="text-sm px-0.5">/</span>}
+                    <Button
+                      variant={sortType === option ? 'selected' : 'unselected'}
+                      size="xsmall"
+                      className="px-1 rounded-md text-xs"
+                      onClick={() => setSortType(option)}
+                    >
+                      {option.charAt(0).toUpperCase() + option.slice(1)}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Status Filter */}
-          {isValidatorSort && viewValidatorsByStatus && (
+          {searchType === SearchType.VALIDATOR && viewValidatorsByStatus && (
             <div className="flex justify-between items-center p-2">
               <div className="flex-1 text-sm">Filter by Status:</div>
               <div className="flex items-center">

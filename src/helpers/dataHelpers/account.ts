@@ -1,10 +1,15 @@
-import { AccountRecord, SubscriptionRecord, WalletRecord } from '@/types';
+import { AccountRecord, WalletRecord } from '@/types';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { getPasswordRecords, hashPassword, savePasswordHash, updatePassword } from './password';
 import { createWallet } from './wallet';
 import { saveSessionData } from './session';
 import { generateUUID } from '../uuid';
-import { DEFAULT_SUBSCRIPTION, SettingsOption } from '@/constants';
+import {
+  DEFAULT_DENOM,
+  DEFAULT_SUBSCRIPTION,
+  SettingsOption,
+  SYMPHONY_MAINNET_ID,
+} from '@/constants';
 import { decryptMnemonic, encryptMnemonic } from './crypto';
 
 const ACCOUNTS_KEY = 'accountsToken';
@@ -72,7 +77,6 @@ export const createAccount = async (
   mnemonic: string,
   password: string,
   walletName: string,
-  subscriptions: SubscriptionRecord = {},
   persist: boolean = true,
 ): Promise<AccountRecord> => {
   console.log('Creating new account with walletName:', walletName);
@@ -86,15 +90,11 @@ export const createAccount = async (
   const walletRecord = walletInfo.walletRecord;
   console.log('Wallet created and wallet record generated:', walletRecord);
 
-  // Set default network and coin denom based on the first entry in subscriptions, if available
-  const defaultChainID = Object.keys(subscriptions)[0] || '';
-  const defaultCoinDenom = subscriptions[defaultChainID]?.[0] || '';
-
   const newAccount: AccountRecord = {
     id: accountID,
     settings: {
-      defaultChainID,
-      defaultCoinDenom,
+      defaultChainID: SYMPHONY_MAINNET_ID,
+      defaultCoinDenom: DEFAULT_DENOM,
       chainSubscriptions: DEFAULT_SUBSCRIPTION,
       activeWalletID: walletRecord.id,
 

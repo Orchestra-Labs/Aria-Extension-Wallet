@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Asset, CombinedStakingInfo, TransactionResult, Uri } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
-import { LogoIcon } from '@/assets/icons';
+import { IconContainer, LogoIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
 import {
   calculateRemainingTime,
@@ -20,7 +20,7 @@ import {
   DEFAULT_MAINNET_ASSET,
   defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
-  LOCAL_MAINNET_ASSET_REGISTRY,
+  SYMPHONY_MAINNET_ASSET_REGISTRY,
   SYMPHONY_MAINNET_ID,
   TextFieldStatus,
   TransactionType,
@@ -89,7 +89,7 @@ export const ValidatorTile = ({
     combinedStakingInfo;
   const delegationResponse = { delegation, balance };
 
-  const symbol = LOCAL_MAINNET_ASSET_REGISTRY.note.symbol;
+  const symbol = SYMPHONY_MAINNET_ASSET_REGISTRY.note.symbol;
 
   // Aggregating the rewards (sum all reward amounts for this validator)
   const rewardAmount = rewards
@@ -223,12 +223,18 @@ export const ValidatorTile = ({
     }
   }
 
-  const validatorIcon =
-    validator.jailed || validator.status === BondStatus.UNBONDED ? (
-      <AlertCircleIcon className="text-error h-8 w-8" />
-    ) : (
-      <LogoIcon />
-    );
+  const validatorIcon = (
+    <IconContainer
+      alt={title}
+      icon={
+        validator.jailed || validator.status === BondStatus.UNBONDED ? (
+          <AlertCircleIcon className="text-error h-8 w-8" />
+        ) : (
+          <LogoIcon className="w-full h-full" />
+        )
+      }
+    />
+  );
 
   const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
     const walletAssets = walletState?.assets || [];
@@ -308,7 +314,7 @@ export const ValidatorTile = ({
 
       const result = await stakeToValidator(
         isSimulation && amount === '0' ? `${maxAvailable}` : amount,
-        LOCAL_MAINNET_ASSET_REGISTRY.note.denom,
+        SYMPHONY_MAINNET_ASSET_REGISTRY.note.denom,
         walletState.address,
         validator.operator_address,
         prefix,

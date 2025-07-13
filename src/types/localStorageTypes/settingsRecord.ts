@@ -1,7 +1,12 @@
 import { SettingsOption } from '@/constants';
 
-export interface SubscriptionRecord {
+export interface NetworkSubscriptionRecord {
   [chainID: string]: string[];
+}
+
+export interface SubscriptionRecord {
+  mainnet: NetworkSubscriptionRecord;
+  testnet: NetworkSubscriptionRecord;
 }
 
 export interface SettingsRecord {

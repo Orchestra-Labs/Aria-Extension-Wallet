@@ -109,14 +109,9 @@ export const CreateWallet = () => {
   // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
 
-  // TODO: in fetchWalletAssets, use exchange assets for base denom information then clear TODO
   // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
 
-  // TODO: modify default asset selection so when MLD isn't selected, default send and receive are changed
-  // TODO: add tutorial pages to show how to swap and stake
-
-  // TODO: fix edit coin list to show symbol, chain, and name
   // TODO: Add first level of routing (swap to IBC send or IBC to swap)
   // TODO: fix copytextfield issue of enlarged border on click
   // TODO: Add remember me
@@ -145,11 +140,8 @@ export const CreateWallet = () => {
   /* ******************************************************************************************* */
 
   /* Interchain-compatibility TODOs (mobile version before this) */
-  // TODO: abstract wallet prefix and mnemonic decryption
-  // TODO: Add view of additional cosmos chains
   // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
   // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
-  // TODO: add button to "add chain" at bottom of Holdings list
   // TODO: add link to github repo for registry
   // TODO: Add routing
   // TODO: modify claim, restake, and unstake functions to withdraw from all unique delegator addresses

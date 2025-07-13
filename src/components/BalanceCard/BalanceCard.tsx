@@ -33,7 +33,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
-  const balanceDisplayUnit = NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
+  const balanceDisplayUnit =
+    networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;
 

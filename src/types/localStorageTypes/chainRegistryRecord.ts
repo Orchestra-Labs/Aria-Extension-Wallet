@@ -1,5 +1,4 @@
 import { NetworkLevel } from '@/constants';
-import { Asset } from '../types';
 
 export interface Uri {
   address: string;
@@ -13,18 +12,26 @@ export interface GasPriceStep {
 }
 
 export interface FeeToken {
-  coinDenom: string;
-  coinMinimalDenom: string;
-  coinDecimals: number;
+  denom: string;
   gasPriceStep: GasPriceStep;
-  coinImageUrl: string;
 }
 
-export interface StakingToken {
-  coinDenom: string;
-  coinMinimalDenom: string;
-  coinDecimals: number;
-  coinImageUrl: string;
+export interface Asset {
+  denom: string;
+  amount: string;
+  exchangeRate?: string;
+  isIbc: boolean;
+  logo: string;
+  symbol: string;
+  name: string;
+  exponent: number;
+  isFeeToken?: boolean;
+  networkName: string;
+  networkID: string;
+}
+
+export interface AssetRegistry {
+  [key: string]: Asset;
 }
 
 export interface SimplifiedChainInfo {
@@ -36,11 +43,11 @@ export interface SimplifiedChainInfo {
   chain_id: string;
   bech32_prefix: string;
   fees?: FeeToken[];
-  staking?: StakingToken;
+  staking_denoms: string[];
   rpc_uris: Uri[];
   rest_uris: Uri[];
   logo_uri?: string;
-  assets?: Record<string, Asset>;
+  assets?: AssetRegistry;
 }
 
 export interface LocalChainRegistry extends Record<string, SimplifiedChainInfo> {}

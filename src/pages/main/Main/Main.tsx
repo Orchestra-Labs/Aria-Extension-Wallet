@@ -1,11 +1,14 @@
 import { Swiper, SwiperClass, SwiperSlide } from 'swiper/react';
 import 'swiper/swiper-bundle.css';
-import { BalanceCard, SearchBar, SortDialog, TileScroller } from '@/components';
+import { BalanceCard, SearchBar, SortDialog, ValidatorScroller } from '@/components';
 import {
   swiperIndexState,
   showCurrentValidatorsAtom,
   showAllAssetsAtom,
   searchTermAtom,
+  filteredAssetsAtom,
+  filteredValidatorsAtom,
+  showCurrentValsOverrideAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
@@ -13,25 +16,35 @@ import { Button } from '@/ui-kit';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { ChainSubscriptions } from '../ChainSubscriptions';
 import { SwapTutorial } from '../SwapTutorial';
+import { AssetScroller } from '@/components/AssetScroller/AssetScroller';
+import { SearchType } from '@/constants';
 
 export const Main = () => {
   const swiperRef = useRef<SwiperClass | null>(null);
   const totalSlides = 2;
 
   const [activeIndex, setActiveIndex] = useAtom(swiperIndexState);
-  console.log('active index', activeIndex);
   const [showCurrentValidators, setShowCurrentValidators] = useAtom(showCurrentValidatorsAtom);
+  const manualOverride = useAtomValue(showCurrentValsOverrideAtom);
   const [showAllAssets, setShowAllAssets] = useAtom(showAllAssetsAtom);
   const setSearchTerm = useSetAtom(searchTermAtom);
   const userAccount = useAtomValue(userAccountAtom);
+  const filteredAssets = useAtomValue(filteredAssetsAtom);
+  const filteredValidators = useAtomValue(filteredValidatorsAtom);
+
   const routeToVisibilitySelection = !userAccount?.settings.hasSetCoinList;
   const routeToTutorial = !userAccount?.settings.hasViewedTutorial;
+
+  const searchType = activeIndex === 0 ? SearchType.ASSET : SearchType.CHAIN;
+
+  const showCurrentVals = manualOverride !== null ? manualOverride : showCurrentValidators;
 
   const assetViewToggleChange = (shouldShowAllAssets: boolean) => {
     setShowAllAssets(shouldShowAllAssets);
   };
 
   const validatorViewToggleChange = (shouldShowCurrent: boolean) => {
+    // Set the manual override
     setShowCurrentValidators(shouldShowCurrent);
   };
 
@@ -52,9 +65,8 @@ export const Main = () => {
     setSearchTerm('');
   }, [activeIndex]);
 
-  // TODO: make tiles name of chain with dropdown on right side.  coins for that chain are slightly shifted right
+  // TODO: make tiles name of coin with dropdown for subtitle.  coins bridged to other chains are in a dropdown of subtiles
   // TODO: allow search by chain name
-  // TODO: modify editcoinlistscreen to different display for tiles.
 
   // TODO: use routing instead
   if (routeToTutorial) {
@@ -114,7 +126,7 @@ export const Main = () => {
               </Button>
             </div>
             <div className="flex-1 flex justify-end">
-              <SortDialog />
+              <SortDialog searchType={searchType} />
             </div>
           </h3>
         ) : (
@@ -122,7 +134,7 @@ export const Main = () => {
             <span className="flex-1">Validators</span>
             <div className="flex-1 flex justify-center items-center space-x-2">
               <Button
-                variant={showCurrentValidators ? 'selected' : 'unselected'}
+                variant={showCurrentVals ? 'selected' : 'unselected'}
                 size="small"
                 onClick={() => validatorViewToggleChange(true)}
                 className="px-2 rounded-md text-xs"
@@ -130,7 +142,7 @@ export const Main = () => {
                 Current
               </Button>
               <Button
-                variant={!showCurrentValidators ? 'selected' : 'unselected'}
+                variant={!showCurrentVals ? 'selected' : 'unselected'}
                 size="small"
                 onClick={() => validatorViewToggleChange(false)}
                 className="px-2 rounded-md text-xs"
@@ -139,7 +151,7 @@ export const Main = () => {
               </Button>
             </div>
             <div className="flex-1 flex justify-end">
-              <SortDialog isValidatorSort />
+              <SortDialog searchType={searchType} />
             </div>
           </h3>
         )}
@@ -165,9 +177,13 @@ export const Main = () => {
           )}
         </div>
 
-        <TileScroller activeIndex={activeIndex} />
+        {activeIndex === 0 ? (
+          <AssetScroller assets={filteredAssets} />
+        ) : (
+          <ValidatorScroller validators={filteredValidators} />
+        )}
 
-        <SearchBar />
+        <SearchBar searchType={searchType} />
 
         {/* <MicrophoneButton /> */}
       </div>

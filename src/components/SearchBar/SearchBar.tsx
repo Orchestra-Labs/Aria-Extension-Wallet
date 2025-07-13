@@ -2,21 +2,20 @@ import React, { useEffect } from 'react';
 import { Input, Separator } from '@/ui-kit';
 import { useAtom } from 'jotai';
 import { dialogSearchTermAtom, searchTermAtom } from '@/atoms';
+import { SearchType } from '@/constants';
 
 interface SearchBarProps {
+  searchType: SearchType;
   isDialog?: boolean;
-  isValidatorSearch?: boolean;
 }
 
 const PLACEHOLDERS = {
+  chain: 'Search by chain name, ID, or supported coins...',
   asset: 'Search by asset name or symbol...',
   validator: 'Search by validator name...',
 };
 
-export const SearchBar: React.FC<SearchBarProps> = ({
-  isDialog = false,
-  isValidatorSearch = false,
-}) => {
+export const SearchBar: React.FC<SearchBarProps> = ({ searchType, isDialog = false }) => {
   const [searchTerm, setSearchTerm] = useAtom(isDialog ? dialogSearchTermAtom : searchTermAtom);
 
   useEffect(() => {
@@ -33,7 +32,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           variant="primary"
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          placeholder={isValidatorSearch ? PLACEHOLDERS.validator : PLACEHOLDERS.asset}
+          placeholder={PLACEHOLDERS[searchType]}
         />
       </div>
     </>

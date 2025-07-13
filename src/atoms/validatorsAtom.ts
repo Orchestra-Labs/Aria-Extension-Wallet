@@ -11,7 +11,22 @@ import {
 import { filterAndSortValidators } from '@/helpers';
 import { ValidatorStatusFilter } from '@/constants';
 
-export const showCurrentValidatorsAtom = atom<boolean>(true);
+export const showCurrentValsOverrideAtom = atom<boolean | null>(null);
+export const showCurrentValidatorsAtom = atom(
+  get => {
+    const validatorData = get(validatorDataAtom);
+    const hasStakedValidators = validatorData.some(
+      validator => parseFloat(validator.balance.amount) > 0,
+    );
+    return hasStakedValidators;
+  },
+  (_, set, newValue: boolean) => {
+    // Allow manual override
+    set(showCurrentValsOverrideAtom, newValue);
+  },
+);
+
+// Add this new atom to track manual overrides
 export const validatorDataAtom = atom<CombinedStakingInfo[]>([]);
 export const selectedValidatorsAtom = atom<CombinedStakingInfo[]>([]);
 export const validatorStatusFilterAtom = atom<ValidatorStatusFilter>(
@@ -23,8 +38,21 @@ export const filteredValidatorsAtom = atom(get => {
   const searchTerm = get(searchTermAtom);
   const sortOrder = get(validatorSortOrderAtom);
   const sortType = get(validatorSortTypeAtom);
-  const showCurrentValidators = get(showCurrentValidatorsAtom);
   const statusFilter = get(validatorStatusFilterAtom);
+
+  // Get both the automatic and manual states
+  const autoShowCurrent = get(showCurrentValidatorsAtom);
+  const manualOverride = get(showCurrentValsOverrideAtom);
+
+  // Determine which value to use (manual override takes precedence)
+  const showCurrentValidators = manualOverride !== null ? manualOverride : autoShowCurrent;
+
+  console.group('[filteredValidatorsAtom]');
+  console.log('validatorData length:', validatorData.length);
+  console.log('hasStakedValidators:', autoShowCurrent);
+  console.log('manualOverride:', manualOverride);
+  console.log('effective showCurrentValidators:', showCurrentValidators);
+  console.groupEnd();
 
   return filterAndSortValidators(
     validatorData,

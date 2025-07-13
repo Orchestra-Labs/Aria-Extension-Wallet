@@ -1,65 +1,218 @@
-import React, { useEffect } from 'react';
-import { Header, Loader, SearchBar, SortDialog, TileScroller } from '@/components';
+import React, { useEffect, useState } from 'react';
+import { AssetScroller, ChainScroller, Header, Loader, SearchBar, SortDialog } from '@/components';
 import {
-  filteredExchangeAssetsAtom,
   isInitialDataLoadAtom,
   selectedCoinListAtom,
-  symphonyAssetsAtom,
   assetDialogSortTypeAtom,
   assetDialogSortOrderAtom,
   dialogSearchTermAtom,
-  subscribedAssetsAtom,
+  filteredChainAssetsAtom,
+  userAccountAtom,
+  filteredChainRegistryAtom,
+  loadFullRegistryAtom,
+  unloadFullRegistryAtom,
+  subscriptionSelectionsAtom,
+  selectedChainIdsAtom,
+  fullChainRegistryAtom,
+  networkLevelAtom,
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
-import { SYMPHONY_MAINNET_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
+import {
+  AssetSortType,
+  DEFAULT_SUBSCRIPTION,
+  NetworkLevel,
+  ROUTES,
+  SearchType,
+  SettingsOption,
+  SortOrder,
+} from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { Asset, SubscriptionRecord } from '@/types';
-import { saveAccountByID } from '@/helpers/dataHelpers/account';
-import { userAccountAtom } from '@/atoms/accountAtom';
+import { Asset, SimplifiedChainInfo } from '@/types';
+import { saveAccountByID, getPrimaryFeeToken } from '@/helpers';
+
+const PAGE_TITLE = 'Chain & Coin Subscriptions';
+
+enum SubscriptionTab {
+  CHAINS_TAB = 'chains',
+  COINS_TAB = 'coins',
+}
+
+enum NetworkLevelTab {
+  MAINNET = 'mainnet',
+  TESTNET = 'testnet',
+}
 
 interface ChainSubscriptionsProps {}
 
-const PAGE_TITLE = 'Select Visible Coins';
-
-export const ChainSubscriptionsScreen: React.FC<ChainSubscriptionsProps> = ({}) => {
+export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const navigate = useNavigate();
 
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
-  const [selectedCoins, setSelectedCoins] = useAtom(selectedCoinListAtom);
-  const filteredExchangeCoins = useAtomValue(filteredExchangeAssetsAtom);
-  const subscribedAssets = useAtomValue(subscribedAssetsAtom);
-  const unfilteredAssets = useAtomValue(symphonyAssetsAtom);
+  const [networkLevelTab, setNetworkLevelTab] = useState<NetworkLevelTab>(NetworkLevelTab.MAINNET);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const testnetAccessEnabled =
+    useAtomValue(userAccountAtom)?.settings[SettingsOption.TESTNET_ACCESS] || false;
+  const setNetworkLevel = useSetAtom(networkLevelAtom);
+  const chainRegistry = useAtomValue(fullChainRegistryAtom);
+  const selectedCoins = useAtomValue(selectedCoinListAtom);
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(assetDialogSortOrderAtom);
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
   const [userAccount, setUserAccount] = useAtom(userAccountAtom);
+  const allChainsData = useAtomValue(filteredChainRegistryAtom);
+  const chainAssets = useAtomValue(filteredChainAssetsAtom);
+  const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
+  const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
+  const [subscriptionSelections, setSubscriptionSelections] = useAtom(subscriptionSelectionsAtom);
+  const selectedChainIds = useAtomValue(selectedChainIdsAtom);
 
-  const allCoinsSelected = selectedCoins.length === unfilteredAssets.length;
-  const noCoinsSelected = selectedCoins.length === 0;
+  const [activeTab, setActiveTab] = useState<SubscriptionTab>(SubscriptionTab.CHAINS_TAB);
 
-  // Store initial settings to revert to them on cancel
   const initialSettings = {
     hasSetCoinList: true,
-    subscribedTo:
+    subscriptions:
       userAccount?.settings.chainSubscriptions &&
-      Object.keys(userAccount.settings.chainSubscriptions).length > 0
+      Object.keys(userAccount.settings.chainSubscriptions.mainnet).length +
+        Object.keys(userAccount.settings.chainSubscriptions.testnet).length >
+        0
         ? userAccount.settings.chainSubscriptions
         : DEFAULT_SUBSCRIPTION,
   };
 
+  const displayChains = React.useMemo(() => {
+    const chains =
+      activeTab === SubscriptionTab.CHAINS_TAB
+        ? allChainsData
+        : allChainsData.filter(chain => selectedChainIds.includes(chain.chain_id));
+
+    // Filter by network tab if testnet access is enabled
+    if (testnetAccessEnabled) {
+      return chains.filter(chain =>
+        networkLevelTab === NetworkLevelTab.MAINNET
+          ? chainRegistry.mainnet[chain.chain_id]
+          : chainRegistry.testnet[chain.chain_id],
+      );
+    }
+    return chains;
+  }, [
+    allChainsData,
+    activeTab,
+    selectedChainIds,
+    testnetAccessEnabled,
+    networkLevelTab,
+    chainRegistry,
+  ]);
+
+  const allChainsSelected = React.useMemo(() => {
+    if (!displayChains.length) return false;
+    const displayChainIds = displayChains.map(chain => chain.chain_id);
+    return displayChainIds.every(id => selectedChainIds.includes(id));
+  }, [selectedChainIds, displayChains]);
+  const noChainsSelected = selectedChainIds.length === 0;
+
+  const allCoinsSelected = React.useMemo(() => {
+    if (!chainAssets.length) return false;
+
+    // Get all assets from subscribed chains for current network level
+    const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
+    const allAssetsFromChains: Asset[] = [];
+
+    for (const chainId of subscribedChainIds) {
+      const chain = chainRegistry[networkLevel][chainId];
+      if (chain?.assets) {
+        allAssetsFromChains.push(...Object.values(chain.assets));
+      }
+    }
+
+    // Get all selected denoms from subscriptionSelections for current network level
+    const selectedDenoms = new Set(
+      Object.values(subscriptionSelections[networkLevel]).flatMap(denoms => denoms),
+    );
+
+    // Check if all assets from subscribed chains are selected
+    return allAssetsFromChains.every(asset => selectedDenoms.has(asset.denom));
+  }, [chainAssets, subscriptionSelections, chainRegistry, networkLevelTab]);
+
+  const noCoinsSelected = React.useMemo(() => {
+    return (
+      Object.values(subscriptionSelections[networkLevel]).flatMap(denoms => denoms).length === 0
+    );
+  }, [subscriptionSelections, networkLevelTab]);
+
   const resetDefaults = () => {
     setSearchTerm('');
-    setSortOrder('Desc');
-    setSortType('name');
+    setSortOrder(SortOrder.ASC);
+    setSortType(AssetSortType.NAME);
+    console.log('[ChainSubscriptions] Component unmounting - unloading full registry');
+    unloadFullRegistry();
   };
 
-  const handleSelectAll = () => {
-    setSelectedCoins(filteredExchangeCoins);
+  const handleSelectAllCoins = () => {
+    const newSelections = { ...subscriptionSelections };
+
+    // Get all assets from subscribed chains for current network level
+    const assetsByChain: Record<string, Asset[]> = {};
+    for (const chainId of Object.keys(subscriptionSelections[networkLevel])) {
+      const chain = chainRegistry[networkLevel][chainId];
+      if (chain?.assets) {
+        assetsByChain[chainId] = Object.values(chain.assets);
+      }
+    }
+
+    // Update selections for each chain to include all assets
+    newSelections[networkLevel] = {};
+    Object.entries(assetsByChain).forEach(([chainId, assets]) => {
+      newSelections[networkLevel][chainId] = assets.map(a => a.denom);
+    });
+
+    setSubscriptionSelections(newSelections);
   };
 
-  const handleSelectNone = () => {
-    setSelectedCoins([]);
+  const handleSelectAllChains = () => {
+    const newSelections = { ...subscriptionSelections };
+
+    displayChains.forEach(chain => {
+      const feeToken = getPrimaryFeeToken(chain);
+      newSelections[networkLevel][chain.chain_id] = feeToken ? [feeToken.denom] : [];
+    });
+
+    setSubscriptionSelections(newSelections);
+  };
+
+  const handleDeselectAllChains = () => {
+    const newSelections = { ...subscriptionSelections };
+    const current = newSelections[networkLevel];
+
+    const toRemove = new Set(displayChains.map(c => c.chain_id));
+    const updated = Object.fromEntries(Object.entries(current).filter(([id]) => !toRemove.has(id)));
+
+    newSelections[networkLevel] =
+      Object.keys(updated).length > 0 ? updated : DEFAULT_SUBSCRIPTION[networkLevel];
+
+    setSubscriptionSelections(newSelections);
+  };
+
+  const handleDeselectAllCoins = () => {
+    const newSelections = { ...subscriptionSelections };
+    const current = newSelections[networkLevel];
+    const updated = { ...current };
+
+    for (const asset of chainAssets) {
+      const chainId = asset.networkID;
+      const denoms = updated[chainId] || [];
+      const filtered = denoms.filter(d => d !== asset.denom);
+      if (filtered.length === 0) {
+        delete updated[chainId];
+      } else {
+        updated[chainId] = filtered;
+      }
+    }
+
+    newSelections[networkLevel] =
+      Object.keys(updated).length > 0 ? updated : DEFAULT_SUBSCRIPTION[networkLevel];
+
+    setSubscriptionSelections(newSelections);
   };
 
   const closeAndReturn = () => {
@@ -68,64 +221,79 @@ export const ChainSubscriptionsScreen: React.FC<ChainSubscriptionsProps> = ({}) 
   };
 
   const handleSelectCoin = (coin: Asset) => {
-    setSelectedCoins(prevSelectedCoins => {
-      const isAlreadySelected = prevSelectedCoins.some(
-        selectedCoin => selectedCoin.denom === coin.denom,
-      );
+    const currentDenoms = subscriptionSelections[networkLevel][coin.networkID] || [];
 
-      const updatedCoins = isAlreadySelected
-        ? prevSelectedCoins.filter(selectedCoin => selectedCoin.denom !== coin.denom)
-        : [...prevSelectedCoins, coin];
+    if (currentDenoms.includes(coin.denom)) {
+      setSubscriptionSelections(prev => {
+        const updatedNetworkSelections = { ...prev[networkLevel] };
+        const updatedDenoms = updatedNetworkSelections[coin.networkID].filter(
+          d => d !== coin.denom,
+        );
 
-      return updatedCoins;
+        if (updatedDenoms.length === 0) {
+          // Remove chain if no coins left
+          delete updatedNetworkSelections[coin.networkID];
+        } else {
+          updatedNetworkSelections[coin.networkID] = updatedDenoms;
+        }
+
+        return {
+          ...prev,
+          [networkLevel]: updatedNetworkSelections,
+        };
+      });
+    } else {
+      setSubscriptionSelections(prev => ({
+        ...prev,
+        [networkLevel]: {
+          ...prev[networkLevel],
+          [coin.networkID]: [...(prev[networkLevel][coin.networkID] || []), coin.denom],
+        },
+      }));
+    }
+  };
+
+  const handleSelectChain = (chain: SimplifiedChainInfo, feeToken: Asset | null) => {
+    setSubscriptionSelections(prev => {
+      const newSelections = { ...prev };
+      const chainId = chain.chain_id;
+
+      if (newSelections[networkLevel][chainId]) {
+        const { [chainId]: _, ...rest } = newSelections[networkLevel];
+        newSelections[networkLevel] = rest;
+      } else {
+        // TODO: if no assets on the chain, set to "all others, however that will be done.  currently it's an unsupported chain"
+        newSelections[networkLevel] = {
+          ...newSelections[networkLevel],
+          [chainId]: feeToken ? [feeToken.denom] : [],
+        };
+      }
+
+      return newSelections;
     });
   };
 
-  // TODO: with multi-coin support, change to select specific coin and chain by sorted category and selection
   const confirmSelection = () => {
     if (userAccount) {
-      const updatedSubscriptions: SubscriptionRecord = {};
-
-      // TODO: change page's save structure to reflect subscription/registry structure to prevent excess looping here
-      const networkID = SYMPHONY_MAINNET_ID;
-      const networkCoinDenoms = unfilteredAssets.map(asset => asset.denom);
-      const selectedNetworkCoins = selectedCoins.map(coin => coin.denom);
-
-      console.log('[EditCoinListScreen] Saving selected coins', selectedNetworkCoins);
-      // TODO: elect Symphony (and Melody) as default if nothing is selected
-      if (selectedNetworkCoins.length === networkCoinDenoms.length) {
-        updatedSubscriptions[networkID] = [];
-      } else if (selectedNetworkCoins.length > 0) {
-        updatedSubscriptions[networkID] = selectedNetworkCoins;
-      }
-
       const updatedUserAccount = {
         ...userAccount,
         settings: {
           ...userAccount.settings,
           hasSetCoinList: true,
-          subscribedTo: updatedSubscriptions,
+          chainSubscriptions: subscriptionSelections,
         },
       };
 
-      console.log('[EditCoinListScreen] Saving account as:', updatedUserAccount);
-
-      // Update state and save to local storage
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
-    } else {
-      console.warn('[EditCoinListScreen] UserAccount is undefined');
     }
-
     closeAndReturn();
   };
 
   const cancel = () => {
-    console.log('[EditCoinListScreen] Cancelling with account set to:', userAccount);
     if (userAccount) {
-      // Restore the initial settings
       userAccount.settings.hasSetCoinList = initialSettings.hasSetCoinList;
-      userAccount.settings.chainSubscriptions = initialSettings.subscribedTo;
+      userAccount.settings.chainSubscriptions = initialSettings.subscriptions;
       saveAccountByID(userAccount);
     }
 
@@ -133,44 +301,113 @@ export const ChainSubscriptionsScreen: React.FC<ChainSubscriptionsProps> = ({}) 
   };
 
   useEffect(() => {
-    if (userAccount) {
-      console.log('[EditCoinListScreen] Subscribed assets', subscribedAssets);
-      setSelectedCoins(subscribedAssets);
-    } else {
-      console.warn('[EditCoinListScreen] UserAccount is undefined');
-    }
+    setNetworkLevel(
+      networkLevelTab === NetworkLevelTab.MAINNET ? NetworkLevel.MAINNET : NetworkLevel.TESTNET,
+    );
+  }, [networkLevelTab, networkLevel]);
+
+  useEffect(() => {
+    console.log('[ChainSubscriptions] Component mounted - loading full registry');
+    loadFullRegistry();
   }, []);
+
+  useEffect(() => {
+    if (userAccount) {
+      setSubscriptionSelections(userAccount.settings.chainSubscriptions || DEFAULT_SUBSCRIPTION);
+    }
+  }, [userAccount]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-black text-white">
       <Header title={PAGE_TITLE} onClose={cancel} />
 
-      {/* TODO: extract the below items from here and assetselectdialog to external component */}
+      {/* Main tabs (Chains/Coins) */}
+      {/* TODO: this section moves between 37 and 61 pixels.  use this information to set animation for height changes */}
+      <div className="flex border-b border-neutral-4">
+        <div
+          className={`flex-1 ${activeTab === SubscriptionTab.CHAINS_TAB ? 'text-blue' : 'text-neutral-2'}`}
+        >
+          {/* Chains tab with potential subtabs */}
+          <button
+            className={`w-full py-2 text-center ${activeTab === SubscriptionTab.CHAINS_TAB ? 'border-b-2 border-blue' : ''}`}
+            onClick={() => setActiveTab(SubscriptionTab.CHAINS_TAB)}
+          >
+            Chains
+          </button>
+
+          {/* Network subtabs (only shown when Chains is active and testnet access is enabled) */}
+          {activeTab === SubscriptionTab.CHAINS_TAB && testnetAccessEnabled && (
+            <div className="flex">
+              <button
+                className={`flex-1 py-1 text-sm ${networkLevelTab === NetworkLevelTab.MAINNET ? 'text-blue border-b-2 border-blue' : 'text-neutral-2'}`}
+                onClick={() => setNetworkLevelTab(NetworkLevelTab.MAINNET)}
+              >
+                Mainnet
+              </button>
+              <button
+                className={`flex-1 py-1 text-sm ${networkLevelTab === NetworkLevelTab.TESTNET ? 'text-blue border-b-2 border-blue' : 'text-neutral-2'}`}
+                onClick={() => setNetworkLevelTab(NetworkLevelTab.TESTNET)}
+              >
+                Testnet
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button
+          className={`flex-1 py-2 text-center ${activeTab === SubscriptionTab.COINS_TAB ? 'text-blue border-b-2 border-blue' : 'text-neutral-2'} ${selectedChainIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          onClick={() => selectedChainIds.length > 0 && setActiveTab(SubscriptionTab.COINS_TAB)}
+          disabled={selectedChainIds.length === 0}
+        >
+          Coins
+        </button>
+      </div>
+
       <div className="flex pt-2 px-4 justify-between items-center px-2">
         <div className="text-sm">Tap to select</div>
         <div className="flex items-center">
           <Button
-            variant={allCoinsSelected ? 'selected' : 'unselected'}
+            variant={
+              (activeTab === SubscriptionTab.CHAINS_TAB ? allChainsSelected : allCoinsSelected)
+                ? 'selected'
+                : 'unselected'
+            }
             size="xsmall"
             className="px-1 rounded-md text-xs"
-            onClick={handleSelectAll}
+            onClick={
+              activeTab === SubscriptionTab.CHAINS_TAB
+                ? handleSelectAllChains
+                : handleSelectAllCoins
+            }
             disabled={isInitialDataLoad}
           >
             All
           </Button>
           <p className="text-sm px-1">/</p>
           <Button
-            variant={noCoinsSelected ? 'selected' : 'unselected'}
+            variant={
+              (activeTab === SubscriptionTab.CHAINS_TAB ? noChainsSelected : noCoinsSelected)
+                ? 'selected'
+                : 'unselected'
+            }
             size="xsmall"
             className="px-1 rounded-md text-xs"
-            onClick={handleSelectNone}
+            onClick={
+              activeTab === SubscriptionTab.CHAINS_TAB
+                ? handleDeselectAllChains
+                : handleDeselectAllCoins
+            }
             disabled={isInitialDataLoad}
           >
             None
           </Button>
         </div>
         <div className="justify-end">
-          <SortDialog isDialog />
+          <SortDialog
+            searchType={
+              activeTab === SubscriptionTab.CHAINS_TAB ? SearchType.CHAIN : SearchType.ASSET
+            }
+          />
         </div>
       </div>
 
@@ -178,19 +415,25 @@ export const ChainSubscriptionsScreen: React.FC<ChainSubscriptionsProps> = ({}) 
         {isInitialDataLoad ? (
           <Loader />
         ) : (
-          // TODO: create CategoryTiles option or new component that allows for animated tile inclusion
           <div className="flex-grow flex flex-col overflow-hidden">
-            <TileScroller
-              activeIndex={0}
-              onSelectAsset={handleSelectCoin}
-              isSelectable
-              isEditPage
-              multiSelectEnabled
-            />
+            {activeTab === SubscriptionTab.CHAINS_TAB ? (
+              <ChainScroller chains={displayChains} onChainSelect={handleSelectChain} />
+            ) : (
+              <AssetScroller
+                assets={chainAssets}
+                onClick={handleSelectCoin}
+                isSelectable
+                multiSelectEnabled
+              />
+            )}
           </div>
         )}
 
-        <SearchBar isDialog />
+        <SearchBar
+          searchType={
+            activeTab === SubscriptionTab.CHAINS_TAB ? SearchType.CHAIN : SearchType.ASSET
+          }
+        />
       </div>
 
       <Separator variant="top" />

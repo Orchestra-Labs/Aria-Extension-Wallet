@@ -1,4 +1,4 @@
-import { Asset } from '../types';
+import { Asset } from './chainRegistryRecord';
 
 export interface Wallet {
   address: string;

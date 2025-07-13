@@ -2,7 +2,7 @@ import {
   COSMOS_CHAIN_ENDPOINTS,
   DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
-  LOCAL_MAINNET_ASSET_REGISTRY,
+  SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRpcNode } from './queryNodes';
 import { DelegationResponse, TransactionResult, Uri } from '@/types';
@@ -243,7 +243,7 @@ export const stakeToValidator = async (
   const endpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
   const formattedAmount = (
     parseFloat(amount) *
-    Math.pow(10, LOCAL_MAINNET_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
+    Math.pow(10, SYMPHONY_MAINNET_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
   ).toFixed(0);
 
   const messages = buildStakingMessage({
@@ -314,7 +314,7 @@ export const claimAndUnstake = async ({
           parseFloat(amount) *
           Math.pow(
             10,
-            LOCAL_MAINNET_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
+            SYMPHONY_MAINNET_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
               GREATER_EXPONENT_DEFAULT,
           )
         ).toFixed(0),

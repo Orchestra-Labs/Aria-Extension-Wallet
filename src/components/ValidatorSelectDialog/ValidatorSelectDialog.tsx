@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -27,9 +26,12 @@ import {
   GREATER_EXPONENT_DEFAULT,
   TransactionType,
   ValidatorSortType,
+  SortOrder,
+  SearchType,
 } from '@/constants';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { Loader } from '../Loader';
+import { ValidatorScroller } from '../ValidatorScroller';
 
 interface ValidatorSelectDialogProps {
   buttonText: string;
@@ -67,6 +69,8 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     fee: string;
     textClass: 'text-error' | 'text-warn' | 'text-blue';
   } | null>({ fee: '0 MLD', textClass: 'text-blue' });
+
+  const searchType = SearchType.VALIDATOR;
 
   // TODO: need to be able to change chain to stake to other chains
   const prefix = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].bech32_prefix;
@@ -154,7 +158,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
   const resetDefaults = () => {
     setSearchTerm('');
-    setSortOrder('Desc');
+    setSortOrder(SortOrder.DESC);
     setSortType(ValidatorSortType.NAME);
     setSelectedValidators([]);
     setIsClaimToRestake(true);
@@ -393,7 +397,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             </Button>
           </div>
           <div className="flex-1 flex justify-end">
-            <SortDialog isValidatorSort isDialog />
+            <SortDialog searchType={searchType} isDialog />
           </div>
         </div>
 
@@ -416,15 +420,14 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             {error && <TransactionResultsTile isSuccess={false} size="md" message={error} />}
           </div>
         ) : (
-          <TileScroller
-            activeIndex={1}
-            onSelectValidator={handleValidatorSelect}
+          <ValidatorScroller
+            validators={filteredValidators}
+            onClick={handleValidatorSelect}
             isSelectable
-            isDialog
           />
         )}
 
-        <SearchBar isDialog isValidatorSearch />
+        <SearchBar searchType={searchType} isDialog />
 
         <div className="flex justify-center space-x-4">
           <Button
