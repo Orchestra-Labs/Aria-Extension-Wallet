@@ -10,6 +10,7 @@ import {
   networkLevelAtom,
   validatorDataAtom,
   subscribedChainRegistryAtom,
+  hasNonZeroAssetsAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -35,6 +36,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const validatorData = useAtomValue(validatorDataAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
@@ -175,7 +177,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
             {currentStep === 0 ? (
               <>
-                <Button className="w-full" asChild>
+                <Button className="w-full" disabled={!hasNonZeroAssets} asChild>
                   <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
                 </Button>
                 <ReceiveDialog

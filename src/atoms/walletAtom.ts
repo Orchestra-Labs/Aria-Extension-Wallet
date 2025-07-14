@@ -50,3 +50,8 @@ export const allWalletAssetsAtom = atom(get => {
   const { chainWallets } = get(sessionWalletAtom);
   return Object.values(chainWallets).flatMap(wallet => wallet.assets);
 });
+
+export const hasNonZeroAssetsAtom = atom(get => {
+  const allAssets = get(allWalletAssetsAtom);
+  return allAssets.some(asset => parseFloat(asset.amount) > 0);
+});

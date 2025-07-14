@@ -9,6 +9,7 @@ import {
   filteredAssetsAtom,
   filteredValidatorsAtom,
   showCurrentValsOverrideAtom,
+  hasNonZeroAssetsAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
@@ -31,6 +32,7 @@ export const Main = () => {
   const userAccount = useAtomValue(userAccountAtom);
   const filteredAssets = useAtomValue(filteredAssetsAtom);
   const filteredValidators = useAtomValue(filteredValidatorsAtom);
+  const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
 
   const routeToVisibilitySelection = !userAccount?.settings.hasSetCoinList;
   const routeToTutorial = !userAccount?.settings.hasViewedTutorial;
@@ -65,8 +67,13 @@ export const Main = () => {
     setSearchTerm('');
   }, [activeIndex]);
 
-  // TODO: make tiles name of coin with dropdown for subtitle.  coins bridged to other chains are in a dropdown of subtiles
-  // TODO: allow search by chain name
+  useEffect(() => {
+    if (hasNonZeroAssets && showAllAssets) {
+      setShowAllAssets(false);
+    }
+  }, [hasNonZeroAssets]);
+
+  // TODO: make tiles name of coin with dropdown next to subtitle.  coins bridged to other chains are in a dropdown of subtiles
 
   // TODO: use routing instead
   if (routeToTutorial) {
