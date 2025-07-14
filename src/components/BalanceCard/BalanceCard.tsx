@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAtomValue } from 'jotai';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
@@ -31,12 +31,20 @@ interface BalanceCardProps {
 }
 
 export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardProps) => {
+  const navigate = useNavigate();
+
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const validatorData = useAtomValue(validatorDataAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
+
+  console.log('[BalanceCard] Non-zero assets check:', {
+    hasNonZeroAssets,
+    walletAssets: useAtomValue(allWalletAssetsAtom),
+    networkLevel: useAtomValue(networkLevelAtom),
+  });
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
@@ -177,8 +185,12 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
             {currentStep === 0 ? (
               <>
-                <Button className="w-full" disabled={!hasNonZeroAssets} asChild>
-                  <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                <Button
+                  className="w-full"
+                  disabled={!hasNonZeroAssets}
+                  onClick={() => navigate(ROUTES.APP.SEND)}
+                >
+                  Send
                 </Button>
                 <ReceiveDialog
                   asset={balanceDisplayUnit}

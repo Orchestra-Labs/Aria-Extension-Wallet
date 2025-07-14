@@ -1,5 +1,7 @@
 import { atom } from 'jotai';
 import { Asset, Wallet } from '@/types';
+import { subscribedChainRegistryAtom } from './chainRegistryAtom';
+import { networkLevelAtom } from './networkLevelAtom';
 
 // Session-only state (cleared on logout)
 export const sessionWalletAtom = atom<{
@@ -53,5 +55,14 @@ export const allWalletAssetsAtom = atom(get => {
 
 export const hasNonZeroAssetsAtom = atom(get => {
   const allAssets = get(allWalletAssetsAtom);
-  return allAssets.some(asset => parseFloat(asset.amount) > 0);
+  const networkLevel = get(networkLevelAtom);
+  const chainRegistry = get(subscribedChainRegistryAtom);
+  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
+
+  return allAssets.some(asset => {
+    if (!validChainIDs.includes(asset.networkID)) return false;
+    const amountStr = asset.amount?.trim() || '0';
+    const amount = Number(amountStr);
+    return !isNaN(amount) && amount > 0;
+  });
 });
