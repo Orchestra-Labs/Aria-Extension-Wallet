@@ -21,10 +21,7 @@ import {
   DEFAULT_MAINNET_ASSET,
   defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
-  NetworkLevel,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
-  SYMPHONY_MAINNET_ID,
-  SYMPHONY_TESTNET_ID,
   TextFieldStatus,
   TransactionType,
 } from '@/constants';
@@ -35,6 +32,7 @@ import {
   filteredValidatorsAtom,
   networkLevelAtom,
   showCurrentValidatorsAtom,
+  selectedValidatorChainAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -60,8 +58,7 @@ const ValidatorTileComponent = ({
 
   const networkLevel = useAtomValue(networkLevelAtom);
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
-  // TODO: On page load set current chain id for validators to user default, then change via button
-  const chainId = networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+  const chainId = useAtomValue(selectedValidatorChainAtom);
   const walletState = useAtomValue(chainWalletAtom(chainId));
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);

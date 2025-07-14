@@ -169,7 +169,31 @@ export const filteredChainRegistryAtom = atom(get => {
   return filteredChains;
 });
 
-export const selectedValidatorChainAtom = atom<string>(SYMPHONY_MAINNET_ID);
+export const selectedValidatorChainAtom = atom<string, [string], void>(
+  get => {
+    const userAccount = get(userAccountAtom);
+    const subscribedChains = get(subscribedChainsAtom);
+    const subscribedChainIds = subscribedChains.map(chain => chain.chain_id);
+
+    // Priority 1: User's default chain ID (if subscribed)
+    const userDefaultChain = userAccount?.settings.defaultChainID;
+    if (userDefaultChain && subscribedChainIds.includes(userDefaultChain)) {
+      return userDefaultChain;
+    }
+
+    // Priority 2: SYMPHONY_MAINNET_ID (if subscribed)
+    if (subscribedChainIds.includes(SYMPHONY_MAINNET_ID)) {
+      return SYMPHONY_MAINNET_ID;
+    }
+
+    // Priority 3: First available subscribed chain
+    return subscribedChains[0]?.chain_id || SYMPHONY_MAINNET_ID;
+  },
+  (_get, set, newChainId) => {
+    // Store the value directly in the atom's internal state
+    set(selectedValidatorChainAtom, newChainId);
+  },
+);
 
 export const selectedValidatorChainInfoAtom = atom(get => {
   const chainId = get(selectedValidatorChainAtom);

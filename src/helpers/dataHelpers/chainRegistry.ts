@@ -2,8 +2,7 @@ import {
   DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
   NetworkLevel,
   STORED_DATA_TIMEOUT,
-  SYMPHONY_MAINNET_ID,
-  SYMPHONY_TESTNET_ID,
+  SYMPHONY_CHAIN_ID_LIST,
 } from '@/constants';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { decompressSync } from 'fflate';
@@ -134,7 +133,7 @@ const mergeKeplrData = (chainInfo: SimplifiedChainInfo, keplrData: any): Simplif
     console.log('Keplr data to merge:', keplrData);
 
     // Skip Symphony chains and invalid data
-    if ([SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID].includes(chainInfo.chain_id)) {
+    if (SYMPHONY_CHAIN_ID_LIST.includes(chainInfo.chain_id)) {
       console.log('Skipping merge for Symphony chain');
       return chainInfo;
     }

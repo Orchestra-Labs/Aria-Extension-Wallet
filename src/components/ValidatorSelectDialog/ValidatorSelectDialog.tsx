@@ -9,6 +9,8 @@ import {
   selectedValidatorsAtom,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
+  networkLevelAtom,
+  selectedValidatorChainAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import {
@@ -22,7 +24,6 @@ import { CombinedStakingInfo, Uri } from '@/types';
 import { useRefreshData, useToast } from '@/hooks';
 import {
   DEFAULT_MAINNET_ASSET,
-  SYMPHONY_MAINNET_ID,
   GREATER_EXPONENT_DEFAULT,
   TransactionType,
   ValidatorSortType,
@@ -54,6 +55,8 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const chainId = useAtomValue(selectedValidatorChainAtom);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -73,9 +76,9 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const searchType = SearchType.VALIDATOR;
 
   // TODO: need to be able to change chain to stake to other chains
-  const prefix = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].bech32_prefix;
-  const restUris = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].rest_uris;
-  const rpcUris = chainRegistry.mainnet[SYMPHONY_MAINNET_ID].rpc_uris;
+  const prefix = chainRegistry[networkLevel][chainId].bech32_prefix;
+  const restUris = chainRegistry[networkLevel][chainId].rest_uris;
+  const rpcUris = chainRegistry[networkLevel][chainId].rpc_uris;
 
   const allValidatorsSelected = selectedValidators.length === filteredValidators.length;
   const noValidatorsSelected = selectedValidators.length === 0;

@@ -19,15 +19,8 @@ import {
   ReceiveDialog,
   ValidatorSelectDialog,
 } from '@/components';
-import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
-import {
-  ROUTES,
-  DEFAULT_MAINNET_ASSET,
-  NetworkLevel,
-  DEFAULT_TESTNET_ASSET,
-  SYMPHONY_MAINNET_ID,
-  SYMPHONY_TESTNET_ID,
-} from '@/constants';
+import { convertToGreaterUnit, formatBalanceDisplay, getSymphonyChainId } from '@/helpers';
+import { ROUTES, DEFAULT_MAINNET_ASSET, NetworkLevel, DEFAULT_TESTNET_ASSET } from '@/constants';
 import { useExchangeRate } from '@/hooks';
 
 interface BalanceCardProps {
@@ -56,8 +49,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   // Check if Symphony chain is subscribed
   const isSymphonySubscribed = useMemo(() => {
-    const symphonyChainId =
-      networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+    const symphonyChainId = getSymphonyChainId(networkLevel);
     return Object.keys(chainRegistry[networkLevel] || {}).includes(symphonyChainId);
   }, [networkLevel, chainRegistry]);
 

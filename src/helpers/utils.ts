@@ -3,7 +3,12 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
 import { isValidSend } from './sendTransactions';
-import { NetworkLevel, TextFieldStatus } from '@/constants';
+import {
+  NetworkLevel,
+  SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
+  TextFieldStatus,
+} from '@/constants';
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs, { strict: false }));
@@ -132,3 +137,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   console.warn(`[Utils] No suitable fee token found for chain ${chain.chain_id}`);
   return null;
 };
+
+export function getSymphonyChainId(networkLevel: NetworkLevel): string {
+  return networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+}
