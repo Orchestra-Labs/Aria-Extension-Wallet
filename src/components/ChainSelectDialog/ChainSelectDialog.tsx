@@ -3,16 +3,18 @@ import { Button, SlideTray } from '@/ui-kit';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
+  chainDialogSortOrderAtom,
   dialogSearchTermAtom,
-  filteredChainRegistryAtom,
   selectedValidatorChainAtom,
   selectedValidatorChainInfoAtom,
+  subscribedChainsAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { ChainScroller } from '../ChainScroller';
 import { SearchType } from '@/constants';
 import { SimplifiedChainInfo } from '@/types';
 import { useRefreshData } from '@/hooks';
+import { filterAndSortChains } from '@/helpers';
 
 interface ChainSelectDialogProps {}
 
@@ -22,9 +24,11 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
   const { refreshData } = useRefreshData();
 
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
-  const filteredChains = useAtomValue(filteredChainRegistryAtom);
+  const subscribedChains = useAtomValue(subscribedChainsAtom);
   const [selectedChainId, setSelectedChainId] = useAtom(selectedValidatorChainAtom);
   const chainInfo = useAtomValue(selectedValidatorChainInfoAtom);
+  const searchTerm = useAtomValue(dialogSearchTermAtom);
+  const sortOrder = useAtomValue(chainDialogSortOrderAtom);
 
   const searchType = SearchType.CHAIN;
 
@@ -49,7 +53,10 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
     );
   }, [chainInfo]);
 
-  // TODO: move to useRefreshData or useValidatorDataRefresh
+  const filteredChains = useMemo(() => {
+    return filterAndSortChains(subscribedChains, searchTerm, sortOrder);
+  }, [subscribedChains, searchTerm, sortOrder]);
+
   useEffect(() => {
     refreshData({ wallet: false, validator: true });
   }, [selectedChainId]);

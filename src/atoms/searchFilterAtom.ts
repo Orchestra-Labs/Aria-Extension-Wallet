@@ -12,6 +12,7 @@ export const validatorSortOrderAtom = atom<SortOrder>(SortOrder.ASC);
 export const validatorSortTypeAtom = atom<ValidatorSortType>(ValidatorSortType.NAME);
 
 // dialogs
+export const chainDialogSortOrderAtom = atom<SortOrder>(SortOrder.ASC);
 export const assetDialogSortOrderAtom = atom<SortOrder>(SortOrder.ASC);
 export const assetDialogSortTypeAtom = atom<AssetSortType>(AssetSortType.NAME);
 export const validatorDialogSortOrderAtom = atom<SortOrder>(SortOrder.ASC);

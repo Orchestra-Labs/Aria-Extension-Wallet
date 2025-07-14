@@ -4,7 +4,7 @@ import {
   SettingsOption,
   SYMPHONY_MAINNET_ID,
 } from '@/constants';
-import { Asset, LocalChainRegistry, SubscriptionRecord } from '@/types';
+import { Asset, LocalChainRegistry, SimplifiedChainInfo, SubscriptionRecord } from '@/types';
 import { atom } from 'jotai';
 import {
   assetSortOrderAtom,
@@ -174,7 +174,7 @@ export const selectedValidatorChainAtom = atom<string>(SYMPHONY_MAINNET_ID);
 export const selectedValidatorChainInfoAtom = atom(get => {
   const chainId = get(selectedValidatorChainAtom);
   const networkLevel = get(networkLevelAtom);
-  const chainRegistry = get(fullChainRegistryAtom);
+  const chainRegistry = get(subscribedChainRegistryAtom);
 
   const chainInfo = chainRegistry[networkLevel][chainId];
   console.log('[selectedValidatorChainInfoAtom]', {
@@ -184,4 +184,11 @@ export const selectedValidatorChainInfoAtom = atom(get => {
   });
 
   return chainRegistry[networkLevel][chainId];
+});
+
+export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
+  const networkLevel = get(networkLevelAtom);
+  const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
+
+  return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
 });

@@ -15,6 +15,7 @@ import {
   swiperIndexState,
   userAccountAtom,
   chainSortOrderAtom,
+  chainDialogSortOrderAtom,
 } from '@/atoms';
 import {
   AssetSortType,
@@ -34,7 +35,9 @@ export const SortDialog: React.FC<SortDialogProps> = ({ searchType, isDialog = f
   const [validatorStatusFilter, setValidatorStatusFilter] = useAtom(validatorStatusFilterAtom);
   // TODO: move away from active index
   const activeIndex = useAtomValue(swiperIndexState);
-  const [chainSortOrder, setChainSortOrder] = useAtom(chainSortOrderAtom);
+  const [chainSortOrder, setChainSortOrder] = useAtom(
+    isDialog ? chainDialogSortOrderAtom : chainSortOrderAtom,
+  );
   const [assetSortOrder, setAssetSortOrder] = useAtom(
     isDialog ? assetDialogSortOrderAtom : assetSortOrderAtom,
   );
