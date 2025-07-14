@@ -5,7 +5,7 @@ import { networkLevelAtom, selectedValidatorChainAtom, subscriptionSelectionsAto
 import { useAtomValue } from 'jotai';
 import { getPrimaryFeeToken } from '@/helpers';
 import { IconContainer } from '@/assets/icons';
-import { SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID } from '@/constants';
+import { SYMPHONY_CHAIN_ID_LIST } from '@/constants';
 
 interface ChainTileProps {
   chain: SimplifiedChainInfo;
@@ -28,7 +28,7 @@ export const ChainTile: React.FC<ChainTileProps> = ({ chain, onClick, isDialog =
   const primaryFeeToken = getPrimaryFeeToken(chain);
   const primaryFeeSymbol = primaryFeeToken?.symbol || '';
 
-  const isSymphonyChain = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID].includes(chain.chain_id);
+  const isSymphonyChain = SYMPHONY_CHAIN_ID_LIST.includes(chain.chain_id);
 
   return (
     <ScrollTile

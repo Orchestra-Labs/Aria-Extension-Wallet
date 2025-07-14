@@ -14,10 +14,9 @@ import { queryRestNode } from './queryNodes';
 import {
   BondStatus,
   COSMOS_CHAIN_ENDPOINTS,
-  SYMPHONY_MAINNET_ID,
   SYMPHONY_ENDPOINTS,
   SYMPHONY_PREFIX,
-  SYMPHONY_TESTNET_ID,
+  SYMPHONY_CHAIN_ID_LIST,
 } from '@/constants';
 import { fromBase64, toBech32 } from '@cosmjs/encoding';
 import { sha256 } from '@cosmjs/crypto';
@@ -391,7 +390,7 @@ const buildUptimeMap = (
 };
 
 export const isSymphonyChain = (chainId: string): boolean => {
-  return [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID].includes(chainId);
+  return SYMPHONY_CHAIN_ID_LIST.includes(chainId);
 };
 
 export const fetchValidatorData = async (

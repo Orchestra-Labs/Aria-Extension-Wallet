@@ -15,6 +15,7 @@ export const SYMPHONY_TESTNET_NAME = 'symphonytestnet';
 export const SYMPHONY_TESTNET_ID = 'symphony-testnet-4';
 export const SYMPHONY_MAINNET_NAME = 'symphony';
 export const SYMPHONY_MAINNET_ID = 'symphony-1';
+export const SYMPHONY_CHAIN_ID_LIST = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID];
 
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
