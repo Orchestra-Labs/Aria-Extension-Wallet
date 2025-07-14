@@ -32,6 +32,7 @@ export const DataProvider: React.FC = () => {
 
   const [phase1LoadComplete, setPhase1LoadComplete] = useState(false);
   const [phase2LoadComplete, setPhase2LoadComplete] = useState(false);
+  const [phase3LoadComplete, setPhase3LoadComplete] = useState(false);
 
   // Check if we have all required data to start loading
   const isReadyToLoadInitial = useMemo(() => {
@@ -51,7 +52,6 @@ export const DataProvider: React.FC = () => {
 
       try {
         await refreshRegistry();
-        await generateAddresses();
         setPhase1LoadComplete(true);
       } catch (error) {
         console.error('[DataProvider] Phase 1 load failed:', error);
@@ -63,10 +63,10 @@ export const DataProvider: React.FC = () => {
 
   useEffect(() => {
     const loadPhase2 = async () => {
-      if (!phase1LoadComplete || !isReadyToLoadInitial || phase2LoadComplete) return;
+      if (!userAccount || !phase1LoadComplete || phase2LoadComplete) return;
 
       try {
-        await refreshData();
+        await generateAddresses();
         setPhase2LoadComplete(true);
       } catch (error) {
         console.error('[DataProvider] Phase 2 load failed:', error);
@@ -74,11 +74,27 @@ export const DataProvider: React.FC = () => {
     };
 
     loadPhase2();
-  }, [phase1LoadComplete, isReadyToLoadInitial, phase2LoadComplete]);
+  }, [userAccount, phase1LoadComplete]);
+
+  useEffect(() => {
+    const loadPhase3 = async () => {
+      if (!phase1LoadComplete || !phase2LoadComplete || !isReadyToLoadInitial || phase3LoadComplete)
+        return;
+
+      try {
+        await refreshData();
+        setPhase3LoadComplete(true);
+      } catch (error) {
+        console.error('[DataProvider] Phase 3 load failed:', error);
+      }
+    };
+
+    loadPhase3();
+  }, [phase2LoadComplete, isReadyToLoadInitial]);
 
   // Handle initial data load completion
   useEffect(() => {
-    if (!isInitialDataLoad || !phase2LoadComplete) return;
+    if (!isInitialDataLoad || !phase3LoadComplete) return;
 
     const hasLoaded =
       !isFetchingWallet &&
@@ -91,7 +107,7 @@ export const DataProvider: React.FC = () => {
     }
   }, [
     isInitialDataLoad,
-    phase2LoadComplete,
+    phase3LoadComplete,
     isFetchingWallet,
     isFetchingValidators,
     walletAssets,
@@ -100,10 +116,10 @@ export const DataProvider: React.FC = () => {
 
   // Refresh data when network level changes
   useEffect(() => {
-    if (!userAccount || !phase2LoadComplete) return;
+    if (!userAccount || !phase3LoadComplete) return;
 
     refreshData();
-  }, [networkLevel, userAccount, phase2LoadComplete]);
+  }, [networkLevel, userAccount, phase3LoadComplete]);
 
   return null;
 };

@@ -19,20 +19,22 @@ export const updateChainWalletAtom = atom(
     const current = get(sessionWalletAtom);
     const existingWallet = current.chainWallets[update.chainId] || { address: '', assets: [] };
 
-    const updatedWallet = {
-      address: update.address ?? existingWallet.address,
-      assets: update.assets ?? existingWallet.assets,
-    };
+    console.log(`[walletAtom] Updating chain ${update.chainId}`, {
+      oldAddress: existingWallet.address,
+      newAddress: update.address,
+      assetsCount: update.assets?.length,
+    });
 
     set(sessionWalletAtom, {
       ...current,
       chainWallets: {
         ...current.chainWallets,
-        [update.chainId]: updatedWallet,
+        [update.chainId]: {
+          address: update.address !== undefined ? update.address : existingWallet.address,
+          assets: update.assets !== undefined ? update.assets : existingWallet.assets,
+        },
       },
     });
-
-    console.log(`[walletAtom] Updated chain ${update.chainId}`, updatedWallet);
   },
 );
 

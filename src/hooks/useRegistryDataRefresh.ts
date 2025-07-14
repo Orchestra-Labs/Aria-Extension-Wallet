@@ -22,8 +22,9 @@ export function useRegistryDataRefresh() {
 
     setIsFetchingRegistry(true);
 
-    let fallbackRegistry = LOCAL_CHAIN_REGISTRY;
-    console.log('[Registry] Default fallback registry set:', fallbackRegistry);
+    const localChainRegistry = LOCAL_CHAIN_REGISTRY;
+    let finalChainRegistry = localChainRegistry;
+    console.log('[Registry] Default fallback registry set:', finalChainRegistry);
 
     try {
       console.log('[Registry] Attempting to get stored registry...');
@@ -59,19 +60,21 @@ export function useRegistryDataRefresh() {
           Object.keys(filteredTestnet).length,
         );
 
-        fallbackRegistry = {
+        const subscribedChainRegistry = {
           mainnet: filteredMainnet,
           testnet: filteredTestnet,
         };
-        console.log('[Registry] New fallback registry:', fallbackRegistry);
+        console.log('[Registry] Subscribed chain registry:', subscribedChainRegistry);
         console.groupEnd();
+
+        finalChainRegistry = subscribedChainRegistry;
+        setChainRegistry(subscribedChainRegistry);
       } else {
         console.warn('[Registry] No stored registry found, using fallback LOCAL_CHAIN_REGISTRY');
+        setChainRegistry(localChainRegistry);
       }
 
-      console.log('[Registry] Setting initial registry state');
-      setChainRegistry(fallbackRegistry);
-
+      console.log('[Registry] Checking should update registry');
       if (shouldUpdateChainRegistry()) {
         console.group('[Registry] Checking for registry updates');
         try {
@@ -106,13 +109,13 @@ export function useRegistryDataRefresh() {
               console.log('Updated mainnet chains:', Object.keys(filteredMainnet).length);
               console.log('Updated testnet chains:', Object.keys(filteredTestnet).length);
 
-              fallbackRegistry = {
+              finalChainRegistry = {
                 mainnet: filteredMainnet,
                 testnet: filteredTestnet,
               };
 
-              console.log('Setting updated registry:', fallbackRegistry);
-              setChainRegistry(fallbackRegistry);
+              console.log('Setting updated registry:', finalChainRegistry);
+              setChainRegistry(finalChainRegistry);
               console.groupEnd();
             }
           }
@@ -124,12 +127,12 @@ export function useRegistryDataRefresh() {
         console.log('[Registry] Skipping update check (shouldUpdateChainRegistry returned false)');
       }
 
-      return fallbackRegistry;
+      return finalChainRegistry;
     } catch (error) {
       console.error('[Registry] Critical error during refresh:', error);
-      setChainRegistry(LOCAL_CHAIN_REGISTRY);
+      setChainRegistry(finalChainRegistry);
     } finally {
-      console.log('[Registry] Final registry state:', chainRegistry);
+      console.log('[Registry] Final registry state:', finalChainRegistry);
       setIsFetchingRegistry(false);
       console.log('isFetchingRegistry set to false');
       console.groupEnd();

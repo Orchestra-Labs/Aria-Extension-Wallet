@@ -67,6 +67,7 @@ export function useWalletDataRefresh() {
 
           if (assets.length > 0) {
             console.log(`[refreshWallet] Found assets for ${chainId}:`, assets);
+            console.log(`[refreshWallet] Current wallet:`, sessionWallet);
             updateChainWallet({ chainId, assets });
           } else {
             console.log(`[refreshWallet] No assets found for ${chainId}`);

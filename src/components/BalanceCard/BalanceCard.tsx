@@ -137,7 +137,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                 <span>&nbsp;</span>
               </div>
               {currentStep === 0 ? (
-                isSymphonySubscribed && (
+                isSymphonySubscribed ? (
                   <div className="flex flex-1 justify-center">
                     <Button
                       variant="selectedEnabled"
@@ -147,6 +147,10 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                     >
                       Reserve
                     </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-1">
+                    <span>&nbsp;</span>
                   </div>
                 )
               ) : (
@@ -174,7 +178,10 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                 <Button className="w-full" asChild>
                   <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
                 </Button>
-                <ReceiveDialog asset={balanceDisplayUnit} />
+                <ReceiveDialog
+                  asset={balanceDisplayUnit}
+                  chainId={getSymphonyChainId(networkLevel)}
+                />
               </>
             ) : (
               <>

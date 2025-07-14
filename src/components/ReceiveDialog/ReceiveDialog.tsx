@@ -2,7 +2,6 @@ import { useAtomValue } from 'jotai';
 import React, { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
-import { SYMPHONY_MAINNET_ID, SYMPHONY_PREFIX } from '@/constants';
 import { truncateWalletAddress } from '@/helpers';
 import { useDebounce } from '@/hooks';
 import { Asset } from '@/types';
@@ -10,25 +9,49 @@ import { Button, CopyTextField, SlideTray } from '@/ui-kit';
 import { AssetInput } from '@/components';
 
 import { QRCodeContainer } from '../QRCodeContainer';
-import { chainWalletAtom } from '@/atoms';
+import { chainWalletAtom, networkLevelAtom, subscribedChainRegistryAtom } from '@/atoms';
 
 interface ReceiveDialogProps {
   buttonSize?: 'default' | 'medium' | 'small' | 'xsmall';
   asset: Asset;
+  chainId: string;
 }
 
-export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'default', asset }) => {
-  // TODO: pass in chain ID
-  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
+export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({
+  buttonSize = 'default',
+  asset,
+  chainId,
+}) => {
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const walletState = useAtomValue(chainWalletAtom(chainId));
   const [amount, setAmount] = useState<number>(0);
   const [showPreferenceInput, setShowPreferenceInput] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset>(asset);
   const debouncedAmount = useDebounce(amount);
 
-  const walletDisplayAddress = useMemo(
-    () => truncateWalletAddress(SYMPHONY_PREFIX, walletState.address),
-    [walletState.address],
-  );
+  const getPrefix = () => {
+    try {
+      const chain = chainRegistry[networkLevel][chainId];
+      console.log(`[ReceiveDialog] Chain information for chain ${chainId}:`, chain);
+      const prefix = chain.bech32_prefix;
+      console.log(`[ReceiveDialog] Bech32 prefix for chain ${chainId}:`, prefix);
+      return prefix;
+    } catch (error) {
+      console.error('[ReceiveDialog] Error getting Bech32 prefix:', error);
+      console.log(
+        '[ReceiveDialog] Available chains in registry:',
+        Object.keys(chainRegistry[networkLevel] || {}),
+      );
+      return 'unknown'; // Fallback prefix
+    }
+  };
+
+  const walletDisplayAddress = useMemo(() => {
+    const prefix = getPrefix();
+    console.log('[ReceiveDialog] Using prefix:', prefix, 'for address:', walletState.address);
+    return truncateWalletAddress(prefix, walletState.address);
+  }, [walletState, chainId, networkLevel]);
 
   const qrData = useMemo<string>(
     () =>
@@ -39,7 +62,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
             amount: debouncedAmount || 0,
           })
         : walletState.address,
-    [selectedAsset.denom, debouncedAmount, showPreferenceInput, walletState.address],
+    [selectedAsset, debouncedAmount, showPreferenceInput],
   );
 
   // reset asset and amount when dialog closes
@@ -70,7 +93,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({ buttonSize = 'defa
               onClick={() => setShowPreferenceInput(true)}
               className="text-xs"
             >
-              Add data? (Aria Only)
+              Add unit/amount? (Aria Only)
             </Button>
           ) : (
             <Button

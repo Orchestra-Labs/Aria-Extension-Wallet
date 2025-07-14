@@ -32,19 +32,24 @@ export function useAddressGeneration() {
     const mnemonic = sessionToken.mnemonic;
     const chainPrefixes: Record<string, string> = {};
 
+    console.log('Full mainnet registry:', chainRegistry?.mainnet);
+    console.log('Looking for osmosis-1:', chainRegistry?.mainnet?.['osmosis-1']);
+    console.log('Looking for dungeon-1:', chainRegistry?.mainnet?.['dungeon-1']);
+
     console.log('Building chain prefixes from subscriptions...');
     for (const networkLevel of [NetworkLevel.MAINNET, NetworkLevel.TESTNET]) {
       const subscriptions = userAccount.settings.chainSubscriptions[networkLevel];
       console.log(`${networkLevel} subscriptions:`, Object.keys(subscriptions));
 
       for (const chainId of Object.keys(subscriptions)) {
-        const chainInfo =
-          networkLevel === NetworkLevel.MAINNET
-            ? chainRegistry?.mainnet?.[chainId]
-            : chainRegistry?.testnet?.[chainId];
+        const chainInfo = chainRegistry[networkLevel][chainId];
+
+        console.log(`Chain info for ${chainId}:`, chainInfo);
 
         if (chainInfo?.bech32_prefix) {
           chainPrefixes[chainId] = chainInfo.bech32_prefix;
+        } else {
+          console.warn(`No bech32_prefix found for ${chainId}`);
         }
       }
     }

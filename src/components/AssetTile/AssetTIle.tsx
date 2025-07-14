@@ -126,7 +126,7 @@ export const AssetTile = ({
         <Button size="medium" className="w-full" onClick={handleSendClick}>
           Send
         </Button>
-        <ReceiveDialog buttonSize="medium" asset={asset} />
+        <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.networkID} />
         <Button size="medium" className="w-full" onClick={() => setActiveIndex(1)}>
           Stake
         </Button>
