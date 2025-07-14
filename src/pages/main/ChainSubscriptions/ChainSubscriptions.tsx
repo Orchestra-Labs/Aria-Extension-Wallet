@@ -15,6 +15,7 @@ import {
   selectedChainIdsAtom,
   fullChainRegistryAtom,
   networkLevelAtom,
+  subscribedChainRegistryAtom,
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +29,7 @@ import {
   SortOrder,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { Asset, SimplifiedChainInfo } from '@/types';
+import { Asset, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
 import { saveAccountByID, getPrimaryFeeToken } from '@/helpers';
 
 const PAGE_TITLE = 'Chain & Coin Subscriptions';
@@ -66,6 +67,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const [subscriptionSelections, setSubscriptionSelections] = useAtom(subscriptionSelectionsAtom);
   const selectedChainIds = useAtomValue(selectedChainIdsAtom);
+  const setSubscribedChainRegistryAtom = useSetAtom(subscribedChainRegistryAtom);
 
   const [activeTab, setActiveTab] = useState<SubscriptionTab>(SubscriptionTab.CHAINS_TAB);
 
@@ -273,7 +275,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     });
   };
 
-  const confirmSelection = () => {
+  const saveToLocalStorage = () => {
     if (userAccount) {
       const updatedUserAccount = {
         ...userAccount,
@@ -287,6 +289,30 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
     }
+  };
+
+  const saveToState = () => {
+    // Update the subscribedChainRegistryAtom based on the new subscriptions
+
+    const updatedRegistry = {
+      mainnet: Object.fromEntries(
+        Object.entries(chainRegistry.mainnet).filter(
+          ([chainId]) => chainId in subscriptionSelections.mainnet,
+        ),
+      ) as LocalChainRegistry,
+      testnet: Object.fromEntries(
+        Object.entries(chainRegistry.testnet).filter(
+          ([chainId]) => chainId in subscriptionSelections.testnet,
+        ),
+      ) as LocalChainRegistry,
+    };
+
+    setSubscribedChainRegistryAtom(updatedRegistry);
+  };
+
+  const confirmSelection = () => {
+    saveToLocalStorage();
+    saveToState();
     closeAndReturn();
   };
 
