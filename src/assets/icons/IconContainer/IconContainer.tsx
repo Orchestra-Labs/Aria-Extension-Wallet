@@ -6,6 +6,7 @@ interface IconContainerProps {
   alt?: string;
   className?: string;
   icon?: React.ReactNode;
+  isFallback?: boolean;
 }
 
 export const IconContainer: React.FC<IconContainerProps> = ({
@@ -13,6 +14,7 @@ export const IconContainer: React.FC<IconContainerProps> = ({
   alt = '',
   className = 'w-full h-full',
   icon,
+  isFallback = false,
 }) => {
   const [error, setError] = React.useState(false);
 
@@ -22,22 +24,26 @@ export const IconContainer: React.FC<IconContainerProps> = ({
 
   const containerStyle = {
     borderRadius: '50%',
-    overflow: 'hidden',
+    overflow: isFallback ? 'visible' : 'hidden',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   };
 
   if (icon) {
-    <div style={containerStyle} className={className}>
-      {icon}
-    </div>;
+    return (
+      <div style={containerStyle} className={className}>
+        {icon}
+      </div>
+    );
   }
 
   if (error || !src) {
-    <div style={containerStyle} className={className}>
-      <NotFoundIcon className={className} />
-    </div>;
+    return (
+      <div style={containerStyle} className={className}>
+        <NotFoundIcon className={className} />
+      </div>
+    );
   }
 
   return (

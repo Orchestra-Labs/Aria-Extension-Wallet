@@ -26,7 +26,6 @@ export const showCurrentValidatorsAtom = atom(
   },
 );
 
-// Add this new atom to track manual overrides
 export const validatorDataAtom = atom<CombinedStakingInfo[]>([]);
 export const selectedValidatorsAtom = atom<CombinedStakingInfo[]>([]);
 export const validatorStatusFilterAtom = atom<ValidatorStatusFilter>(

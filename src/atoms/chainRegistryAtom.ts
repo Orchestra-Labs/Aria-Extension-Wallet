@@ -1,4 +1,9 @@
-import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, SettingsOption } from '@/constants';
+import {
+  DEFAULT_SUBSCRIPTION,
+  LOCAL_CHAIN_REGISTRY,
+  SettingsOption,
+  SYMPHONY_MAINNET_ID,
+} from '@/constants';
 import { Asset, LocalChainRegistry, SubscriptionRecord } from '@/types';
 import { atom } from 'jotai';
 import {
@@ -143,13 +148,40 @@ export const filteredChainRegistryAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);
   const subscriptionSelections = get(subscriptionSelectionsAtom);
 
+  console.log('[filteredChainRegistryAtom] chainRegistry:', chainRegistry);
+  console.log('[filteredChainRegistryAtom] networkLevel:', networkLevel);
+  console.log('[filteredChainRegistryAtom] subscriptionSelections:', subscriptionSelections);
+
   // Get subscribed chain IDs for the current network level
   const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
+  console.log('[filteredChainRegistryAtom] subscribedChainIds:', subscribedChainIds);
 
   const chains = Object.values(chainRegistry[networkLevel]).map(chain => ({
     ...chain,
     isSubscribed: subscribedChainIds.includes(chain.chain_id),
   }));
 
-  return filterAndSortChains(chains, searchTerm, sortOrder);
+  console.log('[filteredChainRegistryAtom] all chains before filtering:', chains);
+
+  const filteredChains = filterAndSortChains(chains, searchTerm, sortOrder);
+  console.log('[filteredChainRegistryAtom] filteredChains:', filteredChains);
+
+  return filteredChains;
+});
+
+export const selectedValidatorChainAtom = atom<string>(SYMPHONY_MAINNET_ID);
+
+export const selectedValidatorChainInfoAtom = atom(get => {
+  const chainId = get(selectedValidatorChainAtom);
+  const networkLevel = get(networkLevelAtom);
+  const chainRegistry = get(fullChainRegistryAtom);
+
+  const chainInfo = chainRegistry[networkLevel][chainId];
+  console.log('[selectedValidatorChainInfoAtom]', {
+    chainId,
+    networkLevel,
+    chainInfo,
+  });
+
+  return chainRegistry[networkLevel][chainId];
 });

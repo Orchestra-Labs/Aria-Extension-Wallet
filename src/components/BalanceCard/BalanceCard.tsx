@@ -12,7 +12,13 @@ import {
   subscribedChainRegistryAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
-import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
+import {
+  ChainSelectDialog,
+  Loader,
+  PoolStatusBlock,
+  ReceiveDialog,
+  ValidatorSelectDialog,
+} from '@/components';
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
 import { ROUTES, DEFAULT_MAINNET_ASSET, NetworkLevel, DEFAULT_TESTNET_ASSET } from '@/constants';
 import { useExchangeRate } from '@/hooks';
@@ -40,6 +46,13 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
   const networkWalletAssets = walletAssets.filter(asset => validChainIDs.includes(asset.networkID));
+
+  // Check if Symphony chain is subscribed
+  const isSymphonySubscribed = useMemo(() => {
+    const symphonyChainId =
+      networkLevel === NetworkLevel.MAINNET ? 'symphony-1' : 'symphony-testnet-4';
+    return validChainIDs.includes(symphonyChainId);
+  }, [networkLevel, validChainIDs]);
 
   let title = '';
   let primaryText = '';
@@ -125,20 +138,21 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                 <span>&nbsp;</span>
               </div>
               {currentStep === 0 ? (
-                // TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
-                <div className="flex flex-1 justify-center">
-                  <Button
-                    variant="selectedEnabled"
-                    size="xsmall"
-                    className="px-1 rounded text-xs"
-                    onClick={() => setShowReserveStatus(!showReserveStatus)}
-                  >
-                    Reserve
-                  </Button>
-                </div>
+                isSymphonySubscribed && (
+                  <div className="flex flex-1 justify-center">
+                    <Button
+                      variant="selectedEnabled"
+                      size="xsmall"
+                      className="px-1 rounded text-xs"
+                      onClick={() => setShowReserveStatus(!showReserveStatus)}
+                    >
+                      Reserve
+                    </Button>
+                  </div>
+                )
               ) : (
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
+                <div className="flex flex-1 justify-center">
+                  <ChainSelectDialog />
                 </div>
               )}
             </div>

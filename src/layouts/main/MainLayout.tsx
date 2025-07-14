@@ -3,21 +3,15 @@ import React, { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { LogoIcon } from '@/assets/icons';
-import { LoaderDots, OptionsDialog } from '@/components';
+import { OptionsDialog } from '@/components';
 import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
-import {
-  isFetchingRegistryDataAtom,
-  networkLevelAtom,
-  sessionWalletAtom,
-  userAccountAtom,
-} from '@/atoms';
+import { networkLevelAtom, sessionWalletAtom, userAccountAtom } from '@/atoms';
 import { Button } from '@/ui-kit';
 
 const MainLayout: React.FC = () => {
   const [networkLevel, setNetworkLevel] = useAtom(networkLevelAtom);
   const userWallet = useAtomValue(sessionWalletAtom);
   const userAccount = useAtomValue(userAccountAtom);
-  const isFetchingRegistry = useAtomValue(isFetchingRegistryDataAtom);
 
   const toggleNetworkLevel = () => {
     setNetworkLevel(prev =>
@@ -43,15 +37,6 @@ const MainLayout: React.FC = () => {
         <Copy width="14px" className="text-neutral-1 ml-1" />
       </div> */}
         <h1 className="text-white text-h3 font-semibold">{userWallet?.name}</h1>
-
-        {isFetchingRegistry && (
-          <div className="absolute top-16 left-0 right-0 flex justify-center items-center">
-            <div className="bg-neutral-800 px-3 py-1 rounded-md flex items-center">
-              <span className="text-sm text-neutral-1">Updating chain registry</span>
-              <LoaderDots className="mr-2" />
-            </div>
-          </div>
-        )}
 
         <div className="flex-1" />
         <div className="flex gap-x-2.5">

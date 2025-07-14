@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Asset, CombinedStakingInfo, TransactionResult, Uri } from '@/types';
+import { Asset, CombinedStakingInfo, TransactionResult, Uri, ValidatorLogoInfo } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
@@ -14,8 +14,7 @@ import {
   stakeToValidator,
   truncateWalletAddress,
   claimAndUnstake,
-  getFallbackValidatorLogo,
-  getValidatorLogoUrl,
+  getValidatorLogoInfo,
 } from '@/helpers';
 import {
   BondStatus,
@@ -76,7 +75,7 @@ const ValidatorTileComponent = ({
     combinedStakingInfo;
   const delegationResponse = { delegation, balance };
 
-  console.log('[ValidatorTile] Building Validator Tile:', validator.description.moniker);
+  // console.log('[ValidatorTile] Building Validator Tile:', validator.description.moniker);
 
   // TODO: if no staking denom, disable staking features
   const stakingDenom = chain.staking_denoms[0];
@@ -105,8 +104,11 @@ const ValidatorTileComponent = ({
     fee: string;
     textClass: 'text-error' | 'text-warn' | 'text-blue';
   } | null>({ fee: `0 ${asset?.symbol || DEFAULT_MAINNET_ASSET.symbol}`, textClass: 'text-blue' });
-  const [validatorLogoUrl, setValidatorLogoUrl] = useState<string | null>(null);
-  const [logoError, setLogoError] = useState(false);
+  const [validatorLogoInfo, setValidatorLogoInfo] = useState<ValidatorLogoInfo>({
+    url: null,
+    isFallback: false,
+    error: false,
+  });
 
   // Aggregating the rewards (sum all reward amounts for this validator)
   const rewardAmount = rewards
@@ -236,11 +238,12 @@ const ValidatorTileComponent = ({
   const validatorIcon = (
     <IconContainer
       alt={title}
-      src={validatorLogoUrl || undefined}
+      src={validatorLogoInfo.url || undefined}
+      isFallback={validatorLogoInfo.isFallback}
       icon={
         validator.jailed || validator.status === BondStatus.UNBONDED ? (
           <AlertCircleIcon className="text-error h-8 w-8" />
-        ) : logoError ? (
+        ) : validatorLogoInfo.error ? (
           <NotFoundIcon className="w-full h-full" />
         ) : undefined
       }
@@ -540,38 +543,19 @@ const ValidatorTileComponent = ({
 
   useEffect(() => {
     const fetchValidatorLogo = async () => {
-      try {
-        // First try to get logo URL from validator description
-        const logoUrl = getValidatorLogoUrl(validator.description);
+      const logoInfo = await getValidatorLogoInfo(
+        validator.description,
+        chainId,
+        chainRegistry[networkLevel],
+      );
+      console.log('[ValidatorTile] Logo info received:', {
+        moniker: validator.description.moniker,
+        url: logoInfo.url,
+        isFallback: logoInfo.isFallback,
+        error: logoInfo.error,
+      });
 
-        if (logoUrl) {
-          // If we have a Keybase URL, fetch the actual image URL
-          if (logoUrl.includes('keybase.io')) {
-            const response = await fetch(logoUrl);
-            const data = await response.json();
-
-            if (data?.them?.[0]?.pictures?.primary?.url) {
-              setValidatorLogoUrl(data.them[0].pictures.primary.url);
-              return;
-            }
-          } else {
-            // Direct image URL case
-            setValidatorLogoUrl(logoUrl);
-            return;
-          }
-        }
-
-        // If Keybase fails or not available, try chain logo
-        const chainLogo = getFallbackValidatorLogo(chainId, chainRegistry);
-        if (chainLogo) {
-          setValidatorLogoUrl(chainLogo);
-        } else {
-          setLogoError(true);
-        }
-      } catch (error) {
-        console.error('Error fetching validator logo:', error);
-        setLogoError(true);
-      }
+      setValidatorLogoInfo(logoInfo);
     };
 
     fetchValidatorLogo();

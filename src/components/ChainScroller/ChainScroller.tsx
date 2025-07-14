@@ -7,9 +7,14 @@ import { Asset, SimplifiedChainInfo } from '@/types';
 interface ChainScrollerProps {
   chains: SimplifiedChainInfo[];
   onChainSelect: (chain: SimplifiedChainInfo, feeToken: Asset | null) => void;
+  isDialog?: boolean;
 }
 
-export const ChainScroller: React.FC<ChainScrollerProps> = ({ chains, onChainSelect }) => {
+export const ChainScroller: React.FC<ChainScrollerProps> = ({
+  chains,
+  onChainSelect,
+  isDialog = false,
+}) => {
   const tileScrollerRef = useRef<TileScrollerHandle>(null);
   const { refreshData } = useRefreshData();
 
@@ -29,7 +34,9 @@ export const ChainScroller: React.FC<ChainScrollerProps> = ({ chains, onChainSel
       {chains.length === 0 ? (
         <p className="text-base text-neutral-1">No chains found</p>
       ) : (
-        chains.map(chain => <ChainTile key={chain.chain_id} chain={chain} onClick={handleClick} />)
+        chains.map(chain => (
+          <ChainTile key={chain.chain_id} chain={chain} onClick={handleClick} isDialog={isDialog} />
+        ))
       )}
     </TileScroller>
   );

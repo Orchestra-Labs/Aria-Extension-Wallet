@@ -4,6 +4,7 @@ export * from './AssetTile';
 export * from './AssetSelectDialog';
 export * from './BalanceCard';
 export * from './ChainScroller';
+export * from './ChainSelectDialog';
 export * from './ChainTile';
 export * from './ConnectedServicesDialog';
 export * from './CreatePasswordForm';

@@ -65,3 +65,9 @@ export interface CombinedStakingInfo {
   uptime?: string;
   unbondingBalance?: UnbondingDelegationEntry;
 }
+
+export interface ValidatorLogoInfo {
+  url: string | null;
+  isFallback: boolean;
+  error: boolean;
+}

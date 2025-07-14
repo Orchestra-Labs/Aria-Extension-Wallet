@@ -3,11 +3,11 @@ import {
   isFetchingValidatorDataAtom,
   networkLevelAtom,
   validatorDataAtom,
+  selectedValidatorChainAtom,
 } from '@/atoms';
 import { fetchValidatorData } from '@/helpers';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { sessionWalletAtom } from '@/atoms/walletAtom';
-import { NetworkLevel, SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID } from '@/constants';
 
 export function useValidatorDataRefresh() {
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
@@ -15,8 +15,7 @@ export function useValidatorDataRefresh() {
   const setIsFetchingData = useSetAtom(isFetchingValidatorDataAtom);
   const { chainWallets } = useAtomValue(sessionWalletAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
-  // TODO: on page load set current chain id for validators to user default, then change via button
-  const chainId = networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+  const chainId = useAtomValue(selectedValidatorChainAtom);
 
   const refreshValidatorData = async () => {
     console.log(
