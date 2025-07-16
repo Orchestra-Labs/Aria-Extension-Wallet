@@ -1,6 +1,6 @@
 import { DEFAULT_MAINNET_ASSET, DEFAULT_TESTNET_ASSET } from '@/constants';
 import { Asset } from '@/types';
-import { atom } from 'jotai';
+import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { allWalletAssetsAtom } from './walletAtom';
@@ -8,8 +8,38 @@ import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
 
-export const selectedAssetAtom = atom<Asset>(DEFAULT_MAINNET_ASSET);
-export const dialogSelectedAssetAtom = atom<Asset>(DEFAULT_MAINNET_ASSET);
+// Helper type for writable atoms
+type WriteableAtom<T> = WritableAtom<T, [T], void>;
+
+// Private atoms to store independent values
+const _selectedAssetAtom = atom<Asset | null>(null);
+const _dialogSelectedAssetAtom = atom<Asset | null>(null);
+
+export const selectedAssetAtom: WriteableAtom<Asset> = atom(
+  get => {
+    const defaultAsset = get(defaultAssetAtom);
+    const independentValue = get(_selectedAssetAtom);
+    // Use independent value if it exists, otherwise fall back to default
+    return independentValue ? independentValue : defaultAsset;
+  },
+  (_, set, newAsset: Asset) => {
+    // Directly update our own atom's storage
+    set(_selectedAssetAtom, newAsset);
+  },
+);
+
+export const dialogSelectedAssetAtom: WriteableAtom<Asset> = atom(
+  get => {
+    const defaultAsset = get(defaultAssetAtom);
+    const independentValue = get(_dialogSelectedAssetAtom);
+    // Use independent value if it exists, otherwise fall back to default
+    return independentValue ? independentValue : defaultAsset;
+  },
+  (_, set, newAsset: Asset) => {
+    // Only update the independent value, not the default
+    set(_dialogSelectedAssetAtom, newAsset);
+  },
+);
 
 export const defaultAssetAtom = atom(get => {
   const userAccount = get(userAccountAtom);

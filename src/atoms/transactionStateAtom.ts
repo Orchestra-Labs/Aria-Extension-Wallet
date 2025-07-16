@@ -1,91 +1,98 @@
-import { atom } from 'jotai';
+import { atom, WritableAtom } from 'jotai';
 import { defaultFeeState, defaultReceiveState, defaultSendState } from '@/constants';
 import { TransactionState } from '@/types';
-import { defaultAssetAtom, selectedAssetAtom } from './assetsAtom';
+import { selectedAssetAtom } from './assetsAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 
-// Helper function to create a transaction state atom with default asset fallback
-const createTransactionStateAtom = (defaultState: TransactionState) => {
+type TransactionStateAtom = WritableAtom<
+  TransactionState,
+  [TransactionState | ((prev: TransactionState) => TransactionState)],
+  void
+>;
+
+// Helper function to create transaction state atoms
+const createTransactionAtom = (
+  defaultState: TransactionState,
+  storageAtom: WritableAtom<TransactionState, [TransactionState], void>,
+) => {
   return atom(
     get => {
-      const defaultAsset = get(selectedAssetAtom);
-      return {
-        ...defaultState,
-        asset: defaultAsset,
-        chainID: defaultAsset.networkID,
-      };
+      const baseState = get(storageAtom);
+      if (baseState.asset.denom === defaultState.asset.denom) {
+        const selectedAsset = get(selectedAssetAtom);
+        return {
+          ...defaultState,
+          asset: selectedAsset,
+          chainID: selectedAsset.networkID,
+        };
+      }
+      return baseState;
     },
     (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
-      const defaultAsset = get(selectedAssetAtom);
-      const newValue =
-        typeof update === 'function'
-          ? update({
-              ...defaultState,
-              asset: defaultAsset,
-              chainID: defaultAsset.networkID,
-            })
-          : update;
-
-      set(defaultStateAtom, newValue);
+      const current = get(storageAtom);
+      const newValue = typeof update === 'function' ? update(current) : update;
+      set(storageAtom, newValue);
     },
-  );
+  ) as TransactionStateAtom;
 };
 
-// Special atom for fee state that considers chain-specific fee tokens
-export const feeStateAtom = atom(
+// Base storage atoms
+const _sendStateAtom = atom<TransactionState>(defaultSendState);
+const _receiveStateAtom = atom<TransactionState>(defaultReceiveState);
+const _feeStateAtom = atom<TransactionState>(defaultFeeState);
+
+// Public state atoms
+export const sendStateAtom = createTransactionAtom(defaultSendState, _sendStateAtom);
+export const receiveStateAtom = createTransactionAtom(defaultReceiveState, _receiveStateAtom);
+
+export const feeStateAtom: TransactionStateAtom = atom(
   get => {
-    const defaultAsset = get(defaultAssetAtom);
+    const selectedAsset = get(selectedAssetAtom);
     const networkLevel = get(networkLevelAtom);
     const chainRegistry = get(subscribedChainRegistryAtom);
 
-    // Get the chain info for the default asset's network
-    const chainInfo = chainRegistry[networkLevel][defaultAsset.networkID];
-
-    // Find the first fee token that matches our default asset
-    const feeToken = chainInfo?.fees?.find(fee => fee.denom === defaultAsset.denom);
+    const chainInfo = chainRegistry[networkLevel][selectedAsset.networkID];
+    const feeToken = chainInfo?.fees?.find(fee => fee.denom === selectedAsset.denom);
 
     return {
-      asset: defaultAsset,
+      asset: selectedAsset,
       amount: feeToken?.gasPriceStep?.average || defaultFeeState.amount,
-      chainID: defaultAsset.networkID,
-      // Include additional fee token info if available
+      chainID: selectedAsset.networkID,
       feeToken: feeToken
         ? {
-            denom: defaultAsset.denom,
+            denom: selectedAsset.denom,
             gasPriceStep: feeToken.gasPriceStep,
           }
         : undefined,
     };
   },
   (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
-    const currentState = get(feeStateAtom);
-    const newValue = typeof update === 'function' ? update(currentState) : update;
-    set(defaultStateAtom, newValue);
+    const current = get(_feeStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_feeStateAtom, newValue);
   },
 );
 
-export const sendStateAtom = createTransactionStateAtom(defaultSendState);
-export const receiveStateAtom = createTransactionStateAtom(defaultReceiveState);
-
-// Maintain the original atom for internal use
-const defaultStateAtom = atom<TransactionState>(defaultSendState);
-
-// Helper function to reset all transaction states
+// Reset function
 export const resetTransactionStatesAtom = atom(null, (get, set) => {
-  const defaultAsset = get(defaultAssetAtom);
+  const selectedAsset = get(selectedAssetAtom);
 
-  set(sendStateAtom, {
+  set(_sendStateAtom, {
     ...defaultSendState,
-    asset: defaultAsset,
-    chainID: defaultAsset.networkID,
+    asset: selectedAsset,
+    chainID: selectedAsset.networkID,
   });
 
-  set(receiveStateAtom, {
+  set(_receiveStateAtom, {
     ...defaultReceiveState,
-    asset: defaultAsset,
-    chainID: defaultAsset.networkID,
+    asset: selectedAsset,
+    chainID: selectedAsset.networkID,
   });
 
-  set(feeStateAtom, get(feeStateAtom));
+  // Reset fee state while maintaining the current fee calculation
+  set(_feeStateAtom, {
+    ...get(feeStateAtom),
+    ...defaultFeeState,
+  });
 });
