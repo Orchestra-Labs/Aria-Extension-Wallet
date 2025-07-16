@@ -4,9 +4,10 @@ import {
   GREATER_EXPONENT_DEFAULT,
   LOCAL_ASSET_REGISTRY,
 } from '@/constants';
-import { queryRpcNode } from './queryNodes';
 import { DelegationResponse, TransactionResult } from '@/types';
+
 import { fetchRewards } from './fetchStakingInfo';
+import { queryRpcNode } from './queryNodes';
 
 const MAX_MESSAGES_PER_BATCH = 15;
 

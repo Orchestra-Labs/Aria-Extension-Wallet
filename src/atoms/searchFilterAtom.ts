@@ -1,5 +1,6 @@
-import { ValidatorSortType } from '@/constants';
 import { atom } from 'jotai';
+
+import { ValidatorSortType } from '@/constants';
 
 export const searchTermAtom = atom<string>('');
 export const dialogSearchTermAtom = atom<string>('');

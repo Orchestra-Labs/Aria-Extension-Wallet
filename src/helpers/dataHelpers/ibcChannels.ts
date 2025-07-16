@@ -1,4 +1,5 @@
 import { NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
+
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const IBC_STORAGE_KEYS = {

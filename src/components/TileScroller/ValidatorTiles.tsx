@@ -1,8 +1,10 @@
-import React from 'react';
 import { useAtomValue } from 'jotai';
-import { ValidatorScrollTile } from '../ValidatorScrollTile';
-import { filteredValidatorsAtom, filteredDialogValidatorsAtom } from '@/atoms';
+import React from 'react';
+
+import { filteredDialogValidatorsAtom, filteredValidatorsAtom } from '@/atoms';
 import { CombinedStakingInfo } from '@/types';
+
+import { ValidatorScrollTile } from '../ValidatorScrollTile';
 
 interface ValidatorTilesProps {
   isSelectable?: boolean;

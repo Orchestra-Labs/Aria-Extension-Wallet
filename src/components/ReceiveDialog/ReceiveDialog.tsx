@@ -1,14 +1,14 @@
+import clsx from 'clsx';
 import { useAtomValue } from 'jotai';
 import React, { useEffect, useMemo, useState } from 'react';
-import clsx from 'clsx';
 
 import { walletStateAtom } from '@/atoms';
+import { AssetInput } from '@/components';
 import { WALLET_PREFIX } from '@/constants';
 import { truncateWalletAddress } from '@/helpers';
 import { useDebounce } from '@/hooks';
 import { Asset } from '@/types';
 import { Button, CopyTextField, SlideTray } from '@/ui-kit';
-import { AssetInput } from '@/components';
 
 import { QRCodeContainer } from '../QRCodeContainer';
 

@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Asset } from '@/types';
+import BigNumber from 'bignumber.js';
+import { useAtomValue } from 'jotai';
+import { useEffect, useState } from 'react';
+
+import { sendStateAtom, walletAssetsAtom } from '@/atoms';
 import {
-  LOCAL_ASSET_REGISTRY,
-  DEFAULT_ASSET,
   CHAIN_ENDPOINTS,
+  DEFAULT_ASSET,
   GREATER_EXPONENT_DEFAULT,
+  LOCAL_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRestNode } from '@/helpers';
-import { useAtomValue } from 'jotai';
-import { sendStateAtom, walletAssetsAtom } from '@/atoms';
-import BigNumber from 'bignumber.js';
+import { Asset } from '@/types';
 
 interface ExchangeRequirementResponse {
   exchange_requirements: {

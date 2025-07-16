@@ -1,8 +1,9 @@
-import { walletAssetsAtom, walletAddressAtom, isFetchingWalletDataAtom } from '@/atoms';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+
+import { isFetchingWalletDataAtom, walletAddressAtom, walletAssetsAtom } from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { DEFAULT_SUBSCRIPTION } from '@/constants';
 import { fetchWalletAssets } from '@/helpers';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 
 export function useWalletAssetsRefresh() {
   const [walletAddress] = useAtom(walletAddressAtom);

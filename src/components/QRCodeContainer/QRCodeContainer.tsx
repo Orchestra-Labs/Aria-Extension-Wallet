@@ -1,5 +1,6 @@
-import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import React from 'react';
+
 import logo from '@/assets/images/logo_with_title_rounded.svg';
 
 interface QRCodeContainerProps {

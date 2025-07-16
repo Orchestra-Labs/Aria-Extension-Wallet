@@ -1,11 +1,11 @@
+import { GREATER_EXPONENT_DEFAULT } from '@/constants';
 import {
-  claimRewards,
   claimAndRestake,
   claimAndUnstake,
+  claimRewards,
   stakeToValidator,
 } from '@/helpers/stakingTransactions';
-import { Intent, CombinedStakingInfo, Asset } from '@/types';
-import { GREATER_EXPONENT_DEFAULT } from '@/constants';
+import { Asset, CombinedStakingInfo, Intent } from '@/types';
 
 type ValidatorTarget =
   | string

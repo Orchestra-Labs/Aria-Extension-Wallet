@@ -1,15 +1,16 @@
-import { useState } from 'react';
-import { Header, TutorialDisplay } from '@/components';
-import { Button, Separator, Stepper } from '@/ui-kit';
-import sendPageImage from '@/assets/images/send_page.png';
-import selectPageImage from '@/assets/images/receive_asset_tile.png';
-import sendImage from '@/assets/images/swap_enabled.png';
-import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '@/constants';
 import { useAtom, useAtomValue } from 'jotai';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import selectPageImage from '@/assets/images/receive_asset_tile.png';
+import sendPageImage from '@/assets/images/send_page.png';
+import sendImage from '@/assets/images/swap_enabled.png';
 import { isInitialDataLoadAtom } from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { Header, TutorialDisplay } from '@/components';
+import { ROUTES } from '@/constants';
 import { saveAccountByID } from '@/helpers';
+import { Button, Separator, Stepper } from '@/ui-kit';
 
 const PAGE_TITLE = 'Swap Tutorial';
 

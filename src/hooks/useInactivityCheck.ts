@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useLogout } from './useLogout';
+
 import { INACTIVITY_TIMEOUT, RECHECK_TIMEOUT } from '@/constants';
+
+import { useLogout } from './useLogout';
 
 /**
  * Custom hook to handle user inactivity and automatic logout.

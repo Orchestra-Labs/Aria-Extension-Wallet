@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+
 import { defaultFeeState, defaultReceiveState, defaultSendState } from '@/constants';
 import { TransactionState } from '@/types';
 

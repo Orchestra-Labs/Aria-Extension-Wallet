@@ -1,19 +1,21 @@
-import { Asset } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
-import { ScrollTile } from '../ScrollTile';
-import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { DEFAULT_ASSET, LOCAL_ASSET_REGISTRY, ROUTES } from '@/constants';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import {
-  swiperIndexState,
-  selectedAssetAtom,
   dialogSelectedAssetAtom,
-  sendStateAtom,
-  selectedCoinListAtom,
   receiveStateAtom,
+  selectedAssetAtom,
+  selectedCoinListAtom,
+  sendStateAtom,
+  swiperIndexState,
 } from '@/atoms/';
+import { DEFAULT_ASSET, LOCAL_ASSET_REGISTRY, ROUTES } from '@/constants';
 import { formatBalanceDisplay } from '@/helpers';
+import { Asset } from '@/types';
+import { Button, SlideTray } from '@/ui-kit';
+
+import { ReceiveDialog } from '../ReceiveDialog';
+import { ScrollTile } from '../ScrollTile';
 
 interface AssetScrollTileProps {
   asset: Asset;

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
-import { EyeOpen, EyeClose } from '@/assets/icons';
-import { InputStatus, ROUTES } from '@/constants';
-import { Button, Input } from '@/ui-kit';
-import { resetNodeErrorCounts, tryAuthorizeAccess } from '@/helpers';
 import { useSetAtom } from 'jotai';
+import React, { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+
+import { EyeClose, EyeOpen } from '@/assets/icons';
 import { isLoggedInAtom } from '@/atoms';
+import { InputStatus, ROUTES } from '@/constants';
+import { resetNodeErrorCounts, tryAuthorizeAccess } from '@/helpers';
+import { Button, Input } from '@/ui-kit';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();

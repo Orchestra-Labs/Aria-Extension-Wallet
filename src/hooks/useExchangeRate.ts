@@ -3,8 +3,8 @@ import BigNumber from 'bignumber.js';
 import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 
-import { CHAIN_ENDPOINTS, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
 import { receiveStateAtom, sendStateAtom } from '@/atoms';
+import { CHAIN_ENDPOINTS, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
 import { isValidSwap, queryRestNode } from '@/helpers';
 
 export function useExchangeRate() {

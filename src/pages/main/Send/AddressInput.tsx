@@ -1,17 +1,18 @@
-import { Input } from '@/ui-kit';
+import { bech32 } from 'bech32';
 import { useAtomValue, useSetAtom } from 'jotai';
+import { useEffect, useState } from 'react';
+
 import {
   addressVerifiedAtom,
   receiveStateAtom,
   recipientAddressAtom,
   walletStateAtom,
 } from '@/atoms';
-import { useEffect, useState } from 'react';
+import { QRCodeScannerDialog } from '@/components';
 import { InputStatus } from '@/constants';
 import { cn, fetchBech32Prefixes } from '@/helpers';
-import { QRCodeScannerDialog } from '@/components';
 import { Asset, ChainData } from '@/types';
-import { bech32 } from 'bech32';
+import { Input } from '@/ui-kit';
 
 interface AddressInputProps {
   addBottomMargin?: boolean;

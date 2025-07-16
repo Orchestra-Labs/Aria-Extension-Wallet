@@ -1,15 +1,16 @@
-import { CombinedStakingInfo } from '@/types';
 import { atom } from 'jotai';
+
 import {
-  validatorSortOrderAtom,
-  validatorSortTypeAtom,
-  searchTermAtom,
   dialogSearchTermAtom,
+  searchTermAtom,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
+  validatorSortOrderAtom,
+  validatorSortTypeAtom,
 } from '@/atoms';
-import { filterAndSortValidators } from '@/helpers';
 import { ValidatorStatusFilter } from '@/constants';
+import { filterAndSortValidators } from '@/helpers';
+import { CombinedStakingInfo } from '@/types';
 
 export const showCurrentValidatorsAtom = atom<boolean>(true);
 export const validatorDataAtom = atom<CombinedStakingInfo[]>([]);

@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { Input, Separator } from '@/ui-kit';
 import { useAtom } from 'jotai';
+import React, { useEffect } from 'react';
+
 import { dialogSearchTermAtom, searchTermAtom } from '@/atoms';
+import { Input, Separator } from '@/ui-kit';
 
 interface SearchBarProps {
   isDialog?: boolean;

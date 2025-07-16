@@ -1,7 +1,8 @@
 import React from 'react';
+
 import { VerifyFailure, VerifySuccess } from '@/assets/icons';
-import { CopyTextField } from '@/ui-kit';
 import { cn, truncateWalletAddress } from '@/helpers';
+import { CopyTextField } from '@/ui-kit';
 
 interface TransactionResultsTileProps {
   isSuccess: boolean;

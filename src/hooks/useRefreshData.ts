@@ -1,7 +1,9 @@
 import { useAtom } from 'jotai';
+
+import { walletAddressAtom } from '@/atoms';
+
 import { useValidatorDataRefresh } from './useValidatorDataRefresh';
 import { useWalletAssetsRefresh } from './useWalletDataRefresh';
-import { walletAddressAtom } from '@/atoms';
 
 export function useRefreshData() {
   const [walletAddress] = useAtom(walletAddressAtom);

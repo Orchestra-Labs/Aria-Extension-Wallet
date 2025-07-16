@@ -1,11 +1,12 @@
 import {
+  CHAIN_ENDPOINTS,
+  GREATER_EXPONENT_DEFAULT,
   IBC_PREFIX,
   LOCAL_ASSET_REGISTRY,
-  GREATER_EXPONENT_DEFAULT,
-  CHAIN_ENDPOINTS,
   LOCAL_CHAIN_REGISTRY,
 } from '@/constants';
 import { Asset, SubscriptionRecord } from '@/types';
+
 import { queryRestNode } from './queryNodes';
 
 const adjustAmountByExponent = (amount: string, exponent: number): string => {

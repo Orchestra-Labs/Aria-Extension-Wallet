@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
 import { Secp256k1HdWallet } from '@cosmjs/amino';
-import { CreatePasswordForm, RecoveryPhraseGrid, WalletSuccessScreen } from '@/components';
-import { ROUTES } from '@/constants';
-import { Button, Stepper } from '@/ui-kit';
 import { useAtom, useSetAtom } from 'jotai';
+import { useEffect, useState } from 'react';
+import { NavLink } from 'react-router-dom';
+
 import {
   confirmPasswordAtom,
   isLoggedInAtom,
@@ -15,9 +13,12 @@ import {
   passwordsVerifiedAtom,
   use24WordsState,
 } from '@/atoms';
-import { createAccount } from '@/helpers/dataHelpers/account';
+import { CreatePasswordForm, RecoveryPhraseGrid, WalletSuccessScreen } from '@/components';
+import { ROUTES } from '@/constants';
 import { createWallet, saveSessionData } from '@/helpers';
+import { createAccount } from '@/helpers/dataHelpers/account';
 import { AccountRecord } from '@/types';
+import { Button, Stepper } from '@/ui-kit';
 
 const STEPS_LABELS = ['Create password', 'Recovery phrase', 'Verify phrase'];
 

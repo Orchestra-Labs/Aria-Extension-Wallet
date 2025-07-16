@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+
 import { VerifySuccess } from '@/assets/icons';
-import { Button, CopyTextField } from '@/ui-kit';
 import { ROUTES } from '@/constants';
 import { truncateWalletAddress } from '@/helpers';
+import { Button, CopyTextField } from '@/ui-kit';
 
 interface WalletSuccessScreenProps {
   caption: string;

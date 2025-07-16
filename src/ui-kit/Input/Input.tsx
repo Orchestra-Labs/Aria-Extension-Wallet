@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { ReactNode } from 'react';
 
-import { cn } from '@/helpers/utils';
 import { InputStatus } from '@/constants';
+import { cn } from '@/helpers/utils';
+
 import { Button } from '../Button';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {

@@ -1,12 +1,13 @@
+import { useAtomValue } from 'jotai';
 import React, { useEffect, useState } from 'react';
-import { CreatePasswordForm, Header, TransactionResultsTile } from '@/components';
 import { useNavigate } from 'react-router-dom';
+
+import { EyeClose, EyeOpen } from '@/assets/icons';
+import { passwordAtom, passwordsVerifiedAtom } from '@/atoms';
+import { CreatePasswordForm, Header, TransactionResultsTile } from '@/components';
 import { InputStatus, ROUTES, VALID_PASSWORD_LENGTH } from '@/constants';
 import { getSessionToken, updateAccountPassword } from '@/helpers';
-import { useAtomValue } from 'jotai';
-import { passwordAtom, passwordsVerifiedAtom } from '@/atoms';
 import { Button, Input, Separator } from '@/ui-kit';
-import { EyeClose, EyeOpen } from '@/assets/icons';
 
 interface ViewPassphraseProps {}
 

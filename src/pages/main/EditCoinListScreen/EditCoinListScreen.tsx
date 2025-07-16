@@ -1,22 +1,23 @@
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import React, { useEffect } from 'react';
-import { Header, Loader, SearchBar, SortDialog, TileScroller } from '@/components';
+import { useNavigate } from 'react-router-dom';
+
 import {
+  assetDialogSortOrderAtom,
+  assetDialogSortTypeAtom,
+  dialogSearchTermAtom,
   filteredExchangeAssetsAtom,
   isInitialDataLoadAtom,
   selectedCoinListAtom,
-  symphonyAssetsAtom,
-  assetDialogSortTypeAtom,
-  assetDialogSortOrderAtom,
-  dialogSearchTermAtom,
   subscribedAssetsAtom,
+  symphonyAssetsAtom,
 } from '@/atoms';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useNavigate } from 'react-router-dom';
-import { DEFAULT_CHAIN_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
-import { Button, Separator } from '@/ui-kit';
-import { Asset, SubscriptionRecord } from '@/types';
-import { saveAccountByID } from '@/helpers/dataHelpers/account';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { Header, Loader, SearchBar, SortDialog, TileScroller } from '@/components';
+import { DEFAULT_CHAIN_ID, DEFAULT_SUBSCRIPTION, ROUTES } from '@/constants';
+import { saveAccountByID } from '@/helpers/dataHelpers/account';
+import { Asset, SubscriptionRecord } from '@/types';
+import { Button, Separator } from '@/ui-kit';
 
 interface EditCoinListScreenProps {}
 

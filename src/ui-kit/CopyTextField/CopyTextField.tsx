@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+
 import { Copy, VerifySuccess } from '@/assets/icons';
-import { Button } from '@/ui-kit';
 import { ICON_CHANGEOVER_TIMEOUT } from '@/constants';
+import { Button } from '@/ui-kit';
 
 interface CopyTextFieldProps {
   variant?: 'transparent' | 'text';

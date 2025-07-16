@@ -1,6 +1,7 @@
-import { Asset, CombinedStakingInfo } from '@/types';
-import { stripNonAlphanumerics } from './formatString';
 import { BondStatus, ValidatorSortType, ValidatorStatusFilter } from '@/constants';
+import { Asset, CombinedStakingInfo } from '@/types';
+
+import { stripNonAlphanumerics } from './formatString';
 
 export function filterAndSortAssets(
   assets: Asset[],

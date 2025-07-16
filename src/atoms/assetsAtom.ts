@@ -1,6 +1,7 @@
+import { atom } from 'jotai';
+
 import { DEFAULT_ASSET } from '@/constants';
 import { Asset } from '@/types';
-import { atom } from 'jotai';
 
 export const showAllAssetsAtom = atom<boolean>(false);
 

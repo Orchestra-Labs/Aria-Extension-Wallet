@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { bech32 } from 'bech32';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAtomValue, useSetAtom } from 'jotai';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePermission } from 'react-use';
-import { bech32 } from 'bech32';
 
 import { QRCode } from '@/assets/icons';
 import { recipientAddressAtom, symphonyAssetsAtom } from '@/atoms';
