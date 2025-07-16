@@ -25,20 +25,22 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   updateReceiveAsset,
   updateTransactionType,
 }) => {
-  const [address, setAddress] = useState('');
+  const sendState = useAtomValue(sendStateAtom);
+  const walletState = useAtomValue(chainWalletAtom(sendState.chainID));
+
   const setRecipientAddress = useSetAtom(recipientAddressAtom);
   const setAddressVerified = useSetAtom(addressVerifiedAtom);
   const setReceiveState = useSetAtom(receiveStateAtom);
-  const sendState = useAtomValue(sendStateAtom);
 
-  const walletState = useAtomValue(chainWalletAtom(sendState.chainID));
-
+  const [address, setAddress] = useState('');
   const [addressStatus, setAddressStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
   const [messageText, setMessageText] = useState<string>('');
   const [allowValidateAddress, setAllowValidatePassword] = useState(false);
   const [testnetPrefixes, setTestnetPrefixes] = useState<ChainData[]>([]);
 
+  // TODO: what is the smallest valid address length, given they can be different lengths?
   const validAddressLength = 47;
+  const placeholder = walletState?.address || 'Wallet Address or ICNS';
 
   const validateAddress = () => {
     if (address === '') {
@@ -170,7 +172,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         status={addressStatus}
         showMessageText={true}
         messageText={messageText}
-        placeholder={walletState.address || 'Wallet Address or ICNS'}
+        placeholder={placeholder}
         icon={<QRCodeScannerDialog updateReceiveAsset={updateReceiveAsset} />}
         value={address}
         onChange={handleAddressChange}

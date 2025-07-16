@@ -84,7 +84,7 @@ export const Send = () => {
   const defaultAsset = useAtomValue(defaultAssetAtom);
   const resetTransactionStates = useSetAtom(resetTransactionStatesAtom);
 
-  const walletState = useAtomValue(chainWalletAtom(sendState.asset.networkID));
+  const walletState = useAtomValue(chainWalletAtom(selectedAsset.networkID));
   const walletAssets = walletState?.assets || [];
 
   // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
@@ -366,6 +366,7 @@ export const Send = () => {
   const updateSendAsset = (newAsset: Asset, propagateChanges: boolean = false) => {
     setSendState(prevState => ({
       ...prevState,
+      chainID: newAsset.networkID,
       asset: {
         ...newAsset,
       },
@@ -388,6 +389,7 @@ export const Send = () => {
   const updateReceiveAsset = (newAsset: Asset, propagate: boolean = false) => {
     setReceiveState(prevState => ({
       ...prevState,
+      chainID: newAsset.networkID,
       asset: {
         ...newAsset,
       },
@@ -847,8 +849,6 @@ export const Send = () => {
     setUserIsOnPage(true);
     setRecipientAddress(walletState.address);
     setAddressVerified(true);
-    updateSendAsset(selectedAsset);
-    updateReceiveAsset(selectedAsset);
 
     return () => {
       setUserIsOnPage(false);

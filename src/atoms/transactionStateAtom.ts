@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
 import { defaultFeeState, defaultReceiveState, defaultSendState } from '@/constants';
 import { TransactionState } from '@/types';
-import { defaultAssetAtom } from './assetsAtom';
+import { defaultAssetAtom, selectedAssetAtom } from './assetsAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 
@@ -9,7 +9,7 @@ import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 const createTransactionStateAtom = (defaultState: TransactionState) => {
   return atom(
     get => {
-      const defaultAsset = get(defaultAssetAtom);
+      const defaultAsset = get(selectedAssetAtom);
       return {
         ...defaultState,
         asset: defaultAsset,
@@ -17,7 +17,7 @@ const createTransactionStateAtom = (defaultState: TransactionState) => {
       };
     },
     (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
-      const defaultAsset = get(defaultAssetAtom);
+      const defaultAsset = get(selectedAssetAtom);
       const newValue =
         typeof update === 'function'
           ? update({

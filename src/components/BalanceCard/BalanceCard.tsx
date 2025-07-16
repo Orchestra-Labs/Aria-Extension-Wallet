@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
 
@@ -11,8 +11,6 @@ import {
   validatorDataAtom,
   subscribedChainRegistryAtom,
   hasNonZeroAssetsAtom,
-  defaultAssetAtom,
-  selectedAssetAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -41,8 +39,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const networkLevel = useAtomValue(networkLevelAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
-  const setSelectedAsset = useSetAtom(selectedAssetAtom);
-  const defaultAsset = useAtomValue(defaultAssetAtom);
 
   console.log('[BalanceCard] Non-zero assets check:', {
     hasNonZeroAssets,
@@ -117,7 +113,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     disabled:border-none disabled:text-neutral-3 disabled:bg-transparent disabled:cursor-default`;
 
   const handleSendClick = () => {
-    setSelectedAsset(defaultAsset);
     navigate(ROUTES.APP.SEND);
   };
 
