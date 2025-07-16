@@ -4,13 +4,17 @@ import {
   GREATER_EXPONENT_DEFAULT,
   SYMPHONY_ENDPOINTS,
   QueryType,
-  SYMPHONY_MAINNET_ID,
   DEFAULT_MAINNET_ASSET,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import { queryRestNode } from '@/helpers';
+import { getSymphonyChainId, queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { allWalletAssetsAtom, subscribedChainRegistryAtom, sendStateAtom } from '@/atoms';
+import {
+  allWalletAssetsAtom,
+  subscribedChainRegistryAtom,
+  sendStateAtom,
+  networkLevelAtom,
+} from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -32,22 +36,24 @@ export const useExchangeAssets = () => {
   const sendState = useAtomValue(sendStateAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const chainInfo = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
-  console.log(`[useExchangeAssets] chainInfo for ${SYMPHONY_MAINNET_ID}:`, chainInfo);
+  const symphonyId = getSymphonyChainId(networkLevel);
+  const chainInfo = chainRegistry[networkLevel][symphonyId];
+  console.log(`[useExchangeAssets] chainInfo for ${symphonyId}:`, chainInfo);
 
   if (!chainInfo) {
-    console.error(`[useExchangeAssets] No chain info found for ${SYMPHONY_MAINNET_ID}`);
+    console.error(`[useExchangeAssets] No chain info found for ${symphonyId}`);
   }
 
   const prefix = chainInfo?.bech32_prefix || '';
   const restUris = chainInfo?.rest_uris || [];
 
   if (!restUris.length) {
-    console.error('[useExchangeAssets] Missing rest URIs for', SYMPHONY_MAINNET_ID);
+    console.error('[useExchangeAssets] Missing rest URIs for', symphonyId);
   }
 
   const fetchExchangeAssets = async () => {
@@ -58,7 +64,7 @@ export const useExchangeAssets = () => {
       const defaultAsset = DEFAULT_MAINNET_ASSET;
       const sendAsset = sendState.asset;
 
-      console.log('[useExchangeAssets] querying for exchange rates for:', SYMPHONY_MAINNET_ID);
+      console.log('[useExchangeAssets] querying for exchange rates for:', symphonyId);
       console.log('[useExchangeAssets] using rest uris:', restUris);
       const response = (await queryRestNode({
         endpoint: `${SYMPHONY_ENDPOINTS.exchangeRequirements}`,

@@ -1,4 +1,9 @@
-import { DEFAULT_MAINNET_ASSET, MAX_RETRIES_PER_QUERY, QueryType } from '@/constants';
+import {
+  DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
+  DEFAULT_MAINNET_ASSET,
+  MAX_RETRIES_PER_QUERY,
+  QueryType,
+} from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
 import { RPCResponse, Uri } from '@/types';
@@ -10,7 +15,6 @@ import {
 import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
-
 const isIndexerError = (error: any): boolean => {
   return (
     error?.message?.includes('transaction indexing is disabled') ||
@@ -44,7 +48,6 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
   return responseBody;
 };
 
-// TODO: modify to support multi-send
 // Helper: Perform an RPC query using signing, such as for claiming rewards or staking
 export const performRpcQuery = async (
   client: SigningStargateClient,
@@ -72,7 +75,9 @@ export const performRpcQuery = async (
     if (!fee || !calculatedFee) {
       console.log('[queryNodes] Calculating fee...');
       // TODO: change hardcoded value to default from registry
-      const defaultGasPrice = GasPrice.fromString(`0.025${feeDenom}`);
+      const defaultGasPrice = GasPrice.fromString(
+        `${DEFAULT_EXTERNAL_CHAIN_GAS_PRICES.average}${feeDenom}`,
+      );
       let gasEstimation = await client.simulate(walletAddress, messages, '');
       console.log('[queryNodes] Gas Estimation:', gasEstimation);
 
@@ -160,9 +165,9 @@ const queryWithRetry = async ({
   let attemptCount = 0;
   let lastError: any = null;
 
+  // TODO: add rest.cosmos.directory/symphony or rest.testcosmos.directory/symphony to start of list before querying.  on each run through while loop, iterate to next in list
   const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
-
-  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= shuffledUris.length - 1) {
+  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= uris.length - 1) {
     const uriIndex = attemptCount;
     const uri = shuffledUris[uriIndex];
 

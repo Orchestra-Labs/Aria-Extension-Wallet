@@ -1,9 +1,13 @@
-// TODO: add send and swap?  or keep as validator actions?
 export enum TransactionType {
+  SEND = 'Send',
+  SWAP = 'Swap',
+  IBC_SEND = 'IBC Send',
+  IBC_SWAP = 'IBC Swap',
+  INVALID = 'Invalid',
   STAKE = 'Stake',
   UNSTAKE = 'Unstake',
-  CLAIM_TO_WALLET = 'Claim to wallet',
-  CLAIM_TO_RESTAKE = 'Claim to restake',
+  CLAIM_TO_WALLET = 'Claim To Wallet',
+  CLAIM_TO_RESTAKE = 'Claim To Restake',
 }
 
 export enum TextFieldStatus {

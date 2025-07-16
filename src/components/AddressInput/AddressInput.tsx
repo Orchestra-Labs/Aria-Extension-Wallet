@@ -5,9 +5,10 @@ import {
   chainWalletAtom,
   receiveStateAtom,
   recipientAddressAtom,
+  sendStateAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
-import { SYMPHONY_MAINNET_ID, InputStatus } from '@/constants';
+import { InputStatus } from '@/constants';
 import { cn, fetchBech32Prefixes } from '@/helpers';
 import { QRCodeScannerDialog } from '@/components';
 import { Asset, ChainData } from '@/types';
@@ -28,8 +29,9 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const setRecipientAddress = useSetAtom(recipientAddressAtom);
   const setAddressVerified = useSetAtom(addressVerifiedAtom);
   const setReceiveState = useSetAtom(receiveStateAtom);
-  // TODO: pass in chain ID
-  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
+  const sendState = useAtomValue(sendStateAtom);
+
+  const walletState = useAtomValue(chainWalletAtom(sendState.chainID));
 
   const [addressStatus, setAddressStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
   const [messageText, setMessageText] = useState<string>('');

@@ -1,3 +1,4 @@
+export * from './AddressInput';
 export * from './AssetInput';
 export * from './AssetScroller';
 export * from './AssetTile';

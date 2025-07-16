@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { usePermission } from 'react-use';
 import { Button } from '@/ui-kit';
 import { MicIcon, SquareIcon } from 'lucide-react';
-import { openMediaOnboardingTab } from '@/helpers';
+import { getSymphonyChainId, openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
@@ -11,16 +11,20 @@ import {
   symphonyAssetsAtom,
   subscribedChainRegistryAtom,
   chainWalletAtom,
+  networkLevelAtom,
 } from '@/atoms';
 import { useRefreshData } from '@/hooks';
-import { SYMPHONY_MAINNET_ID } from '@/constants';
 
 export const MicrophoneButton: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const { refreshData } = useRefreshData();
 
-  const wallet = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
+  const networkLevel = useAtomValue(networkLevelAtom);
+
+  const symphonyChainId = getSymphonyChainId(networkLevel);
+
+  const wallet = useAtomValue(chainWalletAtom(symphonyChainId));
   const validators = useAtomValue(validatorDataAtom);
   const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
@@ -50,7 +54,7 @@ export const MicrophoneButton: React.FC = () => {
     console.log('Sending audio to intent-parser', audioBlob);
 
     // TODO: get chain ID from asset sending, from audio, or from managed state
-    const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+    const chain = chainRegistry[networkLevel][symphonyChainId];
     const prefix = chain.bech32_prefix;
     const restUris = chain.rest_uris;
     const rpcUris = chain.rpc_uris;

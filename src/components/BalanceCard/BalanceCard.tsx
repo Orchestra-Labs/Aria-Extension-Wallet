@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
 
@@ -11,6 +11,8 @@ import {
   validatorDataAtom,
   subscribedChainRegistryAtom,
   hasNonZeroAssetsAtom,
+  defaultAssetAtom,
+  selectedAssetAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -39,6 +41,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const networkLevel = useAtomValue(networkLevelAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
+  const setSelectedAsset = useSetAtom(selectedAssetAtom);
+  const defaultAsset = useAtomValue(defaultAssetAtom);
 
   console.log('[BalanceCard] Non-zero assets check:', {
     hasNonZeroAssets,
@@ -111,6 +115,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     hover:bg-neutral-4 hover:text-blue hover:border-blue
     active:bg-neutral-2 active:text-blue active:border-blue
     disabled:border-none disabled:text-neutral-3 disabled:bg-transparent disabled:cursor-default`;
+
+  const handleSendClick = () => {
+    setSelectedAsset(defaultAsset);
+    navigate(ROUTES.APP.SEND);
+  };
 
   return (
     <div className="h-44 border rounded-xl border-neutral-4 flex relative overflow-hidden">
@@ -185,11 +194,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
             {currentStep === 0 ? (
               <>
-                <Button
-                  className="w-full"
-                  disabled={!hasNonZeroAssets}
-                  onClick={() => navigate(ROUTES.APP.SEND)}
-                >
+                <Button className="w-full" disabled={!hasNonZeroAssets} onClick={handleSendClick}>
                   Send
                 </Button>
                 <ReceiveDialog

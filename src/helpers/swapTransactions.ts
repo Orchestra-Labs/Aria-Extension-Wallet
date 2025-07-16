@@ -108,10 +108,7 @@ export const swapTransaction = async (
   ];
 
   try {
-    const feeDenom = getValidFeeDenom(
-      swapObject.sendObject.denom,
-      swapObject.sendObject.symphonyAssets,
-    );
+    const feeDenom = getValidFeeDenom(swapObject.sendObject.denom, swapObject.sendObject.assets);
     console.log('Swap fee denom:', feeDenom);
     const response = await queryRpcNode({
       endpoint,
@@ -177,7 +174,7 @@ export const multiSwapTransaction = async (
   try {
     const feeDenom = getValidFeeDenom(
       swapObjects[0].sendObject.denom,
-      swapObjects[0].sendObject.symphonyAssets,
+      swapObjects[0].sendObject.assets,
     );
     const response = await queryRpcNode({
       endpoint,

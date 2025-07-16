@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { SYMPHONY_MAINNET_ID, QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
-import { queryRestNode } from '@/helpers';
+import { QueryType, SYMPHONY_ENDPOINTS } from '@/constants';
+import { getSymphonyChainId, queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import { subscribedChainRegistryAtom } from '@/atoms';
+import { networkLevelAtom, subscribedChainRegistryAtom } from '@/atoms';
 
 interface ExchangeRequirementsResponse {
   total: {
@@ -11,17 +11,20 @@ interface ExchangeRequirementsResponse {
   };
 }
 
-// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export const useExchangeRequirements = () => {
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+
   const [totalRequirement, setTotalRequirement] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  const symphonyChainId = getSymphonyChainId(networkLevel);
+
+  const chain = chainRegistry[networkLevel][symphonyChainId];
   const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;
-  console.log('[useExchangeRequirements] querying for exchange rates for:', SYMPHONY_MAINNET_ID);
+  console.log('[useExchangeRequirements] querying for exchange rates for:', symphonyChainId);
   console.log('[useExchangeRequirements] using rest uris:', restUris);
 
   const fetchExchangeRequirement = async () => {

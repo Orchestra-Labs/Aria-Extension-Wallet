@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { DEFAULT_MAINNET_ASSET, SYMPHONY_MAINNET_ASSET_REGISTRY, ROUTES } from '@/constants';
+import { ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -44,13 +44,15 @@ export const AssetTile = ({
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  const title = asset.name || asset.symbol || 'Unknown Asset';
-  const symbol = asset.symbol || DEFAULT_MAINNET_ASSET.symbol || 'MLD';
-  const denom = asset.denom || 'Unknown Denom';
-  const logo = asset.logo || SYMPHONY_MAINNET_ASSET_REGISTRY.note.logo;
+  const title = asset.name;
+  const symbol = asset.symbol;
+  const denom = asset.denom;
+  const logo = asset.logo;
 
   const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);
   const subtitle = isChainSubscriptionsPage ? symbol : network || 'Unknown Network';
+
+  const hasZeroBalance = asset.amount === '0';
 
   let value = '';
   if (isChainSubscriptionsPage) {
@@ -123,11 +125,21 @@ export const AssetTile = ({
       </div>
 
       <div className="flex flex-col items-center justify-center grid grid-cols-3 w-full gap-x-4 px-2">
-        <Button size="medium" className="w-full" onClick={handleSendClick}>
+        <Button
+          size="medium"
+          className="w-full"
+          disabled={hasZeroBalance}
+          onClick={handleSendClick}
+        >
           Send
         </Button>
         <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.networkID} />
-        <Button size="medium" className="w-full" onClick={() => setActiveIndex(1)}>
+        <Button
+          size="medium"
+          className="w-full"
+          disabled={hasZeroBalance}
+          onClick={() => setActiveIndex(1)}
+        >
           Stake
         </Button>
       </div>

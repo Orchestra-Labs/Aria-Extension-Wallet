@@ -291,7 +291,7 @@ const sendIBCTransaction = async (
   console.log('Prepared transaction messages:', messages);
 
   try {
-    const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.symphonyAssets);
+    const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.assets);
     console.log('Determined fee denom:', feeDenom);
 
     const response = await queryRpcNode({

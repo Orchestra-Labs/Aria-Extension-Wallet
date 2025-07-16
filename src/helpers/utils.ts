@@ -54,21 +54,12 @@ export const isValidTransaction = async ({
   recipientAddress,
   sendState,
   receiveState,
-  sendChainLevel,
-  receiveChainLevel,
 }: {
   sendAddress: string;
   recipientAddress: string;
   sendState: TransactionState;
   receiveState: TransactionState;
-  sendChainLevel: NetworkLevel;
-  receiveChainLevel: NetworkLevel;
 }) => {
-  if (sendChainLevel !== receiveChainLevel) {
-    console.warn('[isValidTransaction] Network levels do not match');
-    return false;
-  }
-
   if (!(sendAddress && recipientAddress)) {
     return false;
   }

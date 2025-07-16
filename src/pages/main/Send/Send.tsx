@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Spinner, Swap } from '@/assets/icons';
-import {
-  DEFAULT_MAINNET_ASSET,
-  SYMPHONY_MAINNET_NAME,
-  SYMPHONY_MAINNET_ID,
-  SYMPHONY_TESTNET_ID,
-  defaultReceiveState,
-  defaultSendState,
-  GREATER_EXPONENT_DEFAULT,
-  InputStatus,
-  LOCAL_CHAIN_REGISTRY,
-  NetworkLevel,
-  ROUTES,
-} from '@/constants';
+import { InputStatus, ROUTES, TransactionType } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   callbackChangeMapAtom,
   changeMapAtom,
@@ -28,9 +16,24 @@ import {
   feeStateAtom,
   subscribedChainRegistryAtom,
   chainWalletAtom,
+  networkLevelAtom,
+  defaultAssetAtom,
+  resetTransactionStatesAtom,
 } from '@/atoms';
-import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
-import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
+import {
+  Asset,
+  SimulatedFee,
+  TransactionResult,
+  TransactionState,
+  TransactionSuccess,
+} from '@/types';
+import {
+  AssetInput,
+  WalletSuccessScreen,
+  TransactionResultsTile,
+  Header,
+  AddressInput,
+} from '@/components';
 import {
   convertToGreaterUnit,
   formatBalanceDisplay,
@@ -46,7 +49,6 @@ import {
   truncateWalletAddress,
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast, useGetTobinTaxRateQuery } from '@/hooks/';
-import { AddressInput } from './AddressInput';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -78,8 +80,11 @@ export const Send = () => {
   const [addressVerified, setAddressVerified] = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
-  // TODO: pull in all chains, cycle between them as needed
-  const walletState = useAtomValue(chainWalletAtom(SYMPHONY_MAINNET_ID));
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const defaultAsset = useAtomValue(defaultAssetAtom);
+  const resetTransactionStates = useSetAtom(resetTransactionStatesAtom);
+
+  const walletState = useAtomValue(chainWalletAtom(sendState.asset.networkID));
   const walletAssets = walletState?.assets || [];
 
   // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
@@ -88,10 +93,11 @@ export const Send = () => {
     isIBC: false,
     isValid: true,
   });
-  const [simulatedFee, setSimulatedFee] = useState<{
-    fee: string;
-    textClass: 'text-error' | 'text-warn' | 'text-blue';
-  } | null>({ fee: '0 MLD', textClass: 'text-blue' });
+  const [simulatedFee, setSimulatedFee] = useState<SimulatedFee>({
+    feeAmount: 0,
+    feeUnit: sendState.asset.symbol,
+    textClass: 'text-blue',
+  });
   const [sendPlaceholder, setSendPlaceholder] = useState<string>('');
   const [receivePlaceholder, setReceivePlaceholder] = useState<string>('');
   const [transactionState, setTransactionState] = useState<TransactionSuccess>({
@@ -136,8 +142,9 @@ export const Send = () => {
         setTransactionState({ isSuccess: true, txHash });
       }
     } else {
+      // TODO: move to atom for transaction checks on origin page and success status
       toast({
-        title: `${transactionType.isSwap ? 'Swap' : 'Send'} success!`,
+        title: `${transactionType.isSwap ? TransactionType.SWAP : TransactionType.SEND} success!`,
         description: `Transaction hash: ${displayTransactionHash}`,
         duration: 5000,
       });
@@ -242,10 +249,8 @@ export const Send = () => {
     const swapObject = { sendObject, resultDenom: receiveAsset.denom };
     console.log('Executing swapTransaction with swapObject:', swapObject);
 
-    const sendChain = chainRegistry.mainnet[sendState.chainID];
-    const isMainnet = sendChain.network_level === NetworkLevel.MAINNET;
-    const symphonyChainID = isMainnet ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
-    const rpcUris = chainRegistry.mainnet[symphonyChainID].rest_uris;
+    const chainId = sendState.asset.networkID;
+    const rpcUris = chainRegistry[networkLevel][chainId].rest_uris;
 
     const result = await swapTransaction(
       walletState.address,
@@ -291,9 +296,8 @@ export const Send = () => {
       sendAmount = maxAvailable / 2;
     }
 
-    const adjustedAmount = (
-      sendAmount * Math.pow(10, assetToSend.exponent || GREATER_EXPONENT_DEFAULT)
-    ).toFixed(0); // No decimals, minor unit
+    // NOTE: No decimals, minor unit
+    const adjustedAmount = (sendAmount * Math.pow(10, assetToSend.exponent)).toFixed(0);
 
     const sendObject = {
       recipientAddress: currentRecipientAddress,
@@ -469,11 +473,9 @@ export const Send = () => {
     receiveStateOverride?: TransactionState;
   } = {}) => {
     const sendChain = chainRegistry.mainnet[sendState.chainID];
-    const receiveChain = chainRegistry.mainnet[receiveState.chainID];
     const sendAsset = sendStateOverride.asset;
     const receiveAsset = receiveStateOverride.asset;
     const sendChainLevel = sendChain.network_level;
-    const receiveChainLevel = receiveChain.network_level;
 
     if (!sendAsset || !receiveAsset) {
       console.error('Missing assets for transaction type update');
@@ -497,8 +499,6 @@ export const Send = () => {
         recipientAddress,
         sendState: sendStateOverride,
         receiveState: receiveStateOverride,
-        sendChainLevel,
-        receiveChainLevel,
       });
 
       const newTransactionType = {
@@ -678,15 +678,9 @@ export const Send = () => {
 
   const resetStates = () => {
     console.log('resetting states');
-    setSendState(defaultSendState);
-    setReceiveState(defaultReceiveState);
+    resetTransactionStates();
     setRecipientAddress('');
-    setSelectedAsset(DEFAULT_MAINNET_ASSET);
-    setFeeState(prev => ({
-      ...prev,
-      asset: defaultSendState.asset,
-      amount: 0,
-    }));
+    setSelectedAsset(defaultAsset);
   };
 
   const runSimulation = async () => {
@@ -711,8 +705,9 @@ export const Send = () => {
 
     if (simulationResponse && simulationResponse.data) {
       const gasWanted = parseInt(simulationResponse.data.gasWanted || '0', 10);
+      // TODO: get gas from fees in chain.  match denom to fee asset, get first if not matched.  use default gas from there
       const defaultGasPrice = 0.025;
-      const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+      const exponent = sendState.asset.exponent;
 
       const gasFee = gasWanted * defaultGasPrice;
       const tobinRate = parseFloat(tobinTaxData?.tax_rate || '0');
@@ -792,7 +787,7 @@ export const Send = () => {
   }, [changeMap, sendState.amount, receiveState.amount]);
 
   useEffect(() => {
-    const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+    const exponent = sendState.asset?.exponent;
     const symbol = feeState.asset;
     const feeAmount = feeState.amount;
     const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
@@ -805,7 +800,8 @@ export const Send = () => {
           : 0;
 
     setSimulatedFee({
-      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol.symbol || 'MLD'),
+      feeAmount: feeAmount,
+      feeUnit: symbol.symbol,
       textClass:
         feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
     });
@@ -870,6 +866,7 @@ export const Send = () => {
     return <WalletSuccessScreen caption="Transaction success!" txHash={transactionState.txHash} />;
   }
 
+  //  TODO: move asset input section and fee section to own components
   return (
     <div className="h-screen flex flex-col bg-black text-white">
       <Header title={'Send'} onClose={handleBackClick} useArrow={true} />
@@ -956,19 +953,13 @@ export const Send = () => {
               const isIBC = sendChainName !== receiveChainName;
               const isSwap = sendState.asset?.denom !== receiveState.asset?.denom;
 
-              const sendAssetSymbol =
-                (sendChainName === SYMPHONY_MAINNET_NAME
-                  ? symphonyAssets.find(asset => asset.denom === sendState.asset?.denom)?.symbol
-                  : sendState.asset?.symbol) || 'MLD';
-              const exponent = sendState.asset?.exponent || GREATER_EXPONENT_DEFAULT;
+              const sendAssetSymbol = sendState.asset.symbol;
+              const exponent = sendState.asset.exponent;
               const sendReadableAmount = formatBalanceDisplay(
                 convertToGreaterUnit(sendObject.amount, exponent).toFixed(exponent),
                 sendAssetSymbol,
               );
-              const receiveChainPrefix =
-                Object.values(LOCAL_CHAIN_REGISTRY.mainnet).find(
-                  entry => entry.chain_name?.toLowerCase() === receiveChainName.toLowerCase(),
-                )?.bech32_prefix || '';
+              const receiveChainPrefix = receiveChain.bech32_prefix;
 
               let description = `Send ${sendReadableAmount}`;
               if (isIBC) {
@@ -1011,7 +1002,9 @@ export const Send = () => {
         <div className="flex justify-between items-center text-blue text-sm font-bold mx-2">
           <p>Fee</p>
           <p className={simulatedFee?.textClass}>
-            {simulatedFee && sendState.amount !== 0 ? simulatedFee?.fee : '-'}
+            {simulatedFee && sendState.amount !== 0
+              ? formatBalanceDisplay(`${simulatedFee.feeAmount}`, simulatedFee.feeUnit)
+              : '-'}
           </p>
         </div>
 

@@ -92,6 +92,7 @@ export const createAccount = async (
 
   const newAccount: AccountRecord = {
     id: accountID,
+    // TODO: move settings to defaul.  s.grab from there and add wallet id
     settings: {
       defaultChainID: SYMPHONY_MAINNET_ID,
       defaultCoinDenom: DEFAULT_DENOM,

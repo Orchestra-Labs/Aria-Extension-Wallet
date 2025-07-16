@@ -7,25 +7,26 @@ import {
   SYMPHONY_ENDPOINTS,
   GREATER_EXPONENT_DEFAULT,
   QueryType,
-  SYMPHONY_MAINNET_ID,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import { subscribedChainRegistryAtom, receiveStateAtom, sendStateAtom } from '@/atoms';
-import { isValidSwap, queryRestNode } from '@/helpers';
+import {
+  subscribedChainRegistryAtom,
+  receiveStateAtom,
+  sendStateAtom,
+  networkLevelAtom,
+} from '@/atoms';
+import { getSymphonyChainId, isValidSwap, queryRestNode } from '@/helpers';
 
-// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
 
   // Safely get chain info with fallback to DEFAULT_CHAIN_ID
+  const symphonyChainId = getSymphonyChainId(networkLevel);
   const getChainInfo = (chainId: string) => {
-    return (
-      chainRegistry.mainnet[chainId] ||
-      chainRegistry.testnet[chainId] ||
-      chainRegistry.mainnet[SYMPHONY_MAINNET_ID]
-    );
+    return chainRegistry[networkLevel][chainId] || chainRegistry[networkLevel][symphonyChainId];
   };
 
   const chainInfo = getChainInfo(sendState.chainID);
@@ -34,8 +35,8 @@ export function useExchangeRate() {
 
   const sendAsset = sendState.asset;
   const receiveAsset = receiveState.asset;
-  const sendDenom = sendState.asset?.denom || '';
-  const receiveDenom = receiveState.asset?.denom || '';
+  const sendDenom = sendState.asset.denom;
+  const receiveDenom = receiveState.asset.denom;
 
   // Check if swap is valid
   const validSwap = isValidSwap({ sendAsset, receiveAsset });
@@ -49,9 +50,9 @@ export function useExchangeRate() {
         return '1';
       }
 
+      // TODO: get exponent from the asset itself
       // Format the offer amount to the smallest unit
-      const exponent =
-        SYMPHONY_MAINNET_ASSET_REGISTRY[sendAsset]?.exponent || GREATER_EXPONENT_DEFAULT;
+      const exponent = SYMPHONY_MAINNET_ASSET_REGISTRY[sendAsset].exponent;
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
 
       if (!restUris.length) {

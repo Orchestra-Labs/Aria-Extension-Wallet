@@ -1,16 +1,17 @@
 import { useAtomValue } from 'jotai';
 import { useGetBalances } from './useGetBalances';
 import { useGetModuleAccountsQuery } from './useGetModuleAccountsQuery';
-import { subscribedChainRegistryAtom } from '@/atoms';
-import { SYMPHONY_MAINNET_ID } from '@/constants';
+import { networkLevelAtom, subscribedChainRegistryAtom } from '@/atoms';
+import { getSymphonyChainId } from '@/helpers';
 
 const EXCHANGE_POOL_NAME = 'market';
 
-// TODO: if not subscribed to Symphony, do not show reserve pool or reserve button
 export const useExchangePoolBalance = () => {
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
 
-  const chain = chainRegistry.mainnet[SYMPHONY_MAINNET_ID];
+  const symphonyChainId = getSymphonyChainId(networkLevel);
+  const chain = chainRegistry[networkLevel][symphonyChainId];
   const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;
 
