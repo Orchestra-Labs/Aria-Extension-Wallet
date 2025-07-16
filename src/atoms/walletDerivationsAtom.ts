@@ -122,15 +122,17 @@ export const filteredAssetsAtom = atom(get => {
   return filtered;
 });
 
-// Filtered assets for dialogs/search
-export const filteredDialogAssetsAtom = atom(get =>
-  filterAndSortAssets(
-    get(subscribedAssetsAtom),
-    get(dialogSearchTermAtom),
-    get(assetDialogSortTypeAtom),
-    get(assetDialogSortOrderAtom),
-  ),
-);
+export const filteredDialogAssetsAtom = atom(get => {
+  const assets = get(subscribedAssetsAtom);
+  const searchTerm = get(dialogSearchTermAtom);
+  const sortType = get(assetDialogSortTypeAtom);
+  const sortOrder = get(assetDialogSortOrderAtom);
+
+  // Filter out assets with zero balance
+  const nonZeroAssets = assets.filter(asset => asset.amount !== '0');
+
+  return filterAndSortAssets(nonZeroAssets, searchTerm, sortType, sortOrder);
+});
 
 // Filtered coin list for exchange view (all assets)
 export const coinListAssetsAtom = atom(get =>
