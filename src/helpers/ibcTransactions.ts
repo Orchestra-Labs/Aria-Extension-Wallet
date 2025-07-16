@@ -1,4 +1,7 @@
 import axios from 'axios';
+import { bech32 } from 'bech32';
+
+import { CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import {
   GitHubFile,
   GitHubFileResponse,
@@ -9,13 +12,12 @@ import {
   SendObject,
   TransactionResult,
 } from '@/types';
-import { CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
+
 import { getIBCConnections, ibcConnectionsNeedRefresh, saveIBCConnections } from './dataHelpers';
-import { queryRestNode, queryRpcNode } from './queryNodes';
-import { getValidFeeDenom } from './feeDenom';
 import { getIBCFile, ibcFileNeedsRefresh, saveIBCFile } from './dataHelpers/ibcChannel';
-import { bech32 } from 'bech32';
+import { getValidFeeDenom } from './feeDenom';
 import { fetchBech32Prefixes } from './fetchBech32Prefixes';
+import { queryRestNode, queryRpcNode } from './queryNodes';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com/repos/cosmos/chain-registry/contents';
 const IBC_URLS = {

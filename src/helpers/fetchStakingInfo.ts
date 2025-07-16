@@ -1,3 +1,7 @@
+import { sha256 } from '@cosmjs/crypto';
+import { fromBase64, toBech32 } from '@cosmjs/encoding';
+
+import { BondStatus, CHAIN_ENDPOINTS } from '@/constants';
 import {
   CombinedStakingInfo,
   DelegationResponse,
@@ -8,10 +12,8 @@ import {
   UnbondingDelegationResponse,
   ValidatorInfo,
 } from '@/types';
+
 import { queryRestNode } from './queryNodes';
-import { BondStatus, CHAIN_ENDPOINTS } from '@/constants';
-import { fromBase64, toBech32 } from '@cosmjs/encoding';
-import { sha256 } from '@cosmjs/crypto';
 
 const defaultValidatorInfo: ValidatorInfo = {
   operator_address: '',
@@ -158,7 +160,7 @@ export const fetchValidators = async (
 ): Promise<{ validators: ValidatorInfo[]; pagination: any }> => {
   try {
     if (validatorAddress) {
-      let endpoint = `${CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
+      const endpoint = `${CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
       const response = await queryRestNode({ endpoint });
 
       // Filter single validator by bond status if provided
@@ -191,7 +193,7 @@ export const fetchRewards = async (
   delegations?: { validator_address: string }[],
 ): Promise<{ validator: string; rewards: any[] }[]> => {
   try {
-    let endpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards`;
+    const endpoint = `${CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards`;
 
     // If specific delegations (validators) are provided, query rewards for each validator separately
     if (delegations && delegations.length > 0) {

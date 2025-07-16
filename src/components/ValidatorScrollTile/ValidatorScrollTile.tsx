@@ -1,20 +1,9 @@
+import { useAtomValue } from 'jotai';
+import { AlertCircleIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Asset, CombinedStakingInfo, TransactionResult } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
+
 import { LogoIcon } from '@/assets/icons';
-import { ScrollTile } from '../ScrollTile';
-import {
-  calculateRemainingTime,
-  claimAndRestake,
-  claimRewards,
-  convertToGreaterUnit,
-  formatBalanceDisplay,
-  isValidUrl,
-  selectTextColorByStatus,
-  stakeToValidator,
-  truncateWalletAddress,
-  claimAndUnstake,
-} from '@/helpers';
+import { filteredValidatorsAtom, showCurrentValidatorsAtom, walletStateAtom } from '@/atoms';
 import {
   BondStatus,
   DEFAULT_ASSET,
@@ -24,13 +13,26 @@ import {
   TextFieldStatus,
   TransactionType,
 } from '@/constants';
-import { useAtomValue } from 'jotai';
-import { filteredValidatorsAtom, showCurrentValidatorsAtom, walletStateAtom } from '@/atoms';
+import {
+  calculateRemainingTime,
+  claimAndRestake,
+  claimAndUnstake,
+  claimRewards,
+  convertToGreaterUnit,
+  formatBalanceDisplay,
+  isValidUrl,
+  selectTextColorByStatus,
+  stakeToValidator,
+  truncateWalletAddress,
+} from '@/helpers';
+import { useRefreshData, useToast } from '@/hooks';
+import { Asset, CombinedStakingInfo, TransactionResult } from '@/types';
+import { Button, SlideTray } from '@/ui-kit';
+
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
-import { useRefreshData, useToast } from '@/hooks';
+import { ScrollTile } from '../ScrollTile';
 import { TransactionResultsTile } from '../TransactionResultsTile';
-import { AlertCircleIcon } from 'lucide-react';
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 interface ValidatorScrollTileProps {
@@ -101,7 +103,7 @@ export const ValidatorScrollTile = ({
 
   const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
 
-  let scrollTileValue = `${theoreticalApr || '0.00'}% p.a.`;
+  const scrollTileValue = `${theoreticalApr || '0.00'}% p.a.`;
   let scrollTileSubtitle: string;
   let scrollTileSecondarySubtitle = null;
   let secondarySubtitleStatus = TextFieldStatus.GOOD;
@@ -159,7 +161,7 @@ export const ValidatorScrollTile = ({
   // let showingCurrentValidators = isSelectable && showCurrentValidators;
   let value = formattedRewardAmount;
   let subtitleStatus = TextFieldStatus.GOOD;
-  let amountUnstaking = formatBalanceDisplay(
+  const amountUnstaking = formatBalanceDisplay(
     convertToGreaterUnit(
       parseFloat(unbondingBalance?.balance || '0'),
       GREATER_EXPONENT_DEFAULT,

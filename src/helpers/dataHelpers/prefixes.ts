@@ -1,6 +1,7 @@
 import { STORED_DATA_TIMEOUT } from '@/constants';
-import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { ChainData, PrefixStorage } from '@/types';
+
+import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const PREFIXES_STORAGE_KEY = 'bech32Prefixes';
 

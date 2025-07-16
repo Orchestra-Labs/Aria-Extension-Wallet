@@ -1,10 +1,11 @@
+import { useSetAtom } from 'jotai';
 import React from 'react';
-import { Header, RecoveryPhraseGrid } from '@/components';
 import { useNavigate } from 'react-router-dom';
+
+import { mnemonic12State, mnemonic24State, use24WordsState } from '@/atoms';
+import { Header, RecoveryPhraseGrid } from '@/components';
 import { ROUTES } from '@/constants';
 import { getSessionToken } from '@/helpers';
-import { useSetAtom } from 'jotai';
-import { mnemonic12State, mnemonic24State, use24WordsState } from '@/atoms';
 
 interface ViewPassphraseProps {}
 

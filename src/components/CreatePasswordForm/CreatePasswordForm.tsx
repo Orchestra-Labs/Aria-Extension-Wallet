@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { EyeClose, EyeOpen } from '@/assets/icons';
-import { Input } from '@/ui-kit';
 import { useAtom, useSetAtom } from 'jotai';
+import React, { useEffect, useState } from 'react';
+
+import { EyeClose, EyeOpen } from '@/assets/icons';
 import { confirmPasswordAtom, passwordAtom, passwordsVerifiedAtom } from '@/atoms';
 import { InputStatus, VALID_PASSWORD_LENGTH } from '@/constants';
+import { Input } from '@/ui-kit';
 
 interface CreatePasswordFormProps {
   includeFormClasses?: boolean;
@@ -153,47 +154,45 @@ export const CreatePasswordForm: React.FC<CreatePasswordFormProps> = ({
   };
 
   return (
-    <>
-      <form className={includeFormClasses ? 'mt-9 flex-1' : ''}>
-        {/* New Password Input */}
-        <Input
-          variant="primary"
-          showMessageText={true}
-          status={passwordStatus}
-          messageText={
-            passwordStatus === InputStatus.ERROR ? 'Password must be at least 8 characters' : ''
-          }
-          label="New password (8 characters min)"
-          placeholder="Enter password"
-          type={passwordVisible ? 'text' : 'password'}
-          value={password}
-          onChange={handlePasswordChange}
-          onBlur={handlePasswordBlur}
-          onPaste={handlePasswordPaste}
-          icon={passwordVisible ? <EyeOpen width={20} /> : <EyeClose width={20} />}
-          iconRole="button"
-          onIconClick={() => setPasswordVisible(!passwordVisible)}
-          wrapperClass="mb-4"
-        />
+    <form className={includeFormClasses ? 'mt-9 flex-1' : ''}>
+      {/* New Password Input */}
+      <Input
+        variant="primary"
+        showMessageText={true}
+        status={passwordStatus}
+        messageText={
+          passwordStatus === InputStatus.ERROR ? 'Password must be at least 8 characters' : ''
+        }
+        label="New password (8 characters min)"
+        placeholder="Enter password"
+        type={passwordVisible ? 'text' : 'password'}
+        value={password}
+        onChange={handlePasswordChange}
+        onBlur={handlePasswordBlur}
+        onPaste={handlePasswordPaste}
+        icon={passwordVisible ? <EyeOpen width={20} /> : <EyeClose width={20} />}
+        iconRole="button"
+        onIconClick={() => setPasswordVisible(!passwordVisible)}
+        wrapperClass="mb-4"
+      />
 
-        {/* Confirm Password Input */}
-        <Input
-          variant="primary"
-          showMessageText={true}
-          status={confirmPasswordStatus}
-          messageText={confirmPasswordStatus === 'error' ? 'Passwords do not match' : ''}
-          label="Confirm password"
-          placeholder="Repeat password"
-          type={confirmPasswordVisible ? 'text' : 'password'}
-          value={confirmPassword}
-          onChange={handleConfirmPasswordChange}
-          onBlur={handleConfirmPasswordBlur}
-          onPaste={handleConfirmPasswordPaste}
-          icon={confirmPasswordVisible ? <EyeOpen width={20} /> : <EyeClose width={20} />}
-          iconRole="button"
-          onIconClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
-        />
-      </form>
-    </>
+      {/* Confirm Password Input */}
+      <Input
+        variant="primary"
+        showMessageText={true}
+        status={confirmPasswordStatus}
+        messageText={confirmPasswordStatus === 'error' ? 'Passwords do not match' : ''}
+        label="Confirm password"
+        placeholder="Repeat password"
+        type={confirmPasswordVisible ? 'text' : 'password'}
+        value={confirmPassword}
+        onChange={handleConfirmPasswordChange}
+        onBlur={handleConfirmPasswordBlur}
+        onPaste={handleConfirmPasswordPaste}
+        icon={confirmPasswordVisible ? <EyeOpen width={20} /> : <EyeClose width={20} />}
+        iconRole="button"
+        onIconClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+      />
+    </form>
   );
 };

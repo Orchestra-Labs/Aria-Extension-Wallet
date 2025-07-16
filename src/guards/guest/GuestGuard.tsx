@@ -1,9 +1,9 @@
+import { useAtomValue } from 'jotai';
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 
-import { ROUTES } from '@/constants/routes';
-import { useAtomValue } from 'jotai';
 import { isLoggedInAtom } from '@/atoms';
+import { ROUTES } from '@/constants/routes';
 
 interface GuestGuardProps {
   children?: React.ReactNode;

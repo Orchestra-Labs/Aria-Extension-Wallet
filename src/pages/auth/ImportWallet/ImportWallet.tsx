@@ -1,9 +1,7 @@
+import { useAtom, useSetAtom } from 'jotai';
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { CreatePasswordForm, RecoveryPhraseGrid, WalletSuccessScreen } from '@/components';
-import { ROUTES } from '@/constants';
-import { Button, Stepper } from '@/ui-kit';
-import { useAtom, useSetAtom } from 'jotai';
+
 import {
   confirmPasswordAtom,
   isLoggedInAtom,
@@ -14,9 +12,12 @@ import {
   passwordsVerifiedAtom,
   use24WordsState,
 } from '@/atoms';
-import { createAccount } from '@/helpers/dataHelpers/account';
+import { CreatePasswordForm, RecoveryPhraseGrid, WalletSuccessScreen } from '@/components';
+import { ROUTES } from '@/constants';
 import { createWallet, saveSessionData } from '@/helpers';
+import { createAccount } from '@/helpers/dataHelpers/account';
 import { AccountRecord } from '@/types';
+import { Button, Stepper } from '@/ui-kit';
 
 const STEPS_LABELS = ['Enter Passphrase', 'Create password'];
 

@@ -1,8 +1,11 @@
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useEffect } from 'react';
+
 import {
-  symphonyAssetsAtom,
   isFetchingWalletDataAtom,
   isInitialDataLoadAtom,
   sendStateAtom,
+  symphonyAssetsAtom,
   userWalletAtom,
   validatorDataAtom,
   walletAssetsAtom,
@@ -10,8 +13,6 @@ import {
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { getWalletByID } from '@/helpers/dataHelpers/account';
 import { useExchangeAssets } from '@/hooks';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { useEffect } from 'react';
 
 export const DataProvider: React.FC<{}> = ({}) => {
   const [walletAssets] = useAtom(walletAssetsAtom);

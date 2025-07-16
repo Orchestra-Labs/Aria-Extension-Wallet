@@ -1,6 +1,21 @@
+import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+
 import { Spinner, Swap } from '@/assets/icons';
+import {
+  addressVerifiedAtom,
+  callbackChangeMapAtom,
+  changeMapAtom,
+  feeStateAtom,
+  receiveStateAtom,
+  recipientAddressAtom,
+  selectedAssetAtom,
+  sendStateAtom,
+  symphonyAssetsAtom,
+  walletStateAtom,
+} from '@/atoms';
+import { AssetInput, Header, TransactionResultsTile, WalletSuccessScreen } from '@/components';
 import {
   DEFAULT_ASSET,
   DEFAULT_CHAIN_NAME,
@@ -12,22 +27,6 @@ import {
   NetworkLevel,
   ROUTES,
 } from '@/constants';
-import { Button, Separator } from '@/ui-kit';
-import { useAtom, useAtomValue } from 'jotai';
-import {
-  callbackChangeMapAtom,
-  changeMapAtom,
-  recipientAddressAtom,
-  receiveStateAtom,
-  sendStateAtom,
-  walletStateAtom,
-  selectedAssetAtom,
-  addressVerifiedAtom,
-  symphonyAssetsAtom,
-  feeStateAtom,
-} from '@/atoms';
-import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
-import { AssetInput, WalletSuccessScreen, TransactionResultsTile, Header } from '@/components';
 import {
   convertToGreaterUnit,
   formatBalanceDisplay,
@@ -43,8 +42,11 @@ import {
   truncateWalletAddress,
 } from '@/helpers';
 import { useExchangeRate, useRefreshData, useToast } from '@/hooks/';
-import { AddressInput } from './AddressInput';
 import { useGetTobinTaxRateQuery } from '@/hooks/useGetTobinTaxRateQuery';
+import { Asset, TransactionResult, TransactionState, TransactionSuccess } from '@/types';
+import { Button, Separator } from '@/ui-kit';
+
+import { AddressInput } from './AddressInput';
 
 const pageMountedKey = 'userIsOnPage';
 const setUserIsOnPage = (isOnPage: boolean) => {
@@ -821,59 +823,57 @@ export const Send = () => {
 
       {/* Content container */}
       <div className="flex flex-col justify-between flex-grow p-4 rounded-lg overflow-y-auto">
-        <>
-          {/* TODO: add chain selection if self */}
-          {/* Address Input */}
-          <AddressInput
-            addBottomMargin={false}
-            updateReceiveAsset={updateReceiveAsset}
-            updateTransactionType={updateTransactionType}
-          />
+        {/* TODO: add chain selection if self */}
+        {/* Address Input */}
+        <AddressInput
+          addBottomMargin={false}
+          updateReceiveAsset={updateReceiveAsset}
+          updateTransactionType={updateTransactionType}
+        />
 
-          {/* Separator */}
-          <Separator variant="top" />
+        {/* Separator */}
+        <Separator variant="top" />
 
-          {/* Send Section */}
-          <AssetInput
-            placeholder={sendPlaceholder}
-            variant="send"
-            status={sendErrorStatus}
-            messageText={sendError || ''}
-            assetState={sendState.asset}
-            amountState={sendState.amount}
-            updateAsset={updateSendAsset}
-            updateAmount={updateSendAmount}
-            showClearAndMax
-            disableButtons={isLoading}
-            onClear={() => clearAmount()}
-            onMax={() => setMaxAmount('send')}
-            includeBottomMargin={false}
-            addClearMaxMargin
-          />
+        {/* Send Section */}
+        <AssetInput
+          placeholder={sendPlaceholder}
+          variant="send"
+          status={sendErrorStatus}
+          messageText={sendError || ''}
+          assetState={sendState.asset}
+          amountState={sendState.amount}
+          updateAsset={updateSendAsset}
+          updateAmount={updateSendAmount}
+          showClearAndMax
+          disableButtons={isLoading}
+          onClear={() => clearAmount()}
+          onMax={() => setMaxAmount('send')}
+          includeBottomMargin={false}
+          addClearMaxMargin
+        />
 
-          {/* Separator with reverse icon */}
-          <div className="flex justify-center mb-2">
-            <Button className="rounded-md h-9 w-9 bg-neutral-3" onClick={switchFields}>
-              <Swap />
-            </Button>
-          </div>
+        {/* Separator with reverse icon */}
+        <div className="flex justify-center mb-2">
+          <Button className="rounded-md h-9 w-9 bg-neutral-3" onClick={switchFields}>
+            <Swap />
+          </Button>
+        </div>
 
-          {/* Receive Section */}
-          <AssetInput
-            placeholder={receivePlaceholder}
-            variant="receive"
-            assetState={receiveState.asset}
-            amountState={receiveState.amount}
-            updateAsset={updateReceiveAsset}
-            updateAmount={updateReceiveAmount}
-            showClearAndMax
-            disableButtons={isLoading}
-            onClear={() => clearAmount()}
-            onMax={() => setMaxAmount('receive')}
-            includeBottomMargin={false}
-            addClearMaxMargin
-          />
-        </>
+        {/* Receive Section */}
+        <AssetInput
+          placeholder={receivePlaceholder}
+          variant="receive"
+          assetState={receiveState.asset}
+          amountState={receiveState.amount}
+          updateAsset={updateReceiveAsset}
+          updateAmount={updateReceiveAmount}
+          showClearAndMax
+          disableButtons={isLoading}
+          onClear={() => clearAmount()}
+          onMax={() => setMaxAmount('receive')}
+          includeBottomMargin={false}
+          addClearMaxMargin
+        />
 
         {/* 
           TODO: add labels above text in fee block

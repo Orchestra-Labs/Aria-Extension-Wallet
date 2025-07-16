@@ -1,13 +1,14 @@
+import { useAtomValue } from 'jotai';
+import { MicIcon, SquareIcon } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { usePermission } from 'react-use';
-import { Button } from '@/ui-kit';
-import { MicIcon, SquareIcon } from 'lucide-react';
+
+import { symphonyAssetsAtom, validatorDataAtom, walletStateAtom } from '@/atoms';
 import { openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
-import { Intent } from '@/types';
-import { useAtomValue } from 'jotai';
-import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
+import { Intent } from '@/types';
+import { Button } from '@/ui-kit';
 
 export const MicrophoneButton: React.FC = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);

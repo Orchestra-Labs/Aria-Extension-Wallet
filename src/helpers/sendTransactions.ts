@@ -1,7 +1,8 @@
 import { CHAIN_ENDPOINTS } from '@/constants';
-import { queryRpcNode } from './queryNodes';
-import { SendObject, TransactionResult, RPCResponse, Asset } from '@/types';
+import { Asset, RPCResponse, SendObject, TransactionResult } from '@/types';
+
 import { getValidFeeDenom } from './feeDenom';
+import { queryRpcNode } from './queryNodes';
 
 export const isValidSend = ({
   sendAsset,

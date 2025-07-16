@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { isInitialDataLoadAtom } from '@/atoms';
 import { useAtom, useAtomValue } from 'jotai';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES, SettingsOptions } from '@/constants';
-import { Button, Separator } from '@/ui-kit';
-import { saveAccountByID } from '@/helpers/dataHelpers/account';
+
+import { isInitialDataLoadAtom } from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { Header } from '@/components';
+import { ROUTES, SettingsOptions } from '@/constants';
+import { saveAccountByID } from '@/helpers/dataHelpers/account';
+import { Button, Separator } from '@/ui-kit';
 
 interface SettingsScreenProps {}
 

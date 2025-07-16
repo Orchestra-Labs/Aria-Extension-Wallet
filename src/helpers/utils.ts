@@ -1,9 +1,11 @@
-import { TransactionState } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { isValidSwap } from './swapTransactions';
-import { isValidSend } from './sendTransactions';
+
 import { TextFieldStatus } from '@/constants';
+import { TransactionState } from '@/types';
+
+import { isValidSend } from './sendTransactions';
+import { isValidSwap } from './swapTransactions';
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs, { strict: false }));

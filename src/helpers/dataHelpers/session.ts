@@ -1,7 +1,9 @@
-import { SessionToken } from '@/types';
-import { removeLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { Secp256k1HdWallet } from '@cosmjs/amino';
+
 import { TOKEN_EXPIRATION_TIME } from '@/constants';
+import { SessionToken } from '@/types';
+
+import { removeLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const SESSION_KEY = 'sessionToken';
 

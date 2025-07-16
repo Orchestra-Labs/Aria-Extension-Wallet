@@ -1,7 +1,9 @@
-import { Position, ROUTES } from '@/constants';
 import { ArrowLeft, X } from 'lucide-react';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+
+import { Position, ROUTES } from '@/constants';
+
 import { Separator } from '../../ui-kit/Separator';
 import Tooltip from '../Tooltip/Tooltip';
 

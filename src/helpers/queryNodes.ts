@@ -1,14 +1,16 @@
+import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
+
 import {
   CHAIN_NODES,
   DELAY_BETWEEN_NODE_ATTEMPTS,
   LOCAL_ASSET_REGISTRY,
   MAX_NODES_PER_QUERY,
 } from '@/constants';
-import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
+import { RPCResponse } from '@/types';
+
+import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
-import { RPCResponse } from '@/types';
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
 

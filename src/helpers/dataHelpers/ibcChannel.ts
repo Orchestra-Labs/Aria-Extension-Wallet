@@ -1,6 +1,7 @@
 import { NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
-import { getLocalStorageItem, removeLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { IBCConnectionFile } from '@/types';
+
+import { getLocalStorageItem, removeLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const IBC_FILE_KEY_PREFIX = {
   testnet: 'testnet_ibcFileCache_',

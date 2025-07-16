@@ -1,14 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useAtomValue } from 'jotai';
-import { isFetchingValidatorDataAtom, isFetchingWalletDataAtom } from '@/atoms';
-import { ScrollArea } from '@/ui-kit';
-import { Asset, CombinedStakingInfo } from '@/types';
 import { useDrag } from '@use-gesture/react';
+import { useAtomValue } from 'jotai';
+import React, { useEffect, useRef, useState } from 'react';
 import { animated, useSpring } from 'react-spring';
-import { Loader } from '../Loader';
-import { ValidatorTiles } from '../TileScroller/ValidatorTiles';
-import { AssetTiles } from '../TileScroller/AssetTiles';
+
+import { isFetchingValidatorDataAtom, isFetchingWalletDataAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
+import { Asset, CombinedStakingInfo } from '@/types';
+import { ScrollArea } from '@/ui-kit';
+
+import { Loader } from '../Loader';
+import { AssetTiles } from '../TileScroller/AssetTiles';
+import { ValidatorTiles } from '../TileScroller/ValidatorTiles';
 
 interface TileScrollerProps {
   activeIndex?: number;

@@ -1,10 +1,11 @@
-import { Input } from '@/ui-kit';
-import { AssetSelectDialog } from '@/components';
-import { cn, getRegexForDecimals } from '@/helpers/utils';
-import { Asset } from '@/types';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
+
+import { AssetSelectDialog } from '@/components';
 import { GREATER_EXPONENT_DEFAULT, InputStatus } from '@/constants';
 import { formatNumberWithCommas, stripNonNumerics } from '@/helpers';
+import { cn, getRegexForDecimals } from '@/helpers/utils';
+import { Asset } from '@/types';
+import { Input } from '@/ui-kit';
 
 interface AssetInputProps {
   isDisabled?: boolean;

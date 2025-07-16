@@ -1,13 +1,15 @@
 import { IWalletKit, WalletKit } from '@reown/walletkit';
 import { Core } from '@walletconnect/core';
 
-export let walletkit: IWalletKit;
+export let walletkit: IWalletKit | undefined;
 
 export async function createWalletKit() {
   if (walletkit) return walletkit;
+
   const core = new Core({
     projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   });
+
   walletkit = await WalletKit.init({
     core,
     metadata: {
@@ -23,5 +25,11 @@ export async function createWalletKit() {
 
   const clientId = await walletkit.engine.signClient.core.crypto.getClientId();
   console.log(`WalletKit initialized with Client ID: ${clientId}`);
+
   return walletkit;
+}
+
+// --- Add this reset function ONLY for tests ---
+export function resetWalletKit() {
+  walletkit = undefined;
 }

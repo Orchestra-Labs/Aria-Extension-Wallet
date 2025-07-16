@@ -1,16 +1,18 @@
 import { atom } from 'jotai';
-import { Asset, WalletRecord } from '@/types';
+
 import {
-  searchTermAtom,
-  assetSortOrderAtom,
-  assetSortTypeAtom,
-  showAllAssetsAtom,
-  dialogSearchTermAtom,
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
+  assetSortOrderAtom,
+  assetSortTypeAtom,
+  dialogSearchTermAtom,
+  searchTermAtom,
+  showAllAssetsAtom,
   symphonyAssetsAtom,
 } from '@/atoms';
 import { filterAndSortAssets } from '@/helpers';
+import { Asset, WalletRecord } from '@/types';
+
 import { userAccountAtom } from './accountAtom';
 
 export const userWalletAtom = atom<WalletRecord | null>(null);

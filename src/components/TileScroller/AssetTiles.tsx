@@ -1,6 +1,6 @@
-import React from 'react';
-import { AssetScrollTile } from '../AssetScrollTile';
 import { useAtomValue } from 'jotai';
+import React from 'react';
+
 import {
   coinListAssetsAtom,
   filteredAssetsAtom,
@@ -8,6 +8,8 @@ import {
   filteredExchangeAssetsAtom,
 } from '@/atoms';
 import { Asset } from '@/types';
+
+import { AssetScrollTile } from '../AssetScrollTile';
 
 interface AssetTilesProps {
   isSelectable?: boolean;

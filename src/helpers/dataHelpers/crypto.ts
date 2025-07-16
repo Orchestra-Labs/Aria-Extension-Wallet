@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const MNEMONIC_KEY = 'encryptedMnemonic';

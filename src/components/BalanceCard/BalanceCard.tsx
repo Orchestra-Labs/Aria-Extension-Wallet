@@ -1,14 +1,15 @@
+import BigNumber from 'bignumber.js';
+import { useAtomValue } from 'jotai';
+import { Triangle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+
+import { isInitialDataLoadAtom, validatorDataAtom, walletAssetsAtom } from '@/atoms';
 import { Loader, PoolStatusBlock, ReceiveDialog, ValidatorSelectDialog } from '@/components';
-import { Button } from '@/ui-kit';
-import { useAtomValue } from 'jotai';
-import { isInitialDataLoadAtom, walletAssetsAtom, validatorDataAtom } from '@/atoms';
+import { DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY, ROUTES } from '@/constants';
 import { convertToGreaterUnit, formatBalanceDisplay } from '@/helpers';
-import { ROUTES, DEFAULT_ASSET, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
-import { Triangle } from 'lucide-react';
-import BigNumber from 'bignumber.js';
 import { useExchangeRate } from '@/hooks';
+import { Button } from '@/ui-kit';
 
 interface BalanceCardProps {
   currentStep: number;
@@ -102,88 +103,86 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
       {/* Data Block */}
       {!showReserveStatus && (
-        <>
-          <div className="py-4 flex flex-grow flex-col items-center relative">
-            {/* Data Section */}
-            <div className="flex flex-grow flex-col items-center text-center w-full">
-              <div className="flex justify-between items-center w-full px-4">
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                <div className="flex">
-                  <p className="text-base text-neutral-1">{title}</p>
-                </div>
-                <div className="flex flex-1">
-                  <span>&nbsp;</span>
-                </div>
-                {currentStep === 0 ? (
-                  <div className="flex flex-1 justify-center">
-                    <Button
-                      variant="selectedEnabled"
-                      size="xsmall"
-                      className="px-1 rounded text-xs"
-                      onClick={() => setShowReserveStatus(!showReserveStatus)}
-                    >
-                      Reserve
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-1">
-                    <span>&nbsp;</span>
-                  </div>
-                )}
+        <div className="py-4 flex flex-grow flex-col items-center relative">
+          {/* Data Section */}
+          <div className="flex flex-grow flex-col items-center text-center w-full">
+            <div className="flex justify-between items-center w-full px-4">
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
               </div>
-
-              {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
-                <Loader scaledHeight />
-              ) : (
-                <>
-                  <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
-                  <p className="text-sm text-neutral-1 line-clamp-1">
-                    {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Buttons Section */}
-            <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
+              </div>
+              <div className="flex">
+                <p className="text-base text-neutral-1">{title}</p>
+              </div>
+              <div className="flex flex-1">
+                <span>&nbsp;</span>
+              </div>
               {currentStep === 0 ? (
-                <>
-                  <Button className="w-full" asChild>
-                    <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                <div className="flex flex-1 justify-center">
+                  <Button
+                    variant="selectedEnabled"
+                    size="xsmall"
+                    className="px-1 rounded text-xs"
+                    onClick={() => setShowReserveStatus(!showReserveStatus)}
+                  >
+                    Reserve
                   </Button>
-                  <ReceiveDialog asset={DEFAULT_ASSET} />
-                </>
+                </div>
               ) : (
-                <>
-                  <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
-                  <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
-                </>
+                <div className="flex flex-1">
+                  <span>&nbsp;</span>
+                </div>
               )}
             </div>
 
-            {/* Pagination Dots */}
-            <div className="flex justify-center space-x-2 mt-2">
-              {[...Array(totalSteps)].map((_, index) =>
-                index === currentStep ? (
-                  <span key={index} className="w-2 h-2 rounded-full bg-blue" />
-                ) : (
-                  <Button
-                    key={index}
-                    variant="unselected"
-                    size="blank"
-                    onClick={() => swipeTo(index)}
-                    className="w-2 h-2 rounded-full bg-neutral-4"
-                  />
-                ),
-              )}
-            </div>
+            {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
+              <Loader scaledHeight />
+            ) : (
+              <>
+                <h1 className="text-h2 text-white font-bold line-clamp-1">{primaryText}</h1>
+                <p className="text-sm text-neutral-1 line-clamp-1">
+                  {secondaryText ? `Balance: ${secondaryText}` : <span>&nbsp;</span>}
+                </p>
+              </>
+            )}
           </div>
-        </>
+
+          {/* Buttons Section */}
+          <div className="flex flex-grow grid grid-cols-2 w-full gap-x-4 px-2">
+            {currentStep === 0 ? (
+              <>
+                <Button className="w-full" asChild>
+                  <NavLink to={ROUTES.APP.SEND}>Send</NavLink>
+                </Button>
+                <ReceiveDialog asset={DEFAULT_ASSET} />
+              </>
+            ) : (
+              <>
+                <ValidatorSelectDialog buttonText="Unstake" buttonVariant="secondary" />
+                <ValidatorSelectDialog buttonText="Claim" isClaimDialog />
+              </>
+            )}
+          </div>
+
+          {/* Pagination Dots */}
+          <div className="flex justify-center space-x-2 mt-2">
+            {[...Array(totalSteps)].map((_, index) =>
+              index === currentStep ? (
+                <span key={index} className="w-2 h-2 rounded-full bg-blue" />
+              ) : (
+                <Button
+                  key={index}
+                  variant="unselected"
+                  size="blank"
+                  onClick={() => swipeTo(index)}
+                  className="w-2 h-2 rounded-full bg-neutral-4"
+                />
+              ),
+            )}
+          </div>
+        </div>
       )}
 
       {/* Right-Side Panel Button */}

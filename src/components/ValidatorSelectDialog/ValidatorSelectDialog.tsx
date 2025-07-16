@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button, SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
-import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import React, { useEffect, useRef, useState } from 'react';
+
 import {
   dialogSearchTermAtom,
   filteredDialogValidatorsAtom,
@@ -10,24 +8,28 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
 } from '@/atoms';
-import { SearchBar } from '../SearchBar';
-import {
-  claimAndRestake,
-  claimRewards,
-  formatBalanceDisplay,
-  truncateWalletAddress,
-  claimAndUnstake,
-} from '@/helpers';
-import { CombinedStakingInfo } from '@/types';
-import { useRefreshData, useToast } from '@/hooks';
 import {
   DEFAULT_ASSET,
   GREATER_EXPONENT_DEFAULT,
   TransactionType,
   ValidatorSortType,
 } from '@/constants';
-import { TransactionResultsTile } from '../TransactionResultsTile';
+import {
+  claimAndRestake,
+  claimAndUnstake,
+  claimRewards,
+  formatBalanceDisplay,
+  truncateWalletAddress,
+} from '@/helpers';
+import { useRefreshData, useToast } from '@/hooks';
+import { CombinedStakingInfo } from '@/types';
+import { Button, SlideTray } from '@/ui-kit';
+
 import { Loader } from '../Loader';
+import { SearchBar } from '../SearchBar';
+import { SortDialog } from '../SortDialog';
+import { TileScroller } from '../TileScroller';
+import { TransactionResultsTile } from '../TransactionResultsTile';
 
 interface ValidatorSelectDialogProps {
   buttonText: string;
@@ -282,8 +284,8 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     }
 
     try {
-      let totalAmount = isClaimDialog ? calculateTotalRewards() : calculateTotalDelegations();
-      let simulationResult = isClaimDialog
+      const totalAmount = isClaimDialog ? calculateTotalRewards() : calculateTotalDelegations();
+      const simulationResult = isClaimDialog
         ? isClaimToRestake
           ? await handleClaimAndRestake(true)
           : await handleClaimToWallet(true)

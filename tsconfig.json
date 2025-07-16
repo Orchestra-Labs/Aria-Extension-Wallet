@@ -21,7 +21,7 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true,
 
-    "types": ["node", "vite/client"],
+    "types": ["node", "vite/client", "jest"],
     "typeRoots": ["src/types/**/*", "node_modules/@types"],
     "baseUrl": ".",
     "paths": {

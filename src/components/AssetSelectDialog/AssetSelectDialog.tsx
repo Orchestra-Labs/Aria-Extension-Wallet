@@ -1,10 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
-import { LogoIcon } from '@/assets/icons';
-import { Asset } from '@/types';
-import { SortDialog } from '../SortDialog';
 import { useAtomValue, useSetAtom } from 'jotai';
+import React, { useEffect, useRef, useState } from 'react';
+
+import { LogoIcon } from '@/assets/icons';
 import {
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
@@ -12,7 +9,12 @@ import {
   receiveStateAtom,
   sendStateAtom,
 } from '@/atoms';
+import { Asset } from '@/types';
+import { SlideTray } from '@/ui-kit';
+
 import { SearchBar } from '../SearchBar';
+import { SortDialog } from '../SortDialog';
+import { TileScroller } from '../TileScroller';
 
 interface AssetSelectDialogProps {
   isReceiveDialog?: boolean;

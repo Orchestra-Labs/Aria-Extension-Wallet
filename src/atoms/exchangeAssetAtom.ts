@@ -1,8 +1,9 @@
 import { atom } from 'jotai';
+
 import {
-  dialogSearchTermAtom,
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
+  dialogSearchTermAtom,
   subscribedAssetsAtom,
 } from '@/atoms';
 import { filterAndSortAssets } from '@/helpers';

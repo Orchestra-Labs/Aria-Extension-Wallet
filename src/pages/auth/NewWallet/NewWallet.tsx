@@ -1,11 +1,11 @@
+import { useSetAtom } from 'jotai';
 import React, { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { LogoWhite } from '@/assets/icons/LogoWhite/LogoWhite';
+import { mnemonic12State, mnemonic24State, mnemonicVerifiedState, use24WordsState } from '@/atoms';
 import { ROUTES } from '@/constants';
 import { Button } from '@/ui-kit';
-import { useSetAtom } from 'jotai';
-import { mnemonic12State, mnemonic24State, mnemonicVerifiedState, use24WordsState } from '@/atoms';
 
 export const NewWallet: React.FC = () => {
   const setMnemonic12 = useSetAtom(mnemonic12State);

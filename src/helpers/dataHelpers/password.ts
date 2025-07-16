@@ -1,6 +1,8 @@
 import { lib, SHA512 } from 'crypto-js';
-import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
+
 import { PasswordRecord } from '@/types';
+
+import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 
 const PASSWORD_KEY = 'passwordHash';
 

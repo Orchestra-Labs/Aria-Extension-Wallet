@@ -12,8 +12,8 @@ export const Sort: React.FC<React.SVGProps<SVGSVGElement>> = props => (
     <path
       d="M3 6H21M6 12H18M10 18H14"
       stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-    ></path>
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
   </svg>
 );

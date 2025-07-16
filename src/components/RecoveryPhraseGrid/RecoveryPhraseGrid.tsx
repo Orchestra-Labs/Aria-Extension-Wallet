@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { EnglishMnemonic } from '@cosmjs/crypto';
+import { useDrag } from '@use-gesture/react';
+import { useAtom, useSetAtom } from 'jotai';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+
 import { EyeClose, EyeOpen } from '@/assets/icons';
+import { mnemonic12State, mnemonic24State, mnemonicVerifiedState, use24WordsState } from '@/atoms';
 import { cn } from '@/helpers/utils';
 import { Button, CopyTextField, Input } from '@/ui-kit';
-import { EnglishMnemonic } from '@cosmjs/crypto';
-import { useAtom, useSetAtom } from 'jotai';
-import { mnemonic12State, mnemonic24State, mnemonicVerifiedState, use24WordsState } from '@/atoms';
-import { useDrag } from '@use-gesture/react';
 
 type RecoveryPhraseGridProps = {
   isVerifyMode?: boolean;
@@ -420,7 +421,7 @@ export const RecoveryPhraseGrid: React.FC<RecoveryPhraseGridProps> = ({
                 displayText={'Copy to clipboard'}
                 copyText={localMnemonic.join(' ')}
                 iconHeight={20}
-              ></CopyTextField>
+              />
             )}
           </div>
         </div>

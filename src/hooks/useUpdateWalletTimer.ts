@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { walletStateAtom } from '@/atoms';
 import { useAtom } from 'jotai';
+import { useEffect, useRef } from 'react';
+
+import { walletStateAtom } from '@/atoms';
 import { DATA_FRESHNESS_TIMEOUT } from '@/constants';
+
 import { useRefreshData } from './useRefreshData';
 
 export const useUpdateWalletTimer = () => {

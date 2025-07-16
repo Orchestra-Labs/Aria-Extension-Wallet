@@ -1,6 +1,8 @@
-import React, { ReactNode } from 'react';
-import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
+
+import Tippy from '@tippyjs/react';
+import React, { ReactNode } from 'react';
+
 import { Position } from '@/constants';
 
 interface TooltipProps {

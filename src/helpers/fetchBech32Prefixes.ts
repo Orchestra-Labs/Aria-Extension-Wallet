@@ -1,6 +1,8 @@
 import axios from 'axios';
-import { getPrefixes, prefixesNeedRefresh, savePrefixes } from './dataHelpers';
+
 import { ChainData } from '@/types';
+
+import { getPrefixes, prefixesNeedRefresh, savePrefixes } from './dataHelpers';
 
 const SLIP_0173_URL = 'https://raw.githubusercontent.com/satoshilabs/slips/master/slip-0173.md';
 

@@ -1,6 +1,7 @@
+import { useAtom, useSetAtom } from 'jotai';
+
 import { isFetchingValidatorDataAtom, validatorDataAtom, walletAddressAtom } from '@/atoms';
 import { fetchValidatorData } from '@/helpers';
-import { useAtom, useSetAtom } from 'jotai';
 
 export function useValidatorDataRefresh() {
   const [walletAddress] = useAtom(walletAddressAtom);

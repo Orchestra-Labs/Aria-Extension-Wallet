@@ -1,21 +1,22 @@
-import React from 'react';
-import { Button, SlideTray } from '@/ui-kit';
-import { Sort } from '@/assets/icons';
 import { useAtom, useAtomValue } from 'jotai';
+import React from 'react';
+
+import { Sort } from '@/assets/icons';
 import {
-  assetSortOrderAtom,
-  assetSortTypeAtom,
-  validatorSortOrderAtom,
-  validatorSortTypeAtom,
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
+  assetSortOrderAtom,
+  assetSortTypeAtom,
+  swiperIndexState,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
+  validatorSortOrderAtom,
+  validatorSortTypeAtom,
   validatorStatusFilterAtom,
-  swiperIndexState,
 } from '@/atoms';
-import { ValidatorSortType, ValidatorStatusFilter } from '@/constants';
 import { userAccountAtom } from '@/atoms/accountAtom';
+import { ValidatorSortType, ValidatorStatusFilter } from '@/constants';
+import { Button, SlideTray } from '@/ui-kit';
 
 interface SortDialogProps {
   isValidatorSort?: boolean;

@@ -1,11 +1,12 @@
+import { SettingsOptions } from '@/constants';
 import { AccountRecord, SubscriptionRecord, WalletRecord } from '@/types';
+
+import { generateUUID } from '../uuid';
+import { decryptMnemonic, encryptMnemonic } from './crypto';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { getPasswordRecords, hashPassword, savePasswordHash, updatePassword } from './password';
-import { createWallet } from './wallet';
 import { saveSessionData } from './session';
-import { generateUUID } from '../uuid';
-import { SettingsOptions } from '@/constants';
-import { decryptMnemonic, encryptMnemonic } from './crypto';
+import { createWallet } from './wallet';
 
 const ACCOUNTS_KEY = 'accountsToken';
 
@@ -55,7 +56,7 @@ export const saveAccountByID = (updatedAccount: AccountRecord): boolean => {
 export const removeAccountByID = (id: string): boolean => {
   console.log(`Removing account by ID: ${id}`);
   const accounts = getAccounts();
-  const filteredAccounts = accounts.filter(acc => acc.id === id);
+  const filteredAccounts = accounts.filter(acc => acc.id !== id);
 
   if (accounts.length === filteredAccounts.length) {
     console.warn(`Account with ID ${id} not found.`);
@@ -67,7 +68,6 @@ export const removeAccountByID = (id: string): boolean => {
   return true;
 };
 
-// TODO: check password for ifExists. If exists, return error.  user can create wallet from within app if desired
 export const createAccount = async (
   mnemonic: string,
   password: string,
@@ -86,7 +86,6 @@ export const createAccount = async (
   const walletRecord = walletInfo.walletRecord;
   console.log('Wallet created and wallet record generated:', walletRecord);
 
-  // Set default network and coin denom based on the first entry in subscriptions, if available
   const defaultNetworkID = Object.keys(subscriptions)[0] || '';
   const defaultCoinDenom = subscriptions[defaultNetworkID]?.coinDenoms?.at(0) || '';
 
@@ -99,7 +98,6 @@ export const createAccount = async (
       activeWalletID: walletRecord.id,
       [SettingsOptions.STABLECOIN_FEE]: false,
       [SettingsOptions.VALIDATOR_STATUS]: false,
-      // initialization settings:
       hasSetCoinList: false,
       hasViewedTutorial: false,
     },
@@ -223,14 +221,12 @@ export const updateAccountPassword = ({
     return false;
   }
 
-  // Validate the old password
   const newHash = updatePassword(accountID, oldPassword, newPassword);
   if (!newHash) {
     console.warn('Old password does not match.');
     return false;
   }
 
-  // Re-encrypt mnemonics for all wallets in the account
   const updatedWallets = account.wallets.map(wallet => {
     const decryptedMnemonic = decryptMnemonic(wallet.encryptedMnemonic, oldPassword);
     const reEncryptedMnemonic = encryptMnemonic(decryptedMnemonic, newPassword);
@@ -240,7 +236,6 @@ export const updateAccountPassword = ({
     };
   });
 
-  // Save updated wallet records to the account
   account.wallets = updatedWallets;
   saveAccountByID(account);
   return true;
