@@ -8,12 +8,14 @@ interface ChainScrollerProps {
   chains: SimplifiedChainInfo[];
   onChainSelect: (chain: SimplifiedChainInfo, feeToken: Asset | null) => void;
   isDialog?: boolean;
+  lazyLoad?: boolean;
 }
 
 export const ChainScroller: React.FC<ChainScrollerProps> = ({
   chains,
   onChainSelect,
   isDialog = false,
+  lazyLoad = true,
 }) => {
   const tileScrollerRef = useRef<TileScrollerHandle>(null);
   const { refreshData } = useRefreshData();
@@ -30,12 +32,17 @@ export const ChainScroller: React.FC<ChainScrollerProps> = ({
   };
 
   return (
-    <TileScroller ref={tileScrollerRef} onRefresh={handleRefresh}>
+    <TileScroller ref={tileScrollerRef} onRefresh={handleRefresh} lazyLoad={lazyLoad}>
       {chains.length === 0 ? (
         <p className="text-base text-neutral-1">No chains found</p>
       ) : (
         chains.map(chain => (
-          <ChainTile key={chain.chain_id} chain={chain} onClick={handleClick} isDialog={isDialog} />
+          <div
+            key={chain.chain_id}
+            className="tile-item" // Essential for lazy loading
+          >
+            <ChainTile chain={chain} onClick={handleClick} isDialog={isDialog} />
+          </div>
         ))
       )}
     </TileScroller>

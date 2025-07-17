@@ -12,14 +12,16 @@ interface AssetScrollerProps {
   onClick?: (asset: Asset) => void;
   isReceiveDialog?: boolean;
   multiSelectEnabled?: boolean;
+  lazyLoad?: boolean;
 }
 
 export const AssetScroller: React.FC<AssetScrollerProps> = ({
-  assets,
+  assets = [],
   isSelectable = false,
   onClick,
   isReceiveDialog = false,
   multiSelectEnabled = false,
+  lazyLoad = true,
 }) => {
   const tileScrollerRef = useRef<TileScrollerHandle>(null);
   const { refreshData } = useRefreshData();
@@ -39,22 +41,29 @@ export const AssetScroller: React.FC<AssetScrollerProps> = ({
     onClick?.(asset);
   };
 
-  console.log('[AssetScroller] Rendering AssetScroller with assets:', assets);
-
   return (
-    <TileScroller ref={tileScrollerRef} isRefreshing={isFetching} onRefresh={handleRefresh}>
+    <TileScroller
+      ref={tileScrollerRef}
+      isRefreshing={isFetching}
+      onRefresh={handleRefresh}
+      lazyLoad={lazyLoad}
+    >
       {assets.length === 0 ? (
         <p className="text-base text-neutral-1">No assets found</p>
       ) : (
         assets.map((asset, index) => (
-          <AssetTile
+          <div
             key={assetKeys[index]}
-            asset={asset}
-            isSelectable={isSelectable}
-            isReceiveDialog={isReceiveDialog}
-            multiSelectEnabled={multiSelectEnabled}
-            onClick={handleClick}
-          />
+            className="tile-item" // NOTE: Important for lazy loading
+          >
+            <AssetTile
+              asset={asset}
+              isSelectable={isSelectable}
+              isReceiveDialog={isReceiveDialog}
+              multiSelectEnabled={multiSelectEnabled}
+              onClick={handleClick}
+            />
+          </div>
         ))
       )}
     </TileScroller>

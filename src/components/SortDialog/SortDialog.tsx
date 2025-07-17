@@ -28,9 +28,14 @@ import {
 interface SortDialogProps {
   searchType: SearchType;
   isDialog?: boolean;
+  exclude?: (AssetSortType | ValidatorSortType)[];
 }
 
-export const SortDialog: React.FC<SortDialogProps> = ({ searchType, isDialog = false }) => {
+export const SortDialog: React.FC<SortDialogProps> = ({
+  searchType,
+  isDialog = false,
+  exclude = [],
+}) => {
   const userAccount = useAtomValue(userAccountAtom);
   const [validatorStatusFilter, setValidatorStatusFilter] = useAtom(validatorStatusFilterAtom);
   // TODO: move away from active index
@@ -51,12 +56,13 @@ export const SortDialog: React.FC<SortDialogProps> = ({ searchType, isDialog = f
     isDialog ? validatorDialogSortTypeAtom : validatorSortTypeAtom,
   );
 
-  const sortOptions =
+  const sortOptions = (
     searchType === SearchType.VALIDATOR
       ? Object.values(ValidatorSortType)
       : searchType === SearchType.ASSET
-        ? ['name', 'amount']
-        : [];
+        ? Object.values(AssetSortType)
+        : []
+  ).filter(option => !exclude?.includes(option));
 
   const setSortOrder = (sortOrder: SortOrder) => {
     switch (searchType) {

@@ -4,7 +4,6 @@ export * from './assetsAtom';
 export * from './chainRegistryAtom';
 export * from './changeMapAtom';
 export * from './paginationAtom';
-export * from './exchangeAssetAtom';
 export * from './isLoggedInAtom';
 export * from './loadingAtom';
 export * from './mnemonicAtom';

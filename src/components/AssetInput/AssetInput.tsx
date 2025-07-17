@@ -53,9 +53,11 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   addClearMaxMargin = false,
   ...props
 }) => {
-  const [localInputValue, setLocalInputValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const prevValueRef = useRef<string>('');
+
+  const [localInputValue, setLocalInputValue] = useState<string>('');
+
   const currentAsset = assetState;
   const currentExponent = currentAsset?.exponent ?? GREATER_EXPONENT_DEFAULT;
 

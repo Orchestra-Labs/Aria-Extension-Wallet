@@ -335,6 +335,10 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   useEffect(() => {
     console.log('[ChainSubscriptions] Component mounted - loading full registry');
     loadFullRegistry();
+
+    return () => {
+      closeAndReturn();
+    };
   }, []);
 
   useEffect(() => {

@@ -44,10 +44,11 @@ export const AssetTile = ({
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  const title = asset.name;
-  const symbol = asset.symbol;
-  const denom = asset.denom;
-  const logo = asset.logo;
+  // TODO: some IBC assets come through with no name.  need to parse those based on others that match on denom
+  const title = asset?.name || asset?.denom || 'Unknown Asset';
+  const symbol = asset?.symbol || asset?.denom || '???';
+  const denom = asset?.denom || 'unknown';
+  const logo = asset?.logo || '';
 
   const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);
   const subtitle = isChainSubscriptionsPage ? symbol : network || 'Unknown Network';

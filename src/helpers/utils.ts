@@ -4,6 +4,8 @@ import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
 import { isValidSend } from './sendTransactions';
 import {
+  DEFAULT_MAINNET_ASSET,
+  DEFAULT_TESTNET_ASSET,
   NetworkLevel,
   SYMPHONY_MAINNET_ID,
   SYMPHONY_TESTNET_ID,
@@ -131,4 +133,8 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
 
 export function getSymphonyChainId(networkLevel: NetworkLevel): string {
   return networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+}
+
+export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
+  return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }

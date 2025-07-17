@@ -520,9 +520,7 @@ export const Send = () => {
         `Max: ${formatBalanceDisplay(`${maxSendable}`, sendAsset.symbol || 'MLD')}`,
       );
       setReceivePlaceholder(
-        !newTransactionType.isSwap
-          ? 'No exchange on current pair'
-          : `Max: ${formatBalanceDisplay(`${maxReceivable}`, receiveAsset.symbol || 'MLD')}`,
+        `Max: ${formatBalanceDisplay(`${maxReceivable}`, receiveAsset.symbol || 'MLD')}`,
       );
 
       return newTransactionType;
@@ -1000,7 +998,7 @@ export const Send = () => {
 
         {/* Fee Section */}
         <div className="flex justify-between items-center text-blue text-sm font-bold mx-2">
-          <p>Fee</p>
+          <p>Estimated Fee</p>
           <p className={simulatedFee?.textClass}>
             {simulatedFee && sendState.amount !== 0
               ? formatBalanceDisplay(`${simulatedFee.feeAmount}`, simulatedFee.feeUnit)

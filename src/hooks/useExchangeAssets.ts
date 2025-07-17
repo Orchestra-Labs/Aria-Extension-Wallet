@@ -4,10 +4,9 @@ import {
   GREATER_EXPONENT_DEFAULT,
   SYMPHONY_ENDPOINTS,
   QueryType,
-  DEFAULT_MAINNET_ASSET,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import { getSymphonyChainId, queryRestNode } from '@/helpers';
+import { getSymphonyChainId, getSymphonyDefaultAsset, queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
 import {
   allWalletAssetsAtom,
@@ -61,7 +60,7 @@ export const useExchangeAssets = () => {
     setError(null);
 
     try {
-      const defaultAsset = DEFAULT_MAINNET_ASSET;
+      const defaultAsset = getSymphonyDefaultAsset(networkLevel);
       const sendAsset = sendState.asset;
 
       console.log('[useExchangeAssets] querying for exchange rates for:', symphonyId);

@@ -7,14 +7,16 @@ import {
   dialogSearchTermAtom,
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
-  symphonyAssetsAtom,
   subscribedChainRegistryAtom,
   sessionWalletAtom,
   networkLevelAtom,
+  allRegistryAssetsAtom,
 } from '@/atoms';
 import { userAccountAtom } from './accountAtom';
 import { filterAndSortAssets } from '@/helpers';
 import { Asset } from '@/types';
+
+export const symphonyAssetsAtom = atom<Asset[]>([]);
 
 // Subscribed and merged wallet assets with balances
 export const subscribedAssetsAtom = atom(get => {
@@ -122,6 +124,7 @@ export const filteredAssetsAtom = atom(get => {
   return filtered;
 });
 
+// NOTE: for the asset select dialog for sendable assets (send page)
 export const filteredDialogAssetsAtom = atom(get => {
   const assets = get(subscribedAssetsAtom);
   const searchTerm = get(dialogSearchTermAtom);
@@ -132,6 +135,16 @@ export const filteredDialogAssetsAtom = atom(get => {
   const nonZeroAssets = assets.filter(asset => asset.amount !== '0');
 
   return filterAndSortAssets(nonZeroAssets, searchTerm, sortType, sortOrder);
+});
+
+// NOTE: for the asset select dialog for receivable assets (send page)
+export const filteredReceiveAssetsAtom = atom(get => {
+  const assets = get(allRegistryAssetsAtom);
+  const searchTerm = get(dialogSearchTermAtom);
+  const sortType = get(assetDialogSortTypeAtom);
+  const sortOrder = get(assetDialogSortOrderAtom);
+
+  return filterAndSortAssets(assets, searchTerm, sortType, sortOrder);
 });
 
 // Filtered coin list for exchange view (all assets)

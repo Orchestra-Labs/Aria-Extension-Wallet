@@ -4,7 +4,7 @@ import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { allWalletAssetsAtom } from './walletAtom';
-import { subscribedChainRegistryAtom } from './chainRegistryAtom';
+import { fullChainRegistryAtom, subscribedChainRegistryAtom } from './chainRegistryAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
 
@@ -92,4 +92,30 @@ export const defaultAssetAtom = atom(get => {
 
   // Fallback to network default
   return networkLevel === 'mainnet' ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
+});
+
+// TODO: add Symphony's stablecoins
+// NOTE: Pure registry assets without wallet balances (for receive context)
+export const allRegistryAssetsAtom = atom(get => {
+  const networkLevel = get(networkLevelAtom);
+  const fullRegistry = get(fullChainRegistryAtom)[networkLevel];
+
+  const allAssets: Asset[] = [];
+
+  // Process all chains in the full registry
+  for (const chainInfo of Object.values(fullRegistry)) {
+    const chainAssets = Object.values(chainInfo.assets || {});
+
+    for (const asset of chainAssets) {
+      allAssets.push({
+        ...asset,
+        amount: '0', // Default to 0 since we don't need balances
+        networkID: chainInfo.chain_id,
+        networkName: chainInfo.chain_name,
+        isIbc: false, // Default false unless we have IBC info from registry
+      });
+    }
+  }
+
+  return allAssets;
 });

@@ -9,9 +9,12 @@ import {
   assetDialogSortTypeAtom,
   dialogSearchTermAtom,
   filteredDialogAssetsAtom,
-  filteredExchangeAssetsAtom,
+  filteredReceiveAssetsAtom,
+  isFetchingRegistryDataAtom,
+  loadFullRegistryAtom,
   receiveStateAtom,
   sendStateAtom,
+  unloadFullRegistryAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { AssetScroller } from '../AssetScroller';
@@ -30,13 +33,16 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
 
   const currentStateAtomSource = isReceiveDialog ? receiveStateAtom : sendStateAtom;
   const filteredAssetsAtomSource = isReceiveDialog
-    ? filteredExchangeAssetsAtom
+    ? filteredReceiveAssetsAtom
     : filteredDialogAssetsAtom;
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(assetDialogSortOrderAtom);
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
   const currentState = useAtomValue(currentStateAtomSource);
   const filteredAssets = useAtomValue(filteredAssetsAtomSource);
+  const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
+  const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
+  const isFetchingRegistry = useAtomValue(isFetchingRegistryDataAtom);
 
   const [dialogSelectedAsset, setDialogSelectedAsset] = useState(currentState.asset);
 
@@ -62,14 +68,24 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
     setSortType(AssetSortType.NAME);
   };
 
-  useEffect(() => {
-    setDialogSelectedAsset(currentState.asset);
-  }, [currentState.asset]);
-
   const handleAssetSelection = (asset: Asset) => {
     onClick(asset);
     slideTrayRef.current?.closeWithAnimation();
   };
+
+  useEffect(() => {
+    setDialogSelectedAsset(currentState.asset);
+  }, [currentState.asset]);
+
+  useEffect(() => {
+    if (isReceiveDialog) {
+      loadFullRegistry();
+    }
+
+    return () => {
+      if (isReceiveDialog) unloadFullRegistry();
+    };
+  }, []);
 
   return (
     <SlideTray
@@ -86,16 +102,32 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
             Selected: <span className="text-blue">{dialogSelectedAsset.symbol || 'None'}</span>
           </div>
           <div className="flex justify-end w-[5rem]">
-            <SortDialog searchType={searchType} isDialog />
+            <SortDialog
+              searchType={searchType}
+              exclude={isReceiveDialog ? [AssetSortType.AMOUNT] : undefined}
+              isDialog
+            />
           </div>
         </div>
 
-        <AssetScroller
-          assets={filteredAssets}
-          isSelectable={true}
-          onClick={handleAssetSelection}
-          isReceiveDialog={isReceiveDialog}
-        />
+        {isFetchingRegistry ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-base text-neutral-1">Loading assets...</p>
+          </div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-base text-neutral-1">No assets found</p>
+          </div>
+        ) : (
+          <AssetScroller
+            assets={filteredAssets}
+            onClick={handleAssetSelection}
+            isSelectable
+            isReceiveDialog={isReceiveDialog}
+            // NOTE: lazyload is breaking here.  don't know why
+            lazyLoad={false}
+          />
+        )}
 
         <SearchBar searchType={searchType} isDialog />
       </div>
