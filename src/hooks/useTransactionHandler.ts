@@ -47,12 +47,23 @@ export const useTransactionHandler = () => {
   // ] = useAtom(transactionLogAtom);
   const setTransactionStatus = useSetAtom(transactionStatusAtom);
 
+  const delayClearTransactionStatus = () => {
+    setTimeout(() => {
+      setTransactionStatus(prev => ({
+        ...prev,
+        status: TransactionStatus.IDLE,
+      }));
+    }, 5000);
+  };
+
   const handleTransactionSuccess = (txHash: string) => {
     console.log('[useTransactionHandler] Transaction successful with hash:', txHash);
     setTransactionStatus({
       status: TransactionStatus.SUCCESS,
       txHash,
     });
+
+    delayClearTransactionStatus();
   };
 
   const handleTransactionError = (errorMessage: string) => {
@@ -61,6 +72,8 @@ export const useTransactionHandler = () => {
       status: TransactionStatus.ERROR,
       error: errorMessage,
     });
+
+    delayClearTransactionStatus();
   };
 
   const handleTransaction = async ({ isSimulation = false } = {}) => {
@@ -171,14 +184,6 @@ export const useTransactionHandler = () => {
       handleTransactionError(errorMessage);
       console.groupEnd();
       return null;
-    } finally {
-      if (!isSimulation) {
-        console.log('[useTransactionHandler] Resetting transaction status to IDLE');
-        setTransactionStatus(prev => ({
-          ...prev,
-          status: TransactionStatus.IDLE,
-        }));
-      }
     }
   };
 
