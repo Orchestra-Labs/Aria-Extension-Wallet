@@ -11,3 +11,5 @@ export const STORED_DATA_TIMEOUT = ONE_DAY;
 export const DATA_FRESHNESS_TIMEOUT = 15 * 1000; // Data is considered fresh for 15 seconds
 export const ICON_CHANGEOVER_TIMEOUT = 750; // 0.75 seconds to hold confirmation icon
 export const DELAY_BETWEEN_NODE_ATTEMPTS = 1000; //1 second between queries
+
+export const DEFAULT_REST_TIMEOUT = 2000;

@@ -204,6 +204,7 @@ export interface CustomQueryOptions {
 }
 
 export interface Intent {
+  // TODO: make actions enums
   action: 'send' | 'receive' | 'stake' | 'unstake' | 'claim' | 'claimAndRestake' | 'swap';
   amount: number | 'all';
   coin: { name?: string; symbol?: string; denom?: string };

@@ -1,4 +1,9 @@
-import { DEFAULT_FEE_TOKEN, MAX_RETRIES_PER_QUERY, QueryType } from '@/constants';
+import {
+  DEFAULT_FEE_TOKEN,
+  DEFAULT_REST_TIMEOUT,
+  MAX_RETRIES_PER_QUERY,
+  QueryType,
+} from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
 import { FeeToken, RPCResponse, Uri } from '@/types';
@@ -18,29 +23,50 @@ const isIndexerError = (error: any): boolean => {
 };
 
 // Helper: Perform a REST API query to a selected node
+// TODO: make queryType an enum
 const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
   const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
   const uriEndpoint = `${adjustedUri}${endpoint}`;
   // console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
-  const response = await fetch(`${uriEndpoint}`, {
-    method: queryType,
-    body: null,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
 
-  if (!response.ok) {
-    console.error('[queryNodes] Node query failed:', response);
-    throw new Error('Node query failed');
+  try {
+    const response = await fetch(`${uriEndpoint}`, {
+      method: queryType,
+      body: null,
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.error('[queryNodes] Node query failed:', response);
+      throw new Error('Node query failed');
+    }
+
+    const responseBody = await response.json();
+
+    // console.log(
+    //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
+    //   responseBody,
+    // );
+    return responseBody;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${DEFAULT_REST_TIMEOUT}ms`);
+      }
+      throw error;
+    }
+
+    // Handle non-Error throwables
+    throw new Error(`Unknown error occurred: ${String(error)}`);
   }
-
-  const responseBody = await response.json();
-  // console.log(
-  //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
-  //   responseBody,
-  // );
-
-  return responseBody;
 };
 
 // Helper: Perform an RPC query using signing, such as for claiming rewards or staking
@@ -195,7 +221,7 @@ const queryWithRetry = async ({
   let attemptCount = 0;
   let lastError: any = null;
 
-  // TODO: add rest.cosmos.directory/symphony or rest.testcosmos.directory/symphony to start of list before querying.
+  // TODO: add rest.cosmos.directory/[chain name] (i.e. rest.cosmos.directory/symphony) or rest.testcosmos.directory/[chain name] to start of list before querying.
   const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
   while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= uris.length - 1) {
     const uriIndex = attemptCount % shuffledUris.length;
