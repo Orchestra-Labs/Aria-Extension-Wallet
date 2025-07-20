@@ -1,5 +1,5 @@
 import {
-  DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
+  DEFAULT_EXTERNAL_GAS_PRICES,
   NetworkLevel,
   STORED_DATA_TIMEOUT,
   SYMPHONY_CHAIN_ID_LIST,
@@ -566,22 +566,34 @@ export const filterChainRegistryToSubscriptions = (
 };
 
 const normalizeFeeTokens = (raw: any): FeeToken[] => {
+  // Handle Cosmos Hub format with fee_tokens
   if (raw.fees?.fee_tokens) {
     return raw.fees.fee_tokens.map((t: any) => {
+      // For Dungeon chain, we need to handle both formats that might appear
+      const gasPriceStep = t.gasPriceStep || {
+        low: t.low_gas_price || DEFAULT_EXTERNAL_GAS_PRICES.low,
+        average: t.average_gas_price || DEFAULT_EXTERNAL_GAS_PRICES.average,
+        high: t.high_gas_price || DEFAULT_EXTERNAL_GAS_PRICES.high,
+      };
+
       return {
         denom: t.denom,
-        gasPriceStep: t.gasPriceStep || DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
+        gasPriceStep,
       };
     });
   }
 
+  // Handle Keplr format with feeCurrencies
   if (raw.feeCurrencies) {
-    return raw.feeCurrencies.map((f: any) => ({
-      denom: f.coinMinimalDenom,
-      gasPriceStep: f.gasPriceStep || DEFAULT_EXTERNAL_CHAIN_GAS_PRICES,
-    }));
+    return raw.feeCurrencies.map((f: any) => {
+      return {
+        denom: f.coinMinimalDenom,
+        gasPriceStep: f.gasPriceStep || DEFAULT_EXTERNAL_GAS_PRICES,
+      };
+    });
   }
 
+  // Fallback for chains with no specified fees
   return [];
 };
 
@@ -607,15 +619,22 @@ export const extractChainInfo = (raw: any, assets?: Record<string, Asset>): Simp
     provider: endpoint.provider || 'Unknown',
   });
 
+  const website = raw.website || '';
+
+  const fees = (() => {
+    return normalizeFeeTokens(raw);
+  })();
+
   return {
     chain_name: raw.chain_name,
     status: raw.status || 'unknown',
+    website,
     network_level: networkLevel,
     pretty_name: raw.pretty_name,
     chain_type: raw.chain_type,
     chain_id: raw.chain_id,
     bech32_prefix: raw.bech32_prefix,
-    fees: normalizeFeeTokens(raw),
+    fees,
     staking_denoms: normalizeStakingDenoms(raw),
     rpc_uris: raw.apis?.rpc?.map(createUriFromApi) || [],
     rest_uris: raw.apis?.rest?.map(createUriFromApi) || [],

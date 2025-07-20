@@ -11,10 +11,8 @@ import {
   filteredDialogAssetsAtom,
   filteredReceiveAssetsAtom,
   isFetchingRegistryDataAtom,
-  loadFullRegistryAtom,
   receiveStateAtom,
   sendStateAtom,
-  unloadFullRegistryAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { AssetScroller } from '../AssetScroller';
@@ -40,8 +38,6 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
   const currentState = useAtomValue(currentStateAtomSource);
   const filteredAssets = useAtomValue(filteredAssetsAtomSource);
-  const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
-  const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const isFetchingRegistry = useAtomValue(isFetchingRegistryDataAtom);
 
   const [dialogSelectedAsset, setDialogSelectedAsset] = useState(currentState.asset);
@@ -57,7 +53,11 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
     />
   );
   const triggerComponent = logo ? (
-    <IconContainer src={logo} alt={alt} className="h-7 w-7" />
+    <IconContainer
+      src={logo}
+      alt={alt}
+      className="h-7 w-7 hover:bg-blue-hover hover:text-blue-dark hover:border hover:border-solid hover:border-blue-hover cursor-pointer"
+    />
   ) : (
     <IconContainer icon={icon} alt={alt} className="h-7 w-7" />
   );
@@ -69,6 +69,8 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
   };
 
   const handleAssetSelection = (asset: Asset) => {
+    console.log('[AssetSelectDialog] Selected asset:', asset);
+    console.log('[AssetSelectDialog] Current asset:', currentState.asset);
     onClick(asset);
     slideTrayRef.current?.closeWithAnimation();
   };
@@ -76,16 +78,6 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
   useEffect(() => {
     setDialogSelectedAsset(currentState.asset);
   }, [currentState.asset]);
-
-  useEffect(() => {
-    if (isReceiveDialog) {
-      loadFullRegistry();
-    }
-
-    return () => {
-      if (isReceiveDialog) unloadFullRegistry();
-    };
-  }, []);
 
   return (
     <SlideTray

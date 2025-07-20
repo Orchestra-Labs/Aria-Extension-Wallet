@@ -1,4 +1,3 @@
-import { NetworkLevel } from '@/constants';
 import { Asset } from './localStorageTypes';
 import { StakingParams, UnbondingDelegationEntry, ValidatorInfo } from './validatorData';
 
@@ -12,25 +11,6 @@ export interface SessionToken {
 export interface WalletAssets {
   address: string;
   assets: Asset[];
-}
-
-export interface SendObject {
-  recipientAddress: string;
-  amount: string;
-  denom: string;
-  assets: Asset[];
-}
-export interface SwapObject {
-  sendObject: SendObject;
-  resultDenom: string;
-}
-
-export interface IBCObject {
-  fromAddress: string;
-  sendObject: SendObject;
-  sendChain: string;
-  receiveChain: string;
-  networkLevel: NetworkLevel;
 }
 
 export interface Pagination {
@@ -203,12 +183,6 @@ export interface IBCConnectionFile {
       chain_2: IBCConnectionFileChannel;
     }>;
   };
-}
-
-export interface TransactionState {
-  asset: Asset;
-  amount: number;
-  chainID: string;
 }
 
 export interface BaseAccount {

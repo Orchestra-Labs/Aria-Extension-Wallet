@@ -10,6 +10,13 @@ export enum TransactionType {
   CLAIM_TO_RESTAKE = 'Claim To Restake',
 }
 
+export enum TransactionStatus {
+  IDLE = 'idle',
+  LOADING = 'loading',
+  SUCCESS = 'success',
+  ERROR = 'error',
+}
+
 export enum TextFieldStatus {
   ERROR = 'error',
   WARN = 'warn',

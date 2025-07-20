@@ -1,3 +1,4 @@
+// TODO: remove file if not used
 export const setSessionStorageItem = (key: string, value: string): void => {
   sessionStorage.setItem(key, value);
 };

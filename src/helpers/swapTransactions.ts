@@ -1,6 +1,5 @@
 import { SwapObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
 import { COSMOS_CHAIN_ENDPOINTS, SYMPHONY_PREFIX } from '@/constants';
-import { getValidFeeDenom } from './feeDenom';
 import { symphony } from '@orchestra-labs/symphonyjs';
 import { queryRpcNode } from './queryNodes';
 
@@ -108,14 +107,14 @@ export const swapTransaction = async (
   ];
 
   try {
-    const feeDenom = getValidFeeDenom(swapObject.sendObject.denom, swapObject.sendObject.assets);
-    console.log('Swap fee denom:', feeDenom);
+    const feeToken = swapObject.sendObject.feeToken;
+    console.log('Swap fee token:', feeToken);
     const response = await queryRpcNode({
       endpoint,
       prefix: SYMPHONY_PREFIX,
       rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 
@@ -172,16 +171,13 @@ export const multiSwapTransaction = async (
   );
 
   try {
-    const feeDenom = getValidFeeDenom(
-      swapObjects[0].sendObject.denom,
-      swapObjects[0].sendObject.assets,
-    );
+    const feeToken = swapObjects[0].sendObject.feeToken;
     const response = await queryRpcNode({
       endpoint,
       prefix: SYMPHONY_PREFIX,
       rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 

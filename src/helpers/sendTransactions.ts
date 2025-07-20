@@ -1,7 +1,6 @@
 import { COSMOS_CHAIN_ENDPOINTS } from '@/constants';
 import { queryRpcNode } from './queryNodes';
 import { SendObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
-import { getValidFeeDenom } from './feeDenom';
 
 export const isValidSend = ({
   sendAsset,
@@ -41,15 +40,15 @@ export const sendTransaction = async (
   console.log('Denom:', sendObject.denom);
 
   try {
-    const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.assets);
-    console.log('Fee Denom:', feeDenom);
+    const feeToken = sendObject.feeToken;
+    console.log('Fee Token:', feeToken);
 
     const response = await queryRpcNode({
       endpoint,
       prefix,
       rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 
@@ -105,7 +104,7 @@ export const multiSendTransaction = async (
     },
   }));
 
-  const feeDenom = getValidFeeDenom(sendObjects[0].denom, sendObjects[0].assets);
+  const feeToken = sendObjects[0].feeToken;
 
   try {
     const response = await queryRpcNode({
@@ -113,7 +112,7 @@ export const multiSendTransaction = async (
       prefix,
       rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 

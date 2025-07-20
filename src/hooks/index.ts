@@ -15,6 +15,7 @@ export * from './useRegistryDataRefresh';
 export * from './useReservePoolBalance';
 export * from './useSupportedWCNamespaces';
 export * from './useToast';
+export * from './useTransactionHandler';
 export * from './useUpdateWalletTimer';
 export * from './useValidatorDataRefresh';
 export * from './useWalletConnectEventsManager';

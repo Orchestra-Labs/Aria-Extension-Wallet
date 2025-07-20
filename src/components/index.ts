@@ -1,5 +1,6 @@
 export * from './AddressInput';
 export * from './AssetInput';
+export * from './AssetInputSection';
 export * from './AssetScroller';
 export * from './AssetTile';
 export * from './AssetSelectDialog';

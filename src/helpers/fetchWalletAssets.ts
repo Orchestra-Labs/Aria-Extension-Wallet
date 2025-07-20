@@ -184,6 +184,7 @@ export async function fetchWalletAssets(
 
         const amount = adjustAmountByExponent(coin.amount, metadata.exponent);
         return {
+          name: metadata.name,
           denom: baseDenom,
           symbol: metadata.symbol,
           logo: metadata.logo,

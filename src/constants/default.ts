@@ -21,6 +21,11 @@ export const SYMPHONY_CHAIN_ID_LIST = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID]
 export const IBC_PREFIX = 'ibc/';
 export const LESSER_EXPONENT_DEFAULT = 0;
 export const GREATER_EXPONENT_DEFAULT = 6;
-export const DEFAULT_EXTERNAL_CHAIN_GAS_PRICES = { low: 0.01, average: 0.025, high: 0.04 };
+export const DEFAULT_EXTERNAL_GAS_PRICES = { low: 0.01, average: 0.025, high: 0.04 };
+export const DEFAULT_GAS_PRICES = { low: 0.00025, average: 0.0025, high: 0.004 };
+export const DEFAULT_FEE_TOKEN = {
+  denom: DEFAULT_DENOM,
+  gasPriceStep: DEFAULT_GAS_PRICES,
+};
 
 export const MAX_RETRIES_PER_QUERY = 3;

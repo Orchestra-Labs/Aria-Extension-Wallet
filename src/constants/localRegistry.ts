@@ -123,6 +123,7 @@ export const DEFAULT_MAINNET_REGISTRY: LocalChainRegistry = {
   [SYMPHONY_MAINNET_ID]: {
     chain_name: 'local symphony',
     status: 'live',
+    website: '',
     network_level: NetworkLevel.MAINNET,
     pretty_name: 'Symphony',
     chain_type: 'cosmos',
@@ -166,6 +167,7 @@ export const DEFAULT_MAINNET_REGISTRY: LocalChainRegistry = {
   'stargaze-1': {
     chain_name: 'local stargaze',
     status: 'live',
+    website: '',
     network_level: NetworkLevel.MAINNET,
     pretty_name: 'Stargaze',
     chain_type: 'cosmos',
@@ -218,6 +220,7 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
   [SYMPHONY_TESTNET_ID]: {
     chain_name: 'local symphonytestnet',
     status: 'active',
+    website: '',
     network_level: NetworkLevel.TESTNET,
     pretty_name: 'Symphony Testnet',
     chain_type: 'cosmos',
@@ -243,6 +246,7 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
   ['osmo-test-5']: {
     chain_name: 'local osmosistestnet',
     status: 'live',
+    website: '',
     network_level: NetworkLevel.TESTNET,
     pretty_name: 'Osmosis Testnet',
     chain_type: 'cosmos',
@@ -280,6 +284,7 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
   ['elgafar-1']: {
     chain_name: 'local stargazetestnet',
     status: 'live',
+    website: '',
     network_level: NetworkLevel.TESTNET,
     pretty_name: 'Stargaze Testnet',
     chain_type: 'cosmos',

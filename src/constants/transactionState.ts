@@ -1,4 +1,4 @@
-import { SYMPHONY_MAINNET_ID } from './default';
+import { DEFAULT_FEE_TOKEN, SYMPHONY_MAINNET_ID } from './default';
 import { DEFAULT_MAINNET_ASSET } from './localRegistry';
 
 export const defaultSendState = {
@@ -6,13 +6,18 @@ export const defaultSendState = {
   amount: 0,
   chainID: SYMPHONY_MAINNET_ID,
 };
+
 export const defaultReceiveState = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
   chainID: SYMPHONY_MAINNET_ID,
 };
+
 export const defaultFeeState = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
-  chainID: SYMPHONY_MAINNET_ID,
+  chainID: DEFAULT_MAINNET_ASSET.networkID,
+  feeToken: DEFAULT_FEE_TOKEN,
+  gasWanted: 0,
+  gasPrice: 0,
 };

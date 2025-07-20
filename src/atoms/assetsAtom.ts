@@ -3,7 +3,6 @@ import { Asset } from '@/types';
 import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
-import { allWalletAssetsAtom } from './walletAtom';
 import { fullChainRegistryAtom, subscribedChainRegistryAtom } from './chainRegistryAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
@@ -15,17 +14,18 @@ type WriteableAtom<T> = WritableAtom<T, [T], void>;
 const _selectedAssetAtom = atom<Asset | null>(null);
 const _dialogSelectedAssetAtom = atom<Asset | null>(null);
 
-export const selectedAssetAtom: WriteableAtom<Asset> = atom(
+export const selectedAssetAtom = atom(
   get => {
     const defaultAsset = get(defaultAssetAtom);
     const independentValue = get(_selectedAssetAtom);
-    // Use independent value if it exists, otherwise fall back to default
-    return independentValue ? independentValue : defaultAsset;
+
+    // Deep compare instead of reference check
+    if (independentValue && JSON.stringify(independentValue) === JSON.stringify(defaultAsset)) {
+      return independentValue;
+    }
+    return independentValue || defaultAsset;
   },
-  (_, set, newAsset: Asset) => {
-    // Directly update our own atom's storage
-    set(_selectedAssetAtom, newAsset);
-  },
+  (_, set, newAsset) => set(_selectedAssetAtom, newAsset as Asset),
 );
 
 export const dialogSelectedAssetAtom: WriteableAtom<Asset> = atom(
@@ -44,34 +44,11 @@ export const dialogSelectedAssetAtom: WriteableAtom<Asset> = atom(
 export const defaultAssetAtom = atom(get => {
   const userAccount = get(userAccountAtom);
   const networkLevel = get(networkLevelAtom);
-  const walletAssets = get(allWalletAssetsAtom);
   const chainRegistry = get(subscribedChainRegistryAtom);
 
   // If user has a default coin denom
   if (userAccount?.settings.defaultCoinDenom) {
-    // First try to find in wallet assets
-    const walletAsset = walletAssets.find(
-      asset => asset.denom === userAccount.settings.defaultCoinDenom,
-    );
-
-    if (walletAsset) {
-      // Try to get full asset details from chain registry
-      const chain = chainRegistry[networkLevel][walletAsset.networkID];
-      if (chain?.assets) {
-        const fullAsset = Object.values(chain.assets).find(a => a.denom === walletAsset.denom);
-        if (fullAsset) {
-          return {
-            ...fullAsset,
-            amount: walletAsset.amount,
-            networkID: walletAsset.networkID,
-            networkName: walletAsset.networkName,
-          };
-        }
-      }
-      return walletAsset;
-    }
-
-    // If not found in wallet, try to find in chain registry
+    // Try to find in chain registry
     if (userAccount.settings.defaultChainID) {
       const chain = chainRegistry[networkLevel][userAccount.settings.defaultChainID];
       if (chain?.assets) {

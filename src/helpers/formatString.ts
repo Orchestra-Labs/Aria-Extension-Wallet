@@ -48,3 +48,11 @@ export const formatBalanceDisplay = (number: string, symbol: string): string => 
   const formattedAmount = formatNumberWithCommas(removeTrailingZeroes(stringToFormat));
   return `${formattedAmount} ${symbol}`;
 };
+
+export const formatLowBalanceDisplay = (number: string, symbol: string): string => {
+  const num = parseFloat(number);
+  if (num < 0.001) {
+    return num.toExponential(4) + ' ' + symbol;
+  }
+  return formatBalanceDisplay(number, symbol);
+};

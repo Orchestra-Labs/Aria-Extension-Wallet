@@ -1,4 +1,4 @@
-import { atom } from 'jotai';
+import { Atom, atom } from 'jotai';
 import { Asset, Wallet } from '@/types';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { networkLevelAtom } from './networkLevelAtom';
@@ -11,8 +11,17 @@ export const sessionWalletAtom = atom<{
 }>({ name: '', encryptedMnemonic: '', chainWallets: {} });
 
 // Per-chain wallet accessor
-export const chainWalletAtom = (chainId: string) =>
-  atom(get => get(sessionWalletAtom).chainWallets[chainId] || { address: '', assets: [] });
+const chainWalletCache = new Map<string, Atom<Wallet>>();
+
+export const chainWalletAtom = (chainId: string) => {
+  if (!chainWalletCache.has(chainId)) {
+    chainWalletCache.set(
+      chainId,
+      atom(get => get(sessionWalletAtom).chainWallets[chainId] || { address: '', assets: [] }),
+    );
+  }
+  return chainWalletCache.get(chainId)!;
+};
 
 // Secure updater for chain wallet data
 export const updateChainWalletAtom = atom(
@@ -50,7 +59,9 @@ export const walletAddressesAtom = atom(get => {
 // Flatten all wallet assets across chains
 export const allWalletAssetsAtom = atom(get => {
   const { chainWallets } = get(sessionWalletAtom);
-  return Object.values(chainWallets).flatMap(wallet => wallet.assets);
+  return Object.values(chainWallets)
+    .flatMap(wallet => wallet.assets)
+    .map(asset => Object.freeze({ ...asset }));
 });
 
 export const hasNonZeroAssetsAtom = atom(get => {

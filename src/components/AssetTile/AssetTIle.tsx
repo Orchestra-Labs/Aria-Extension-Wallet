@@ -69,10 +69,10 @@ export const AssetTile = ({
   }
 
   const isSelected = multiSelectEnabled
-    ? selectedCoins.some(selected => selected.denom === asset.denom)
+    ? selectedCoins.some(selected => selected === asset)
     : isSendPage
-      ? asset.denom === currentState.asset.denom
-      : asset.denom === dialogSelectedAsset.denom;
+      ? asset === currentState.asset
+      : asset === dialogSelectedAsset;
 
   const handleSendClick = () => {
     setSelectedAsset(asset);

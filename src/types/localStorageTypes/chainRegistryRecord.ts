@@ -37,6 +37,7 @@ export interface AssetRegistry {
 export interface SimplifiedChainInfo {
   chain_name: string;
   status: string;
+  website: string;
   network_level: NetworkLevel;
   pretty_name: string;
   chain_type: string;

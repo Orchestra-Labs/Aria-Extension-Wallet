@@ -13,7 +13,6 @@ import {
 import { COSMOS_CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import { getIBCConnections, ibcConnectionsNeedRefresh, saveIBCConnections } from './dataHelpers';
 import { queryRestNode, queryRpcNode } from './queryNodes';
-import { getValidFeeDenom } from './feeDenom';
 import { getIBCFile, ibcFileNeedsRefresh, saveIBCFile } from './dataHelpers/ibcChannel';
 import { bech32 } from 'bech32';
 import { fetchBech32Prefixes } from './fetchBech32Prefixes';
@@ -291,15 +290,15 @@ const sendIBCTransaction = async (
   console.log('Prepared transaction messages:', messages);
 
   try {
-    const feeDenom = getValidFeeDenom(sendObject.denom, sendObject.assets);
-    console.log('Determined fee denom:', feeDenom);
+    const feeToken = sendObject.feeToken;
+    console.log('Determined fee token:', feeToken);
 
     const response = await queryRpcNode({
       endpoint,
       prefix,
       rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 
