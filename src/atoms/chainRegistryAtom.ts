@@ -1,9 +1,4 @@
-import {
-  DEFAULT_SUBSCRIPTION,
-  LOCAL_CHAIN_REGISTRY,
-  SettingsOption,
-  SYMPHONY_MAINNET_ID,
-} from '@/constants';
+import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, SettingsOption } from '@/constants';
 import { Asset, LocalChainRegistry, SimplifiedChainInfo, SubscriptionRecord } from '@/types';
 import { atom } from 'jotai';
 import {
@@ -13,7 +8,12 @@ import {
   searchTermAtom,
 } from './searchFilterAtom';
 import { networkLevelAtom } from './networkLevelAtom';
-import { filterAndSortAssets, filterAndSortChains, getStoredChainRegistry } from '@/helpers';
+import {
+  filterAndSortAssets,
+  filterAndSortChains,
+  getStoredChainRegistry,
+  getSymphonyChainId,
+} from '@/helpers';
 import { userAccountAtom } from './accountAtom';
 
 const EMPTY_CHAIN_REGISTRY = { mainnet: {}, testnet: {} };
@@ -169,8 +169,14 @@ export const filteredChainRegistryAtom = atom(get => {
   return filteredChains;
 });
 
+const _selectedValidatorChainAtom = atom<string | null>(null);
 export const selectedValidatorChainAtom = atom<string, [string], void>(
   get => {
+    const independentValue = get(_selectedValidatorChainAtom);
+    if (independentValue !== null) {
+      return independentValue;
+    }
+
     const userAccount = get(userAccountAtom);
     const subscribedChains = get(subscribedChainsAtom);
     const subscribedChainIds = subscribedChains.map(chain => chain.chain_id);
@@ -181,17 +187,20 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
       return userDefaultChain;
     }
 
-    // Priority 2: SYMPHONY_MAINNET_ID (if subscribed)
-    if (subscribedChainIds.includes(SYMPHONY_MAINNET_ID)) {
-      return SYMPHONY_MAINNET_ID;
+    const networkLevel = get(networkLevelAtom);
+    const symphonyChainId = getSymphonyChainId(networkLevel);
+
+    // Priority 2: symphony id (if subscribed)
+    if (subscribedChainIds.includes(symphonyChainId)) {
+      return symphonyChainId;
     }
 
     // Priority 3: First available subscribed chain
-    return subscribedChains[0]?.chain_id || SYMPHONY_MAINNET_ID;
+    return subscribedChains[0]?.chain_id || symphonyChainId;
   },
-  (_get, set, newChainId) => {
-    // Store the value directly in the atom's internal state
-    set(selectedValidatorChainAtom, newChainId);
+  (_, set, newChainId: string) => {
+    // Store the value in the private atom
+    set(_selectedValidatorChainAtom, newChainId);
   },
 );
 
