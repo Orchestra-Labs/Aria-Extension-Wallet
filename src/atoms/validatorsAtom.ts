@@ -11,18 +11,21 @@ import {
 import { filterAndSortValidators } from '@/helpers';
 import { ValidatorStatusFilter } from '@/constants';
 
-export const showCurrentValsOverrideAtom = atom<boolean | null>(null);
+const _showCurrentValidatorsOverrideAtom = atom<boolean | null>(null);
+const _autoShowCurrentValidatorsAtom = atom(get => {
+  const validatorData = get(validatorDataAtom);
+  return validatorData.some(validator => parseFloat(validator.balance.amount) > 0);
+});
+
+// Public combined atom (similar to selectedAssetAtom)
 export const showCurrentValidatorsAtom = atom(
   get => {
-    const validatorData = get(validatorDataAtom);
-    const hasStakedValidators = validatorData.some(
-      validator => parseFloat(validator.balance.amount) > 0,
-    );
-    return hasStakedValidators;
+    const override = get(_showCurrentValidatorsOverrideAtom);
+    const autoValue = get(_autoShowCurrentValidatorsAtom);
+    return override !== null ? override : autoValue;
   },
   (_, set, newValue: boolean) => {
-    // Allow manual override
-    set(showCurrentValsOverrideAtom, newValue);
+    set(_showCurrentValidatorsOverrideAtom, newValue);
   },
 );
 
@@ -38,19 +41,11 @@ export const filteredValidatorsAtom = atom(get => {
   const sortOrder = get(validatorSortOrderAtom);
   const sortType = get(validatorSortTypeAtom);
   const statusFilter = get(validatorStatusFilterAtom);
-
-  // Get both the automatic and manual states
-  const autoShowCurrent = get(showCurrentValidatorsAtom);
-  const manualOverride = get(showCurrentValsOverrideAtom);
-
-  // Determine which value to use (manual override takes precedence)
-  const showCurrentValidators = manualOverride !== null ? manualOverride : autoShowCurrent;
+  const showCurrentValidators = get(showCurrentValidatorsAtom);
 
   console.group('[filteredValidatorsAtom]');
   console.log('validatorData length:', validatorData.length);
-  console.log('hasStakedValidators:', autoShowCurrent);
-  console.log('manualOverride:', manualOverride);
-  console.log('effective showCurrentValidators:', showCurrentValidators);
+  console.log('showCurrentValidators:', showCurrentValidators);
   console.groupEnd();
 
   return filterAndSortValidators(

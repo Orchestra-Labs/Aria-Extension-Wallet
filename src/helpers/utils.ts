@@ -138,9 +138,3 @@ export function getSymphonyChainId(networkLevel: NetworkLevel): string {
 export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
-
-export const getFeeTextClass = (percentage: number) => {
-  if (percentage > 1) return 'text-error';
-  if (percentage > 0.75) return 'text-warn';
-  return 'text-blue';
-};

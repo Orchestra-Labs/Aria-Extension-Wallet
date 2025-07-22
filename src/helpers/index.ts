@@ -15,6 +15,7 @@ export * from './sendTransactions';
 export * from './sleep';
 export * from './sort';
 export * from './stakingTransactions';
+export * from './statusUtils';
 export * from './swapTransactions';
 export * from './timer';
 export * from './transactionHandlers';

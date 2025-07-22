@@ -8,7 +8,6 @@ import {
   searchTermAtom,
   filteredAssetsAtom,
   filteredValidatorsAtom,
-  showCurrentValsOverrideAtom,
   hasNonZeroAssetsAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
@@ -26,7 +25,6 @@ export const Main = () => {
 
   const [activeIndex, setActiveIndex] = useAtom(swiperIndexState);
   const [showCurrentValidators, setShowCurrentValidators] = useAtom(showCurrentValidatorsAtom);
-  const manualOverride = useAtomValue(showCurrentValsOverrideAtom);
   const [showAllAssets, setShowAllAssets] = useAtom(showAllAssetsAtom);
   const setSearchTerm = useSetAtom(searchTermAtom);
   const userAccount = useAtomValue(userAccountAtom);
@@ -37,9 +35,7 @@ export const Main = () => {
   const routeToVisibilitySelection = !userAccount?.settings.hasSetCoinList;
   const routeToTutorial = !userAccount?.settings.hasViewedTutorial;
 
-  const searchType = activeIndex === 0 ? SearchType.ASSET : SearchType.CHAIN;
-
-  const showCurrentVals = manualOverride !== null ? manualOverride : showCurrentValidators;
+  const searchType = activeIndex === 0 ? SearchType.ASSET : SearchType.VALIDATOR;
 
   const assetViewToggleChange = (shouldShowAllAssets: boolean) => {
     setShowAllAssets(shouldShowAllAssets);
@@ -141,7 +137,7 @@ export const Main = () => {
             <span className="flex-1">Validators</span>
             <div className="flex-1 flex justify-center items-center space-x-2">
               <Button
-                variant={showCurrentVals ? 'selected' : 'unselected'}
+                variant={showCurrentValidators ? 'selected' : 'unselected'}
                 size="small"
                 onClick={() => validatorViewToggleChange(true)}
                 className="px-2 rounded-md text-xs"
@@ -149,7 +145,7 @@ export const Main = () => {
                 Current
               </Button>
               <Button
-                variant={!showCurrentVals ? 'selected' : 'unselected'}
+                variant={!showCurrentValidators ? 'selected' : 'unselected'}
                 size="small"
                 onClick={() => validatorViewToggleChange(false)}
                 className="px-2 rounded-md text-xs"

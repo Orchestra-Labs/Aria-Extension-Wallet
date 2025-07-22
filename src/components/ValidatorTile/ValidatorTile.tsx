@@ -9,9 +9,12 @@ import {
   formatBalanceDisplay,
   isValidUrl,
   selectTextColorByStatus,
-  truncateWalletAddress,
   getValidatorLogoInfo,
   formatLowBalanceDisplay,
+  getVotingPowerStatus,
+  getUptimeStatus,
+  getValidatorStatus,
+  truncateWalletAddress,
 } from '@/helpers';
 import {
   BondStatus,
@@ -35,6 +38,7 @@ import {
   validatorTxHash,
   lastSimulationUpdateAtom,
   validatorCalculatedFeeAtom,
+  chainInfoAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -42,181 +46,145 @@ import { TransactionResultsTile } from '../TransactionResultsTile';
 import { AlertCircleIcon } from 'lucide-react';
 import { useValidatorActions } from '@/hooks';
 
-// TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 interface ValidatorTileProps {
   combinedStakingInfo: CombinedStakingInfo;
   isSelectable?: boolean;
   onClick?: (validator: CombinedStakingInfo) => void;
 }
 
+// TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
+// TODO: if no staking denom, disable staking features
 const ValidatorTileComponent = ({
   combinedStakingInfo,
   isSelectable = false,
   onClick,
 }: ValidatorTileProps) => {
+  // Refs and state
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
   const { runTransaction, runSimulation } = useValidatorActions(combinedStakingInfo);
 
+  // Atoms
   const networkLevel = useAtomValue(networkLevelAtom);
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
   const chainId = useAtomValue(selectedValidatorChainAtom);
-  const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const isLoading = useAtomValue(isValidatorLoadingAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
   const transactionFailed = useAtomValue(validatorTxFailedAtom);
   const isSuccess = useAtomValue(isValidatorSuccessAtom);
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
-  const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const transactionHash = useAtomValue(validatorTxHash);
+  const chainInfo = useAtomValue(chainInfoAtom);
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
+  const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
+  const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
 
-  const chain = chainRegistry[networkLevel][chainId];
-
-  const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
-    combinedStakingInfo;
-  const delegationResponse = { delegation, balance };
-
-  // console.log('[ValidatorTile] Building Validator Tile:', validator.description.moniker);
-
-  // TODO: if no staking denom, disable staking features
-  const stakingDenom = chain.staking_denoms[0];
-  const asset = chain.assets?.[stakingDenom];
-  const symbol = asset?.symbol || 'MLD';
-  const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
+  // Derived data
+  const chain = chainInfo(chainId);
 
   const [amount, setAmount] = useState(0);
-  const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
-  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake' | 'claim' | null>(
-    !combinedStakingInfo.delegation ? 'stake' : null,
-  );
+  const [isClaimToRestake, setIsClaimToRestake] = useState(true);
+  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake' | 'claim' | null>(null);
   const [validatorLogoInfo, setValidatorLogoInfo] = useState<ValidatorLogoInfo>({
     url: null,
     isFallback: false,
     error: false,
   });
 
-  const rewardAmount = rewards
-    .reduce((sum, reward) => sum + parseFloat(reward.amount), 0)
-    .toString();
-  const strippedRewardAmount = `${convertToGreaterUnit(parseFloat(rewardAmount), exponent).toFixed(
-    exponent,
-  )}`;
-  const userHasUnbonding = unbondingBalance && parseFloat(unbondingBalance?.balance || '') > 0;
-  const formattedRewardAmount = formatBalanceDisplay(strippedRewardAmount, symbol);
-  const delegatedAmount = convertToGreaterUnit(parseFloat(delegation.shares || '0'), exponent);
-  const userIsFullyUnstaking = userHasUnbonding && delegatedAmount === 0;
+  const {
+    validator,
+    delegation,
+    balance,
+    rewards,
+    unbondingBalance,
+    theoreticalApr,
+    uptime,
+    votingPower,
+  } = combinedStakingInfo;
+  const delegationResponse = { delegation, balance };
 
+  // Asset info
+  const stakingDenom = chain.staking_denoms[0];
+  const asset = chain.assets?.[stakingDenom] || DEFAULT_MAINNET_ASSET;
+  const symbol = asset.symbol;
+  const exponent = asset.exponent || GREATER_EXPONENT_DEFAULT;
+
+  // Calculations
+  const rewardAmount = rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
+  const formattedRewardAmount = formatBalanceDisplay(
+    convertToGreaterUnit(rewardAmount, exponent).toFixed(exponent),
+    symbol,
+  );
+  const delegatedAmount = convertToGreaterUnit(parseFloat(delegation.shares || '0'), exponent);
+  const hasUnbonding = unbondingBalance && parseFloat(unbondingBalance.balance) > 0;
+
+  // Display values
   const title = validator.description.moniker || 'Unknown Validator';
   const commission = `${parseFloat(validator.commission.commission_rates.rate) * 100}%`;
-  const isSelected = selectedValidators.some(
-    v => v.delegation.validator_address === combinedStakingInfo.delegation.validator_address,
-  );
-
-  let scrollTileValue = `${theoreticalApr || '0.00'}% p.a.`;
-  let scrollTileSubtitle: string;
-  let scrollTileSecondarySubtitle = null;
-  let secondarySubtitleStatus = TextFieldStatus.GOOD;
-  let statusLabel = '';
-  let statusColor = TextFieldStatus.GOOD;
-
-  if (showCurrentValidators) {
-    if (delegatedAmount > 0) {
-      scrollTileSubtitle = `${formatBalanceDisplay(`${delegatedAmount}`, symbol)} Staked`;
-    } else {
-      scrollTileSubtitle = 'Unstaking';
-    }
-  } else {
-    if (validator.jailed) {
-      scrollTileSubtitle = 'Jailed';
-    } else if (validator.status === BondStatus.UNBONDED) {
-      scrollTileSubtitle = 'Inactive';
-    } else if (userIsFullyUnstaking) {
-      scrollTileSubtitle = 'Unstaking';
-    } else if (delegatedAmount === 0) {
-      scrollTileSubtitle = 'No delegation';
-    } else {
-      scrollTileSubtitle = `${formatBalanceDisplay(`${delegatedAmount}`, symbol)}`;
-    }
-  }
+  const website = validator.description.website;
+  const isWebsiteValid = isValidUrl(website);
 
   const dialogSubTitle = formatBalanceDisplay(
     `${isNaN(delegatedAmount) ? 0 : delegatedAmount}`,
     symbol,
   );
 
+  const isSelected = selectedValidators.some(
+    v => v.delegation.validator_address === delegation.validator_address,
+  );
+
   const unbondingDays = `${combinedStakingInfo.stakingParams?.unbonding_time} days`;
   const unstakingTime = `${calculateRemainingTime(combinedStakingInfo.unbondingBalance?.completion_time || '')}`;
-
-  if (validator.jailed) {
-    statusLabel = 'Jailed';
-    statusColor = TextFieldStatus.ERROR;
-  } else if (validator.status === BondStatus.UNBONDING) {
-    statusLabel = 'Unbonding';
-    statusColor = TextFieldStatus.WARN;
-  } else if (validator.status === BondStatus.UNBONDED) {
-    statusLabel = 'Inactive';
-    statusColor = TextFieldStatus.WARN;
-  } else {
-    statusLabel = 'Active';
-    statusColor = TextFieldStatus.GOOD;
-  }
-
-  const textColor = selectTextColorByStatus(statusColor);
-
-  const website = validator.description.website;
-  const isWebsiteValid = isValidUrl(website);
-
-  let value = formattedRewardAmount;
-  let subtitleStatus = TextFieldStatus.GOOD;
   let amountUnstaking = formatBalanceDisplay(
     convertToGreaterUnit(parseFloat(unbondingBalance?.balance || '0'), exponent).toFixed(exponent),
     symbol,
   );
 
-  if (showCurrentValidators) {
-    value = formattedRewardAmount;
-  } else {
-    const uptime = parseFloat(combinedStakingInfo.uptime || '0');
-    scrollTileSubtitle = `${uptime.toFixed(2)}% uptime`;
+  // Status determination
+  const { label: statusLabel, color: statusColor } = getValidatorStatus(validator);
+  const textColor = selectTextColorByStatus(statusColor);
 
-    if (uptime < 90) {
-      subtitleStatus = TextFieldStatus.ERROR;
-    } else if (uptime < 98) {
-      subtitleStatus = TextFieldStatus.WARN;
-    } else {
-      subtitleStatus = TextFieldStatus.GOOD;
+  // Tile display configuration
+  const getTileConfig = () => {
+    if (showCurrentValidators) {
+      return {
+        value: formattedRewardAmount,
+        subtitle:
+          delegatedAmount > 0
+            ? `${formatBalanceDisplay(`${delegatedAmount}`, symbol)} Staked`
+            : hasUnbonding
+              ? 'Unstaking'
+              : 'No delegation',
+        secondarySubtitle: null,
+        secondaryStatus: TextFieldStatus.GOOD,
+      };
     }
 
-    value = `${combinedStakingInfo.theoreticalApr || 0}% p.a.`;
-  }
-
-  if (userIsFullyUnstaking) {
-    statusColor = TextFieldStatus.WARN;
-    scrollTileSecondarySubtitle = 'Unstaking...';
-  }
-
-  if (!showCurrentValidators) {
-    const votingPower = parseFloat(combinedStakingInfo.votingPower || '0');
-    scrollTileSecondarySubtitle = `${votingPower.toFixed(2)}%`;
-
+    // For "All" view
+    const uptimeValue = parseFloat(uptime || '0');
+    const votingPowerValue = parseFloat(votingPower || '0');
     const numValidators = selectedValidators.length || 1;
     const evenSplit = 100 / numValidators;
-    const warnThreshold = evenSplit * 1.5;
-    const errorThreshold = evenSplit * 2;
 
-    if (votingPower === 0) {
-      secondarySubtitleStatus = TextFieldStatus.ERROR;
-    } else if (votingPower > errorThreshold) {
-      secondarySubtitleStatus = TextFieldStatus.ERROR;
-    } else if (votingPower > warnThreshold) {
-      secondarySubtitleStatus = TextFieldStatus.WARN;
-    } else {
-      secondarySubtitleStatus = TextFieldStatus.GOOD;
-    }
-  }
+    return {
+      value: `${theoreticalApr || '0.00'}% p.a.`,
+      subtitle: `${uptimeValue.toFixed(2)}% uptime`,
+      subtitleStatus: getUptimeStatus(validator, uptimeValue),
+      secondarySubtitle: `${votingPowerValue.toFixed(2)}%`,
+      secondaryStatus: getVotingPowerStatus(votingPowerValue, evenSplit),
+    };
+  };
 
+  const {
+    value: scrollTileValue,
+    subtitle: scrollTileSubtitle,
+    subtitleStatus,
+    secondarySubtitle: scrollTileSecondarySubtitle,
+    secondaryStatus: secondarySubtitleStatus,
+  } = getTileConfig();
+
+  // Validator icon
   const validatorIcon = (
     <IconContainer
       alt={title}
@@ -280,16 +248,7 @@ const ValidatorTileComponent = ({
 
   const canRunSimulation = () => {
     if (selectedAction === 'claim') return true;
-
-    const canRun = amount > 0 && !isLoading && selectedAction;
-
-    console.log('[validatorTile] Evaluation:', {
-      amount: amount,
-      isLoading,
-      result: canRun,
-    });
-
-    return canRun;
+    return amount > 0 && !isLoading && selectedAction;
   };
 
   useEffect(() => {
@@ -298,12 +257,9 @@ const ValidatorTileComponent = ({
     const setupInterval = () => {
       intervalId = setInterval(() => {
         if (canRunSimulation()) {
-          console.log('[Periodic Check] Running simulation');
           handleAction({ isSimulation: true });
           setLastUpdateTime(Date.now());
         } else {
-          // Clear interval if conditions are no longer met
-          console.log('[Periodic Check] Conditions no longer met, clearing interval');
           clearInterval(intervalId);
         }
       }, 5000);
@@ -318,7 +274,7 @@ const ValidatorTileComponent = ({
         handleAction({ isSimulation: true });
         setLastUpdateTime(Date.now());
       }
-      // Start the interval after initial check
+
       setupInterval();
     }
 
@@ -328,10 +284,6 @@ const ValidatorTileComponent = ({
       }
     };
   }, [amount, isLoading, selectedAction]);
-
-  useEffect(() => {
-    console.log('[ValidatorTile] Calculated fee updated:', calculatedFee);
-  }, [calculatedFee]);
 
   useEffect(() => {
     const fetchValidatorLogo = async () => {
@@ -346,7 +298,6 @@ const ValidatorTileComponent = ({
     fetchValidatorLogo();
 
     return () => {
-      // Reset the states when the component is unmounted
       resetDefaults();
     };
   }, []);
@@ -374,7 +325,7 @@ const ValidatorTileComponent = ({
                 status={statusColor}
                 subtitle={scrollTileSubtitle}
                 subtitleStatus={subtitleStatus}
-                value={value}
+                value={scrollTileValue}
                 icon={validatorIcon}
                 secondarySubtitle={scrollTileSecondarySubtitle}
                 secondarySubtitleStatus={secondarySubtitleStatus}
@@ -408,7 +359,7 @@ const ValidatorTileComponent = ({
                 {' '}
                 <strong>Amount Staked:</strong> <span className="text-blue">{dialogSubTitle}</span>
               </p>
-              {userHasUnbonding && (
+              {hasUnbonding && (
                 <>
                   <p className="line-clamp-1">
                     <strong>Amount Unstaking:</strong>{' '}
