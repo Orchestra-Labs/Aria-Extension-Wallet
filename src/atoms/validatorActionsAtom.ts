@@ -78,7 +78,7 @@ export const executeUnstakeAtom = atom(
       simulate,
     }: {
       amount: string;
-      delegations: DelegationResponse | DelegationResponse[];
+      delegations: DelegationResponse[];
       simulate: boolean;
     },
   ) => {

@@ -73,8 +73,6 @@ const ValidatorTileComponent = ({
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
 
   const chain = chainRegistry[networkLevel][chainId];
-  const restUris = chain.rest_uris;
-  const rpcUris = chain.rpc_uris;
 
   const { validator, delegation, balance, rewards, unbondingBalance, theoreticalApr } =
     combinedStakingInfo;
@@ -84,17 +82,9 @@ const ValidatorTileComponent = ({
 
   // TODO: if no staking denom, disable staking features
   const stakingDenom = chain.staking_denoms[0];
-  console.log('stakingDenom:', stakingDenom); // Check the staking denom being used
-
   const asset = chain.assets?.[stakingDenom];
-  console.log('asset:', asset); // Check the full asset object
-  console.log('chain.assets:', chain.assets); // Check all available assets
-
   const symbol = asset?.symbol || 'MLD';
-  console.log('symbol:', symbol); // This will show what symbol is being used
-
   const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
-  console.log('exponent:', exponent); // Check the exponent being used
 
   const [amount, setAmount] = useState(0);
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
@@ -256,15 +246,19 @@ const ValidatorTileComponent = ({
     try {
       switch (selectedAction) {
         case 'stake':
-          await actionFn('stake', rpcUris, amount.toString());
+          await actionFn('stake', amount.toString());
           break;
         case 'unstake':
-          await actionFn('unstake', rpcUris, amount.toString());
+          await actionFn('unstake', amount.toString(), false, [delegationResponse]);
           break;
         case 'claim':
-          await actionFn('claim', rpcUris, '0', isClaimToRestake, restUris, delegationResponse, [
-            { validator: validator.operator_address, rewards },
-          ]);
+          await actionFn(
+            'claim',
+            '0',
+            isClaimToRestake,
+            [delegationResponse],
+            [{ validator: validator.operator_address, rewards }],
+          );
           break;
       }
 
@@ -285,6 +279,8 @@ const ValidatorTileComponent = ({
   };
 
   const canRunSimulation = () => {
+    if (selectedAction === 'claim') return true;
+
     const canRun = amount > 0 && !isLoading && selectedAction;
 
     console.log('[validatorTile] Evaluation:', {
@@ -313,8 +309,11 @@ const ValidatorTileComponent = ({
       }, 5000);
     };
 
-    // Initial check
-    if (canRunSimulation()) {
+    if (selectedAction === 'claim') {
+      handleAction({ isSimulation: true });
+      setLastUpdateTime(Date.now());
+      setupInterval();
+    } else if (canRunSimulation()) {
       if (Date.now() - lastUpdateTime > 5000) {
         handleAction({ isSimulation: true });
         setLastUpdateTime(Date.now());
@@ -328,7 +327,7 @@ const ValidatorTileComponent = ({
         clearInterval(intervalId);
       }
     };
-  }, [amount, isLoading]);
+  }, [amount, isLoading, selectedAction]);
 
   useEffect(() => {
     console.log('[ValidatorTile] Calculated fee updated:', calculatedFee);

@@ -1,5 +1,5 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { CombinedStakingInfo, DelegationResponse, TransactionResult, Uri } from '@/types';
+import { CombinedStakingInfo, DelegationResponse, TransactionResult } from '@/types';
 import { validatorFeeStateAtom, validatorTransactionStateAtom } from '@/atoms/validatorStateAtom';
 import {
   executeClaimAtom,
@@ -15,9 +15,7 @@ interface HandleTransactionParams {
   isSimulation: boolean;
   amount?: string;
   toRestake?: boolean;
-  rpcUris: Uri[];
-  restUris?: Uri[];
-  delegations?: DelegationResponse | DelegationResponse[];
+  delegations?: DelegationResponse[];
   rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[];
 }
 
@@ -35,8 +33,6 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
     isSimulation,
     amount = '0',
     toRestake = false,
-    rpcUris,
-    restUris = [],
     delegations = [],
     rewards = [],
   }: HandleTransactionParams): Promise<TransactionResult | null> => {
@@ -46,8 +42,6 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
     console.log('[useValidatorActions] Parameters:', {
       amount,
       toRestake,
-      rpcUris: rpcUris.length,
-      restUris: restUris.length,
       delegations: Array.isArray(delegations) ? delegations.length : 1,
       rewards: rewards.length,
     });
@@ -159,10 +153,8 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
 
   const runTransaction = async (
     action: 'stake' | 'unstake' | 'claim',
-    rpcUris: Uri[],
     amount: string = '0',
     toRestake: boolean = false,
-    restUris: Uri[] = [],
     delegations?: any,
     rewards: any[] = [],
   ): Promise<TransactionResult | null> => {
@@ -171,8 +163,6 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
       isSimulation: false,
       amount,
       toRestake,
-      rpcUris,
-      restUris,
       delegations,
       rewards,
     });
@@ -180,10 +170,8 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
 
   const runSimulation = async (
     action: 'stake' | 'unstake' | 'claim',
-    rpcUris: Uri[],
     amount: string = '0',
     toRestake: boolean = false,
-    restUris: Uri[] = [],
     delegations?: any,
     rewards: any[] = [],
   ): Promise<TransactionResult | null> => {
@@ -192,8 +180,6 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
       isSimulation: true,
       amount,
       toRestake,
-      rpcUris,
-      restUris,
       delegations,
       rewards,
     });

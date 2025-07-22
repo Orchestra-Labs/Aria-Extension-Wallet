@@ -308,15 +308,14 @@ export const claimAndUnstake = async ({
   simulateOnly = false,
 }: {
   chain: SimplifiedChainInfo;
-  delegations: DelegationResponse | DelegationResponse[];
+  delegations: DelegationResponse[];
   amount?: string;
   feeToken: FeeToken;
   simulateOnly?: boolean;
 }): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
-  const delegationsArray = Array.isArray(delegations) ? delegations : [delegations];
-  const delegatorAddress = delegationsArray[0].delegation.delegator_address;
-  const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
+  const delegatorAddress = delegations[0].delegation.delegator_address;
+  const validatorAddresses = delegations.map(d => d.delegation.validator_address);
   const prefix = chain.bech32_prefix;
   const rpcUris = chain.rpc_uris;
 
@@ -330,14 +329,14 @@ export const claimAndUnstake = async ({
           parseFloat(amount) *
           Math.pow(
             10,
-            chain?.assets?.[delegationsArray[0].balance.denom].exponent || GREATER_EXPONENT_DEFAULT,
+            chain?.assets?.[delegations[0].balance.denom].exponent || GREATER_EXPONENT_DEFAULT,
           )
         ).toFixed(0),
-        denom: delegationsArray[0].balance.denom,
+        denom: delegations[0].balance.denom,
       })
     : buildStakingMessage({
         endpoint,
-        delegations: delegationsArray,
+        delegations,
       });
 
   // Simulate first
