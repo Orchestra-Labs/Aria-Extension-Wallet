@@ -42,6 +42,13 @@ export const unloadFullRegistryAtom = atom(null, (_, set) => {
 
 export const subscriptionSelectionsAtom = atom<SubscriptionRecord>(DEFAULT_SUBSCRIPTION);
 
+export const chainInfoAtom = atom(get => {
+  const networkLevel = get(networkLevelAtom);
+  const chainRegistry = get(subscribedChainRegistryAtom);
+
+  return (chainId: string) => chainRegistry[networkLevel][chainId];
+});
+
 // Helper atoms for derived states
 export const selectedChainIdsAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);
@@ -207,16 +214,16 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
 export const selectedValidatorChainInfoAtom = atom(get => {
   const chainId = get(selectedValidatorChainAtom);
   const networkLevel = get(networkLevelAtom);
-  const chainRegistry = get(subscribedChainRegistryAtom);
+  const chainInfo = get(chainInfoAtom);
 
-  const chainInfo = chainRegistry[networkLevel][chainId];
+  const chain = chainInfo(chainId);
   console.log('[selectedValidatorChainInfoAtom]', {
     chainId,
     networkLevel,
-    chainInfo,
+    chain,
   });
 
-  return chainRegistry[networkLevel][chainId];
+  return chain;
 });
 
 export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {

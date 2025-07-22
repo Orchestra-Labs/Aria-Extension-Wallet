@@ -16,5 +16,6 @@ export * from './transactionAtom';
 export * from './transactionStateAtom';
 export * from './transactionTypeAtom';
 export * from './validatorsAtom';
+export * from './validatorStateAtom';
 export * from './walletAtom';
 export * from './walletDerivationsAtom';

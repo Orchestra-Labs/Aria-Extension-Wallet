@@ -4,8 +4,13 @@ import {
   claimAndUnstake,
   stakeToValidator,
 } from '@/helpers/stakingTransactions';
-import { Intent, CombinedStakingInfo, Asset, Uri } from '@/types';
-import { GREATER_EXPONENT_DEFAULT } from '@/constants';
+import { Intent, CombinedStakingInfo, Asset } from '@/types';
+import {
+  DEFAULT_FEE_TOKEN,
+  GREATER_EXPONENT_DEFAULT,
+  LOCAL_CHAIN_REGISTRY,
+  SYMPHONY_MAINNET_ID,
+} from '@/constants';
 
 type ValidatorTarget =
   | string
@@ -22,17 +27,11 @@ export const handleIntent = async (
     walletAssets,
     validators,
     symphonyAssets,
-    prefix,
-    restUris,
-    rpcUris,
   }: {
     address: string;
     walletAssets: Asset[];
     validators: CombinedStakingInfo[];
     symphonyAssets: Asset[];
-    prefix: string;
-    restUris: Uri[];
-    rpcUris: Uri[];
   },
 ) => {
   console.log('[handleIntent] Received intent:', intent);
@@ -70,6 +69,10 @@ export const handleIntent = async (
   console.log('[handleIntent] Wallet asset found:', walletAsset);
   console.log('[handleIntent] Available balance:', available);
 
+  // TODO: get chain information dynamically.  pass in registry, check validator lists for matches, etc
+  const chain = LOCAL_CHAIN_REGISTRY.mainnet[SYMPHONY_MAINNET_ID];
+  const feeToken = DEFAULT_FEE_TOKEN;
+
   const resolveValidator = (input: ValidatorTarget): CombinedStakingInfo | undefined => {
     if (typeof input === 'object') {
       return (
@@ -105,13 +108,13 @@ export const handleIntent = async (
       );
 
       const ops = targets.map(v => v.validator.operator_address);
-      const fee = await simulateFee(() => claimRewards(address, ops, prefix, rpcUris, true));
+      const fee = await simulateFee(() => claimRewards(address, ops, chain, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claim fee');
         return;
       }
 
-      return await claimRewards(address, ops, prefix, rpcUris);
+      return await claimRewards(address, ops, chain);
     }
 
     case 'claimAndRestake': {
@@ -124,15 +127,13 @@ export const handleIntent = async (
         rewards: v.rewards,
       }));
 
-      const fee = await simulateFee(() =>
-        claimAndRestake(prefix, restUris, rpcUris, targets, rewards, true),
-      );
+      const fee = await simulateFee(() => claimAndRestake(chain, targets, rewards, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claimAndRestake fee');
         return;
       }
 
-      return await claimAndRestake(prefix, restUris, rpcUris, targets, rewards);
+      return await claimAndRestake(chain, targets, rewards);
     }
 
     case 'unstake': {
@@ -145,10 +146,10 @@ export const handleIntent = async (
 
       const fee = await simulateFee(() =>
         claimAndUnstake({
-          prefix,
-          rpcUris,
+          chain,
           delegations: targets,
           amount: amount?.toString(),
+          feeToken,
           simulateOnly: true,
         }),
       );
@@ -158,10 +159,10 @@ export const handleIntent = async (
       }
 
       return await claimAndUnstake({
-        prefix,
-        rpcUris,
+        chain,
         delegations: targets,
         amount: amount?.toString(),
+        feeToken,
       });
     }
 
@@ -183,8 +184,8 @@ export const handleIntent = async (
           resolvedDenom,
           address,
           validator.validator.operator_address,
-          prefix,
-          rpcUris,
+          chain,
+          feeToken,
           true,
         ),
       );
@@ -225,8 +226,8 @@ export const handleIntent = async (
         resolvedDenom,
         address,
         validator.validator.operator_address,
-        prefix,
-        rpcUris,
+        chain,
+        feeToken,
       );
 
       return {

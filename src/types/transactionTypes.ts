@@ -1,4 +1,4 @@
-import { InputStatus, NetworkLevel, TransactionType } from '@/constants';
+import { InputStatus, NetworkLevel, TransactionStatus, TransactionType } from '@/constants';
 import { Asset, FeeToken } from './localStorageTypes';
 
 export interface TransactionDetails {
@@ -90,6 +90,12 @@ export type TransactionError = {
   message: string;
   status: InputStatus;
 };
+
+export interface TransactionStatusState {
+  status: TransactionStatus;
+  error?: string;
+  txHash?: string;
+}
 
 export interface TransactionState {
   asset: Asset;

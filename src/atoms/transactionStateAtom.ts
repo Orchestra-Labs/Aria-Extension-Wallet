@@ -1,18 +1,26 @@
 import { atom, WritableAtom } from 'jotai';
 import {
   DEFAULT_FEE_TOKEN,
-  defaultFeeState,
-  defaultReceiveState,
-  defaultSendState,
+  DEFAULT_FEE_STATE,
+  DEFAULT_RECEIVE_STATE,
+  DEFAULT_SEND_STATE,
   InputStatus,
   TransactionStatus,
 } from '@/constants';
-import { Asset, CalculatedFeeDisplay, FeeState, TransactionLog, TransactionState } from '@/types';
+import {
+  Asset,
+  CalculatedFeeDisplay,
+  FeeState,
+  TransactionLog,
+  TransactionState,
+  TransactionStatusState,
+} from '@/types';
 import { selectedAssetAtom } from './assetsAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { allWalletAssetsAtom } from './walletAtom';
 import { transactionTypeAtom } from './transactionTypeAtom';
+import { getFeeTextClass } from '@/helpers';
 
 type TransactionStateAtom = WritableAtom<
   TransactionState,
@@ -46,13 +54,13 @@ const createTransactionAtom = (
 };
 
 // Base storage atoms
-const _sendStateAtom = atom<TransactionState>(defaultSendState);
-const _receiveStateAtom = atom<TransactionState>(defaultReceiveState);
-const _feeStateAtom = atom<FeeState>(defaultFeeState);
+const _sendStateAtom = atom<TransactionState>(DEFAULT_SEND_STATE);
+const _receiveStateAtom = atom<TransactionState>(DEFAULT_RECEIVE_STATE);
+export const _feeStateAtom = atom<FeeState>(DEFAULT_FEE_STATE);
 
 // Public state atoms
-export const sendStateAtom = createTransactionAtom(defaultSendState, _sendStateAtom);
-export const receiveStateAtom = createTransactionAtom(defaultReceiveState, _receiveStateAtom);
+export const sendStateAtom = createTransactionAtom(DEFAULT_SEND_STATE, _sendStateAtom);
+export const receiveStateAtom = createTransactionAtom(DEFAULT_RECEIVE_STATE, _receiveStateAtom);
 
 export const feeStateAtom = atom<FeeState, [FeeState | ((prev: FeeState) => FeeState)], void>(
   get => {
@@ -132,12 +140,6 @@ export const calculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
   });
   console.groupEnd();
 
-  const getFeeTextClass = (percentage: number) => {
-    if (percentage > 1) return 'text-error';
-    if (percentage > 0.75) return 'text-warn';
-    return 'text-blue';
-  };
-
   return {
     ...defaultReturn,
     feeAmount: feeState.amount,
@@ -156,13 +158,13 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
 
   // Reset main states
   set(_sendStateAtom, {
-    ...defaultSendState,
+    ...DEFAULT_SEND_STATE,
     asset: selectedAsset,
     chainID: selectedAsset.networkID,
   });
 
   set(_receiveStateAtom, {
-    ...defaultReceiveState,
+    ...DEFAULT_RECEIVE_STATE,
     asset: selectedAsset,
     chainID: selectedAsset.networkID,
   });
@@ -170,7 +172,7 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
   // Reset fee state
   set(_feeStateAtom, {
     ...get(feeStateAtom),
-    ...defaultFeeState,
+    ...DEFAULT_FEE_STATE,
   });
 
   // Reset errors
@@ -211,11 +213,7 @@ export const transactionLogAtom = atom<TransactionLog>({
   entries: [],
 });
 
-export const transactionStatusAtom = atom<{
-  status: TransactionStatus;
-  error?: string;
-  txHash?: string;
-}>({
+export const transactionStatusAtom = atom<TransactionStatusState>({
   status: TransactionStatus.IDLE,
 });
 

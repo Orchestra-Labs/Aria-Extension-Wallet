@@ -569,7 +569,7 @@ const normalizeFeeTokens = (raw: any): FeeToken[] => {
   // Handle Cosmos Hub format with fee_tokens
   if (raw.fees?.fee_tokens) {
     return raw.fees.fee_tokens.map((t: any) => {
-      // For Dungeon chain, we need to handle both formats that might appear
+      // Handle both formats that might appear
       const gasPriceStep = t.gasPriceStep || {
         low: t.low_gas_price || DEFAULT_EXTERNAL_GAS_PRICES.low,
         average: t.average_gas_price || DEFAULT_EXTERNAL_GAS_PRICES.average,
@@ -598,17 +598,35 @@ const normalizeFeeTokens = (raw: any): FeeToken[] => {
 };
 
 const normalizeStakingDenoms = (raw: any): string[] => {
-  // Handle Cosmos Hub format
+  const stakingDenoms = new Set<string>();
+
+  // Add Cosmos Hub format staking tokens
   if (Array.isArray(raw.staking?.staking_tokens)) {
-    return raw.staking.staking_tokens.map((t: any) => t.denom).filter(Boolean);
+    raw.staking.staking_tokens.forEach((t: any) => {
+      if (t.denom) {
+        stakingDenoms.add(t.denom);
+      }
+    });
   }
 
-  // Handle Keplr format
+  // Add Keplr format stake currency
   if (raw.stakeCurrency?.coinMinimalDenom) {
-    return [raw.stakeCurrency.coinMinimalDenom];
+    stakingDenoms.add(raw.stakeCurrency.coinMinimalDenom);
   }
 
-  return [];
+  // Assume no staking denoms found yet and check fee tokens
+  if (stakingDenoms.size === 0) {
+    // Check Cosmos Hub fee tokens
+    if (Array.isArray(raw.fees?.fee_tokens) && raw.fees.fee_tokens.length === 1) {
+      stakingDenoms.add(raw.fees.fee_tokens[0].denom);
+    }
+    // Check Keplr fee currencies
+    else if (Array.isArray(raw.feeCurrencies) && raw.feeCurrencies.length === 1) {
+      stakingDenoms.add(raw.feeCurrencies[0].coinMinimalDenom);
+    }
+  }
+
+  return Array.from(stakingDenoms);
 };
 
 export const extractChainInfo = (raw: any, assets?: Record<string, Asset>): SimplifiedChainInfo => {

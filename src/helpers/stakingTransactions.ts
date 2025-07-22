@@ -2,10 +2,9 @@ import {
   COSMOS_CHAIN_ENDPOINTS,
   DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
-  SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import { queryRpcNode } from './queryNodes';
-import { DelegationResponse, TransactionResult, Uri } from '@/types';
+import { DelegationResponse, FeeToken, SimplifiedChainInfo, TransactionResult } from '@/types';
 import { fetchRewards } from './fetchStakingInfo';
 
 const MAX_MESSAGES_PER_BATCH = 15;
@@ -62,8 +61,8 @@ export const buildStakingMessage = ({
 export const claimRewards = async (
   delegatorAddress: string,
   validatorAddress: string | string[],
-  prefix: string,
-  rpcUris: Uri[],
+  chain: SimplifiedChainInfo,
+  feeToken?: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
@@ -79,9 +78,10 @@ export const claimRewards = async (
   try {
     const response = await queryRpcNode({
       endpoint,
-      prefix,
-      rpcUris,
+      prefix: chain.bech32_prefix,
+      rpcUris: chain.rpc_uris,
       messages,
+      feeToken,
       simulateOnly,
     });
 
@@ -111,17 +111,19 @@ export const claimRewards = async (
 // TOOD: this properly handles mass messages.  expand the solution to the others
 // TODO: ensure this sends back a sum of all batches when simulating
 export const claimAndRestake = async (
-  prefix: string,
-  restUris: Uri[],
-  rpcUris: Uri[],
+  chain: SimplifiedChainInfo,
   delegations: DelegationResponse | DelegationResponse[],
   rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[],
+  feeToken?: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
   const delegateEndpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
   const delegationsArray = Array.isArray(delegations) ? delegations : [delegations];
   const delegatorAddress = delegationsArray[0].delegation.delegator_address;
   const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+  const rpcUris = chain.rpc_uris;
 
   try {
     const validatorRewards =
@@ -165,6 +167,7 @@ export const claimAndRestake = async (
         prefix,
         rpcUris,
         messages: messageChunks[0],
+        feeToken,
         simulateOnly: true,
       });
 
@@ -181,6 +184,7 @@ export const claimAndRestake = async (
         prefix,
         rpcUris,
         messages,
+        feeToken,
         simulateOnly: true,
       });
 
@@ -200,6 +204,7 @@ export const claimAndRestake = async (
         prefix,
         rpcUris,
         messages,
+        feeToken,
         simulateOnly: false,
         fee: {
           amount: [{ denom: DEFAULT_MAINNET_ASSET.denom, amount: feeAmount.toFixed(0) }],
@@ -236,14 +241,22 @@ export const stakeToValidator = async (
   denom: string,
   walletAddress: string,
   validatorAddress: string,
-  prefix: string,
-  rpcUris: Uri[],
+  chain: SimplifiedChainInfo,
+  feeToken: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
+  console.log('[stakeToValidator] Starting stake operation', {
+    amount,
+    denom,
+    walletAddress: walletAddress,
+    validatorAddress: validatorAddress,
+    simulateOnly,
+  });
+
   const endpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
+
   const formattedAmount = (
-    parseFloat(amount) *
-    Math.pow(10, SYMPHONY_MAINNET_ASSET_REGISTRY[denom].exponent || GREATER_EXPONENT_DEFAULT)
+    parseFloat(amount) * Math.pow(10, chain.assets?.[denom]?.exponent || GREATER_EXPONENT_DEFAULT)
   ).toFixed(0);
 
   const messages = buildStakingMessage({
@@ -257,9 +270,10 @@ export const stakeToValidator = async (
   try {
     const response = await queryRpcNode({
       endpoint,
-      prefix,
-      rpcUris,
+      prefix: chain.bech32_prefix,
+      rpcUris: chain.rpc_uris,
       messages,
+      feeToken,
       simulateOnly,
     });
 
@@ -287,22 +301,24 @@ export const stakeToValidator = async (
 
 // NOTE: Cosmos unstaking automatically claims rewards
 export const claimAndUnstake = async ({
-  prefix,
-  rpcUris,
+  chain,
   delegations,
   amount,
+  feeToken,
   simulateOnly = false,
 }: {
-  prefix: string;
-  rpcUris: Uri[];
+  chain: SimplifiedChainInfo;
   delegations: DelegationResponse | DelegationResponse[];
   amount?: string;
+  feeToken: FeeToken;
   simulateOnly?: boolean;
 }): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
   const delegationsArray = Array.isArray(delegations) ? delegations : [delegations];
   const delegatorAddress = delegationsArray[0].delegation.delegator_address;
   const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
+  const prefix = chain.bech32_prefix;
+  const rpcUris = chain.rpc_uris;
 
   // Build undelegate messages
   const messages = amount
@@ -314,8 +330,7 @@ export const claimAndUnstake = async ({
           parseFloat(amount) *
           Math.pow(
             10,
-            SYMPHONY_MAINNET_ASSET_REGISTRY[delegationsArray[0].balance.denom].exponent ||
-              GREATER_EXPONENT_DEFAULT,
+            chain?.assets?.[delegationsArray[0].balance.denom].exponent || GREATER_EXPONENT_DEFAULT,
           )
         ).toFixed(0),
         denom: delegationsArray[0].balance.denom,
@@ -331,6 +346,7 @@ export const claimAndUnstake = async ({
     prefix,
     rpcUris,
     messages,
+    feeToken,
     simulateOnly: true,
   });
 
@@ -359,6 +375,7 @@ export const claimAndUnstake = async ({
     prefix,
     rpcUris,
     messages,
+    feeToken,
     simulateOnly: false,
     fee: {
       amount: [{ denom: DEFAULT_MAINNET_ASSET.denom, amount: feeAmount.toFixed(0) }],

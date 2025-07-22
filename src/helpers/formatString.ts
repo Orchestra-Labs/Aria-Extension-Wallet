@@ -51,8 +51,18 @@ export const formatBalanceDisplay = (number: string, symbol: string): string => 
 
 export const formatLowBalanceDisplay = (number: string, symbol: string): string => {
   const num = parseFloat(number);
-  if (num < 0.001) {
-    return num.toExponential(4) + ' ' + symbol;
+
+  console.log('Before formatting:', {
+    rawNumber: number,
+    parsedNumber: num,
+    symbol,
+  });
+
+  if (num > 0 && num < 1) {
+    return num.toFixed(4) + ' ' + symbol;
+  } else if (num < 10) {
+    return num.toFixed(2) + ' ' + symbol;
   }
+
   return formatBalanceDisplay(number, symbol);
 };

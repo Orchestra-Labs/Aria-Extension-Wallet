@@ -19,7 +19,7 @@ import {
   simulationBlockedAtom,
 } from '@/atoms';
 import { useEffect } from 'react';
-import { useExchangeRate, useTransactionHandler } from '@/hooks';
+import { useExchangeRate, useSendActions } from '@/hooks';
 import { AddressInput } from '../AddressInput';
 import { InputStatus } from '@/constants';
 import { formatBalanceDisplay } from '@/helpers';
@@ -28,7 +28,7 @@ interface AssetInputSectionProps {}
 
 export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   const { exchangeRate = 1 } = useExchangeRate();
-  const { runSimulation } = useTransactionHandler();
+  const { runSimulation } = useSendActions();
 
   // Atom state
   const [sendState, setSendState] = useAtom(sendStateAtom);
@@ -169,9 +169,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   };
 
   const canRunSimulation = () => {
-    const canRun = Boolean(
-      recipientAddress && addressVerified && sendState.amount > 0 && !isLoading,
-    );
+    const canRun = recipientAddress && addressVerified && sendState.amount > 0 && !isLoading;
 
     console.log('[canRunSimulation] Evaluation:', {
       recipientAddress: !!recipientAddress,
@@ -250,11 +248,43 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   useEffect(() => {
     if (canRunSimulation()) {
       simulateTransaction();
-    } else if (canRunSimulation() && Date.now() - lastUpdateTime > 5000) {
-      // NOTE: update fees every 5 seconds
-      runSimulation();
+      setLastUpdateTime(Date.now());
     }
     // NOTE: no sendstate dependency needed here.  sendstate calls for simulation elsewhere
+  }, [sendState, recipientAddress, addressVerified, isLoading]);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    const setupInterval = () => {
+      intervalId = setInterval(() => {
+        if (canRunSimulation()) {
+          console.log('[Periodic Check] Running simulation');
+          runSimulation();
+          setLastUpdateTime(Date.now());
+        } else {
+          // Clear interval if conditions are no longer met
+          console.log('[Periodic Check] Conditions no longer met, clearing interval');
+          clearInterval(intervalId);
+        }
+      }, 5000);
+    };
+
+    // Initial check
+    if (canRunSimulation()) {
+      if (Date.now() - lastUpdateTime > 5000) {
+        simulateTransaction();
+        setLastUpdateTime(Date.now());
+      }
+      // Start the interval after initial check
+      setupInterval();
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [sendState, recipientAddress, addressVerified, isLoading]);
 
   useEffect(() => {

@@ -1,44 +1,46 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Asset, CombinedStakingInfo, TransactionResult, Uri, ValidatorLogoInfo } from '@/types';
+import { CombinedStakingInfo, ValidatorLogoInfo } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
 import {
   calculateRemainingTime,
-  claimAndRestake,
-  claimRewards,
   convertToGreaterUnit,
   formatBalanceDisplay,
   isValidUrl,
   selectTextColorByStatus,
-  stakeToValidator,
   truncateWalletAddress,
-  claimAndUnstake,
   getValidatorLogoInfo,
+  formatLowBalanceDisplay,
 } from '@/helpers';
 import {
   BondStatus,
   DEFAULT_MAINNET_ASSET,
-  defaultFeeState,
   GREATER_EXPONENT_DEFAULT,
-  SYMPHONY_MAINNET_ASSET_REGISTRY,
   TextFieldStatus,
-  TransactionType,
 } from '@/constants';
-import { useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   subscribedChainRegistryAtom,
-  chainWalletAtom,
   filteredValidatorsAtom,
   networkLevelAtom,
   showCurrentValidatorsAtom,
   selectedValidatorChainAtom,
+  isValidatorLoadingAtom,
+  isValidatorSuccessAtom,
+  resetValidatorTransactionAtom,
+  validatorErrorAtom,
+  validatorTxFailedAtom,
+  maxAvailableAtom,
+  validatorTxHash,
+  lastSimulationUpdateAtom,
+  validatorCalculatedFeeAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
-import { useRefreshData, useToast } from '@/hooks';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { AlertCircleIcon } from 'lucide-react';
+import { useValidatorActions } from '@/hooks';
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 interface ValidatorTileProps {
@@ -52,19 +54,25 @@ const ValidatorTileComponent = ({
   isSelectable = false,
   onClick,
 }: ValidatorTileProps) => {
-  const { toast } = useToast();
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
-  const { refreshData } = useRefreshData();
+  const { runTransaction, runSimulation } = useValidatorActions(combinedStakingInfo);
 
   const networkLevel = useAtomValue(networkLevelAtom);
   const selectedValidators = useAtomValue(filteredValidatorsAtom);
   const chainId = useAtomValue(selectedValidatorChainAtom);
-  const walletState = useAtomValue(chainWalletAtom(chainId));
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const isLoading = useAtomValue(isValidatorLoadingAtom);
+  const transactionError = useAtomValue(validatorErrorAtom);
+  const transactionFailed = useAtomValue(validatorTxFailedAtom);
+  const isSuccess = useAtomValue(isValidatorSuccessAtom);
+  const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
+  const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
+  const maxAvailable = useAtomValue(maxAvailableAtom);
+  const transactionHash = useAtomValue(validatorTxHash);
+  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
 
   const chain = chainRegistry[networkLevel][chainId];
-  const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;
   const rpcUris = chain.rpc_uris;
 
@@ -76,38 +84,29 @@ const ValidatorTileComponent = ({
 
   // TODO: if no staking denom, disable staking features
   const stakingDenom = chain.staking_denoms[0];
-  const asset = chain.assets?.[stakingDenom];
-  const symbol = asset?.symbol || 'MLD';
-  const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
+  console.log('stakingDenom:', stakingDenom); // Check the staking denom being used
 
-  const chainFees = chain.fees || [];
-  const defaultGasPrice = chainFees[0].gasPriceStep.average || 0.025;
+  const asset = chain.assets?.[stakingDenom];
+  console.log('asset:', asset); // Check the full asset object
+  console.log('chain.assets:', chain.assets); // Check all available assets
+
+  const symbol = asset?.symbol || 'MLD';
+  console.log('symbol:', symbol); // This will show what symbol is being used
+
+  const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
+  console.log('exponent:', exponent); // Check the exponent being used
 
   const [amount, setAmount] = useState(0);
-  const [feeState, setFeeState] = useState(defaultFeeState);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
   const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake' | 'claim' | null>(
     !combinedStakingInfo.delegation ? 'stake' : null,
   );
-  const [transactionSuccess, setTransactionSuccess] = useState<{
-    success: boolean;
-    txHash?: string;
-  }>({
-    success: false,
-  });
-  const [simulatedFee, setSimulatedFee] = useState<{
-    fee: string;
-    textClass: 'text-error' | 'text-warn' | 'text-blue';
-  } | null>({ fee: `0 ${asset?.symbol || DEFAULT_MAINNET_ASSET.symbol}`, textClass: 'text-blue' });
   const [validatorLogoInfo, setValidatorLogoInfo] = useState<ValidatorLogoInfo>({
     url: null,
     isFallback: false,
     error: false,
   });
 
-  // Aggregating the rewards (sum all reward amounts for this validator)
   const rewardAmount = rewards
     .reduce((sum, reward) => sum + parseFloat(reward.amount), 0)
     .toString();
@@ -124,8 +123,6 @@ const ValidatorTileComponent = ({
   const isSelected = selectedValidators.some(
     v => v.delegation.validator_address === combinedStakingInfo.delegation.validator_address,
   );
-
-  const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
 
   let scrollTileValue = `${theoreticalApr || '0.00'}% p.a.`;
   let scrollTileSubtitle: string;
@@ -178,11 +175,9 @@ const ValidatorTileComponent = ({
 
   const textColor = selectTextColorByStatus(statusColor);
 
-  // Validator website validation
   const website = validator.description.website;
   const isWebsiteValid = isValidUrl(website);
 
-  // let showingCurrentValidators = isSelectable && showCurrentValidators;
   let value = formattedRewardAmount;
   let subtitleStatus = TextFieldStatus.GOOD;
   let amountUnstaking = formatBalanceDisplay(
@@ -247,296 +242,97 @@ const ValidatorTileComponent = ({
     />
   );
 
-  const calculateMaxAvailable = (sendAsset: Asset, simulatedFeeAmount?: number) => {
-    const walletAssets = walletState?.assets || [];
-    const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
-    if (!walletAsset) return 0;
-
-    const maxAmount = parseFloat(walletAsset.amount || '0');
-    const feeAmount = simulatedFeeAmount ? simulatedFeeAmount : feeState.amount;
-
-    const maxAvailable = Math.max(0, maxAmount - feeAmount);
-    return maxAvailable;
-  };
-
   const handleClick = () => {
     if (onClick) {
       onClick(combinedStakingInfo);
     }
   };
 
-  const handleTransactionSuccess = (transactionType: TransactionType, txHash: string) => {
-    const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
+  const handleAction = async ({ isSimulation = false }: { isSimulation?: boolean } = {}) => {
+    if (!selectedAction) return;
 
-    if (slideTrayIsOpen) {
-      setSelectedAction(null);
-      setTransactionSuccess(prev => ({
-        ...prev,
-        success: true,
-        txHash,
-      }));
+    const actionFn = isSimulation ? runSimulation : runTransaction;
 
-      // Set timeout to reset success state after 3 seconds (3000 ms)
-      setTimeout(() => {
-        setTransactionSuccess(prev => ({
-          ...prev,
-          success: false,
-        }));
-      }, 3000);
-    } else {
-      const displayTransactionHash = truncateWalletAddress('', txHash as string);
-
-      toast({
-        title: `${transactionType} success!`,
-        description: `Transaction hash: ${displayTransactionHash}`,
-      });
-
-      setTransactionSuccess(prev => ({
-        ...prev,
-        success: false,
-      }));
-    }
-  };
-
-  const handleTransactionError = (transactionType: TransactionType, errorMessage: string) => {
-    const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
-
-    if (slideTrayIsOpen) {
-      setError(errorMessage);
-
-      setTimeout(() => {
-        setError('');
-      }, 3000);
-    } else {
-      toast({
-        title: `${transactionType} failed!`,
-        description: errorMessage,
-      });
-      setError('');
-    }
-  };
-
-  const handleStake = async (amount: string, rpcUris: Uri[], isSimulation: boolean = false) => {
-    if (!isSimulation) setIsLoading(true);
-
-    const txType = TransactionType.STAKE;
     try {
-      const maxAvailable = calculateMaxAvailable(DEFAULT_MAINNET_ASSET, Number(amount));
-
-      const result = await stakeToValidator(
-        isSimulation && amount === '0' ? `${maxAvailable}` : amount,
-        SYMPHONY_MAINNET_ASSET_REGISTRY.note.denom,
-        walletState.address,
-        validator.operator_address,
-        prefix,
-        rpcUris,
-        isSimulation,
-      );
-
-      if (isSimulation) return result;
-
-      if (result.success && result.data?.code === 0) {
-        const txHash = result.data.txHash as string;
-
-        handleTransactionSuccess(txType, txHash);
-      } else {
-        const errorMessage = `Stake failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(txType, errorMessage);
+      switch (selectedAction) {
+        case 'stake':
+          await actionFn('stake', rpcUris, amount.toString());
+          break;
+        case 'unstake':
+          await actionFn('unstake', rpcUris, amount.toString());
+          break;
+        case 'claim':
+          await actionFn('claim', rpcUris, '0', isClaimToRestake, restUris, delegationResponse, [
+            { validator: validator.operator_address, rewards },
+          ]);
+          break;
       }
+
+      setLastUpdateTime(Date.now());
     } catch (error) {
-      const errorMessage = `Stake failed: ${error || 'No error message provided'}`;
-      handleTransactionError(txType, errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
+      console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, error);
     }
-  };
-
-  const handleUnstake = async (amount: string, rpcUris: Uri[], isSimulation: boolean = false) => {
-    if (!isSimulation) setIsLoading(true);
-
-    const txType = TransactionType.UNSTAKE;
-    try {
-      const result = await claimAndUnstake({
-        prefix,
-        rpcUris,
-        amount,
-        delegations: delegationResponse,
-        simulateOnly: isSimulation,
-      });
-
-      if (isSimulation) return result;
-
-      if (result.success && result.data?.code === 0) {
-        const txHash = result.data.txHash as string;
-
-        handleTransactionSuccess(txType, txHash);
-      } else {
-        const errorMessage = `Unstake failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(txType, errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = `Unstake failed: ${error || 'No error message provided'}`;
-      handleTransactionError(txType, errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
-    }
-  };
-
-  const handleClaimToWallet = async (rpcUris: Uri[], isSimulation: boolean = false) => {
-    if (!isSimulation) setIsLoading(true);
-
-    const txType = TransactionType.CLAIM_TO_WALLET;
-    try {
-      const result = await claimRewards(
-        walletState.address,
-        validator.operator_address,
-        prefix,
-        rpcUris,
-        isSimulation,
-      );
-
-      if (isSimulation) return result;
-
-      if (result.success && result.data?.code === 0) {
-        const txHash = result.data.txHash as string;
-
-        handleTransactionSuccess(txType, txHash);
-      } else {
-        const errorMessage = `Claim failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(txType, errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = `Claim failed: ${error || 'No error message provided'}`;
-      handleTransactionError(txType, errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
-    }
-  };
-
-  const handleClaimAndRestake = async (
-    restUris: Uri[],
-    rpcUris: Uri[],
-    isSimulation: boolean = true,
-  ) => {
-    if (!isSimulation) setIsLoading(true);
-
-    const txType = TransactionType.CLAIM_TO_RESTAKE;
-    try {
-      const result = await claimAndRestake(
-        prefix,
-        restUris,
-        rpcUris,
-        delegationResponse,
-        [
-          {
-            validator: validator.operator_address,
-            rewards: rewards,
-          },
-        ],
-        isSimulation,
-      );
-
-      if (isSimulation) return result;
-
-      if (result.success && result.data?.code === 0) {
-        const txHash = result.data.txHash as string;
-        handleTransactionSuccess(txType, txHash);
-      } else {
-        const errorMessage = `Claim failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(txType, errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = `Claim and restake failed: ${error || 'No error message provided'}`;
-      handleTransactionError(txType, errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
-    }
-  };
-
-  const formatFee = (gasWanted: number) => {
-    const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
-    const feeAmount = gasWanted * defaultGasPrice;
-    const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
-
-    setFeeState(prevState => ({
-      ...prevState,
-      asset: DEFAULT_MAINNET_ASSET,
-      amount: feeInGreaterUnit,
-    }));
-  };
-
-  const updateFee = async () => {
-    if (selectedAction !== 'claim' && (amount === 0 || isNaN(amount))) {
-      if (selectedAction === 'stake') {
-        handleStake('0', rpcUris, true);
-      }
-      formatFee(0);
-    } else {
-      let result = { success: false, message: '', data: { gasWanted: '' } } as TransactionResult;
-
-      if (selectedAction === 'claim') {
-        result = (
-          isClaimToRestake
-            ? await handleClaimAndRestake(restUris, rpcUris, true)
-            : await handleClaimToWallet(rpcUris, true)
-        ) as TransactionResult;
-      } else if (selectedAction === 'stake') {
-        result = (await handleStake(amount.toString(), rpcUris, true)) as TransactionResult;
-      } else if (selectedAction === 'unstake') {
-        result = (await handleUnstake(amount.toString(), rpcUris, true)) as TransactionResult;
-      }
-
-      formatFee(parseFloat(result.data?.gasWanted || '0'));
-    }
-  };
-
-  const setMaxAmount = () => {
-    const asset = DEFAULT_MAINNET_ASSET;
-
-    const maxAvailable = calculateMaxAvailable(asset);
-    setAmount(maxAvailable);
   };
 
   const resetDefaults = () => {
+    // NOTE: reset atom states
+    resetTransactionStates();
+
+    // NOTE: reset local states
     setAmount(0);
-    setFeeState(prevState => ({
-      ...prevState,
-      asset: DEFAULT_MAINNET_ASSET,
-      amount: 0,
-    }));
-    setSimulatedFee({
-      fee: `0 ${asset?.symbol || DEFAULT_MAINNET_ASSET.symbol}`,
-      textClass: 'text-blue',
-    });
     setIsClaimToRestake(false);
     setSelectedAction(null);
   };
 
-  useEffect(() => {
-    const exponent = asset?.exponent || GREATER_EXPONENT_DEFAULT;
-    const symbol = feeState.asset.symbol;
-    const feeAmount = feeState.amount;
-    const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
+  const canRunSimulation = () => {
+    const canRun = amount > 0 && !isLoading && selectedAction;
 
-    const feePercentage =
-      amount === 0 ? 0 : feeInGreaterUnit ? (feeInGreaterUnit / amount) * 100 : 0;
-
-    setSimulatedFee({
-      fee: formatBalanceDisplay(feeAmount.toFixed(exponent), symbol),
-      textClass:
-        feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
+    console.log('[validatorTile] Evaluation:', {
+      amount: amount,
+      isLoading,
+      result: canRun,
     });
-  }, [feeState]);
+
+    return canRun;
+  };
 
   useEffect(() => {
-    if (slideTrayIsOpen) updateFee();
-  }, [slideTrayIsOpen, selectedAction, amount, isClaimToRestake]);
+    let intervalId: NodeJS.Timeout;
 
-  useEffect(() => {
-    if (transactionSuccess.success) {
-      refreshData();
+    const setupInterval = () => {
+      intervalId = setInterval(() => {
+        if (canRunSimulation()) {
+          console.log('[Periodic Check] Running simulation');
+          handleAction({ isSimulation: true });
+          setLastUpdateTime(Date.now());
+        } else {
+          // Clear interval if conditions are no longer met
+          console.log('[Periodic Check] Conditions no longer met, clearing interval');
+          clearInterval(intervalId);
+        }
+      }, 5000);
+    };
+
+    // Initial check
+    if (canRunSimulation()) {
+      if (Date.now() - lastUpdateTime > 5000) {
+        handleAction({ isSimulation: true });
+        setLastUpdateTime(Date.now());
+      }
+      // Start the interval after initial check
+      setupInterval();
     }
-  }, [transactionSuccess.success]);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [amount, isLoading]);
+
+  useEffect(() => {
+    console.log('[ValidatorTile] Calculated fee updated:', calculatedFee);
+  }, [calculatedFee]);
 
   useEffect(() => {
     const fetchValidatorLogo = async () => {
@@ -545,17 +341,15 @@ const ValidatorTileComponent = ({
         chainId,
         chainRegistry[networkLevel],
       );
-      console.log('[ValidatorTile] Logo info received:', {
-        moniker: validator.description.moniker,
-        url: logoInfo.url,
-        isFallback: logoInfo.isFallback,
-        error: logoInfo.error,
-      });
-
       setValidatorLogoInfo(logoInfo);
     };
 
     fetchValidatorLogo();
+
+    return () => {
+      // Reset the states when the component is unmounted
+      resetDefaults();
+    };
   }, []);
 
   return (
@@ -683,17 +477,19 @@ const ValidatorTileComponent = ({
             <div
               className={`flex flex-grow flex-col items-center justify-center ${selectedAction === 'claim' ? '' : 'px-[1.5rem]'}`}
             >
-              {transactionSuccess.success && (
+              {isSuccess && (
                 <div className="flex-grow">
                   <TransactionResultsTile
                     isSuccess
                     size="sm"
-                    txHash={truncateWalletAddress('', transactionSuccess.txHash as string)}
+                    txHash={truncateWalletAddress('', transactionHash)}
                   />
                 </div>
               )}
 
-              {error && <TransactionResultsTile isSuccess={false} size="sm" message={error} />}
+              {transactionFailed && (
+                <TransactionResultsTile isSuccess={false} size="sm" message={transactionError} />
+              )}
 
               {isLoading && (
                 <div className="flex flex-grow items-center px-4">
@@ -701,38 +497,35 @@ const ValidatorTileComponent = ({
                 </div>
               )}
 
-              {!isLoading && (selectedAction === 'stake' || selectedAction === 'unstake') && (
-                <div className="flex flex-col items-center w-full">
-                  <AssetInput
-                    placeholder={`Enter ${selectedAction} amount`}
-                    variant="stake"
-                    assetState={asset || DEFAULT_MAINNET_ASSET}
-                    amountState={amount}
-                    updateAmount={newAmount => setAmount(newAmount)}
-                    reducedHeight
-                    showClearAndMax
-                    showEndButton
-                    disableButtons={isLoading}
-                    onClear={() => setAmount(0)}
-                    // TODO: delegated amount is not applicable to staking max
-                    onMax={() => {
-                      if (selectedAction === 'stake') {
-                        setMaxAmount();
-                      } else {
-                        setAmount(delegatedAmount);
-                      }
-                    }}
-                    endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
-                    onEndButtonClick={() => {
-                      selectedAction === 'stake'
-                        ? handleStake(amount.toString(), rpcUris)
-                        : handleUnstake(amount.toString(), rpcUris);
-                    }}
-                  />
-                </div>
-              )}
+              {!isLoading &&
+                !isSuccess &&
+                (selectedAction === 'stake' || selectedAction === 'unstake') && (
+                  <div className="flex flex-col items-center w-full">
+                    <AssetInput
+                      placeholder={`Enter ${selectedAction} amount`}
+                      variant="stake"
+                      assetState={asset || DEFAULT_MAINNET_ASSET}
+                      amountState={amount}
+                      updateAmount={newAmount => setAmount(newAmount)}
+                      reducedHeight
+                      showClearAndMax
+                      showEndButton
+                      disableButtons={isLoading}
+                      onClear={() => setAmount(0)}
+                      onMax={() => {
+                        if (selectedAction === 'stake') {
+                          setAmount(maxAvailable);
+                        } else {
+                          setAmount(delegatedAmount);
+                        }
+                      }}
+                      endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+                      onEndButtonClick={handleAction}
+                    />
+                  </div>
+                )}
 
-              {!isLoading && selectedAction === 'claim' && (
+              {!isLoading && !isSuccess && selectedAction === 'claim' && (
                 <>
                   <div className="flex justify-between items-center text-sm font-bold w-full">
                     <p className="text-sm pr-1">Claim:</p>
@@ -765,11 +558,7 @@ const ValidatorTileComponent = ({
                       variant="secondary"
                       className="w-full"
                       disabled={isLoading}
-                      onClick={() =>
-                        isClaimToRestake
-                          ? handleClaimAndRestake(restUris, rpcUris, false)
-                          : handleClaimToWallet(rpcUris, false)
-                      }
+                      onClick={() => handleAction()}
                     >
                       {`Claim ${isClaimToRestake ? 'to Restake' : 'to Wallet'}`}
                     </Button>
@@ -780,9 +569,11 @@ const ValidatorTileComponent = ({
 
             {/* Fee Section */}
             <div className="flex justify-between items-center text-blue text-sm font-bold w-full">
-              <p>Fee</p>
-              <p className={simulatedFee?.textClass}>
-                {simulatedFee && amount !== 0 && selectedAction ? simulatedFee.fee : '-'}
+              <p>Estimated Fee</p>
+              <p className={calculatedFee.textClass}>
+                {calculatedFee && calculatedFee.feeAmount > 0
+                  ? formatLowBalanceDisplay(`${calculatedFee.calculatedFee}`, calculatedFee.feeUnit)
+                  : '-'}
               </p>
             </div>
           </div>

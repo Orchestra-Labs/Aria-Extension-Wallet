@@ -14,10 +14,11 @@ import {
 } from '@/atoms';
 import { TransactionStatus } from '@/constants';
 import { TransactionResult } from '@/types';
+import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
-export const useTransactionHandler = () => {
+export const useSendActions = () => {
   console.log('[useTransactionHandler] Initializing hook');
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
@@ -47,36 +48,9 @@ export const useTransactionHandler = () => {
   // ] = useAtom(transactionLogAtom);
   const setTransactionStatus = useSetAtom(transactionStatusAtom);
 
-  const delayClearTransactionStatus = () => {
-    setTimeout(() => {
-      setTransactionStatus(prev => ({
-        ...prev,
-        status: TransactionStatus.IDLE,
-      }));
-    }, 5000);
-  };
-
-  const handleTransactionSuccess = (txHash: string) => {
-    console.log('[useTransactionHandler] Transaction successful with hash:', txHash);
-    setTransactionStatus({
-      status: TransactionStatus.SUCCESS,
-      txHash,
-    });
-
-    delayClearTransactionStatus();
-  };
-
-  const handleTransactionError = (errorMessage: string) => {
-    console.error('[useTransactionHandler] ', errorMessage);
-    setTransactionStatus({
-      status: TransactionStatus.ERROR,
-      error: errorMessage,
-    });
-
-    delayClearTransactionStatus();
-  };
-
-  const handleTransaction = async ({ isSimulation = false } = {}) => {
+  const handleTransaction = async ({
+    isSimulation = false,
+  } = {}): Promise<TransactionResult | null> => {
     console.group('[useTransactionHandler] Starting transaction');
 
     if (!isSimulation) {
@@ -158,7 +132,11 @@ export const useTransactionHandler = () => {
 
           console.log('[useTransactionHandler] Updated fee state');
         } else {
-          handleTransactionSuccess(result.data.txHash || '');
+          handleTransactionSuccess(
+            result.data.txHash || '',
+            setTransactionStatus,
+            transactionType.type,
+          );
           setFeeState({
             ...feeState,
             amount: 0,
@@ -172,7 +150,7 @@ export const useTransactionHandler = () => {
       } else {
         const errorMessage = `Transaction failed: ${result.message || 'Unknown error'}`;
         console.error('[useTransactionHandler]', errorMessage);
-        handleTransactionError(errorMessage);
+        handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
         console.groupEnd();
         return null;
       }
@@ -181,7 +159,7 @@ export const useTransactionHandler = () => {
         error instanceof Error ? error.message : String(error)
       }`;
       console.error('[useTransactionHandler] Caught error:', error);
-      handleTransactionError(errorMessage);
+      handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
       console.groupEnd();
       return null;
     }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Spinner } from '@/assets/icons';
-import { ROUTES, TransactionStatus } from '@/constants';
+import { ROUTES } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -37,12 +37,12 @@ import {
   formatLowBalanceDisplay,
   // truncateWalletAddress
 } from '@/helpers';
-import { useTransactionHandler } from '@/hooks/';
+import { useSendActions } from '@/hooks/';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
 export const Send = () => {
   const location = useLocation();
-  const { runTransaction } = useTransactionHandler();
+  const { runTransaction } = useSendActions();
 
   // const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   const [sendState, setSendState] = useAtom(sendStateAtom);
@@ -79,11 +79,6 @@ export const Send = () => {
       setRecipientAddress(stableAddress);
       setSelectedAsset(defaultAsset);
     }
-
-    // Reset transaction status
-    setTransactionStatus({
-      status: TransactionStatus.IDLE,
-    });
 
     // Reset transaction log
     // setTransactionLog({
