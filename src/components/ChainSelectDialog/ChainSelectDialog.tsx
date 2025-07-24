@@ -8,6 +8,7 @@ import {
   selectedValidatorChainAtom,
   selectedValidatorChainInfoAtom,
   subscribedChainsAtom,
+  validatorDataAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { ChainScroller } from '../ChainScroller';
@@ -29,6 +30,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
   const chainInfo = useAtomValue(selectedValidatorChainInfoAtom);
   const searchTerm = useAtomValue(dialogSearchTermAtom);
   const sortOrder = useAtomValue(chainDialogSortOrderAtom);
+  const setValidatorState = useSetAtom(validatorDataAtom);
 
   console.log('[ChainSelectDialog] subscribed chains:', subscribedChains);
 
@@ -48,6 +50,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
   const handleChainSelection = (chain: SimplifiedChainInfo) => {
     if (chain.chain_id !== selectedChainId) {
       setSelectedChainId(chain.chain_id);
+      setValidatorState([]);
     }
 
     slideTrayRef.current?.closeWithAnimation();

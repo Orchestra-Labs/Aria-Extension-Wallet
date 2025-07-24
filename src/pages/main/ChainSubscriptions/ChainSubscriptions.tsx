@@ -32,6 +32,7 @@ import { Button, Separator } from '@/ui-kit';
 import { Asset, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
 import { saveAccountByID, getPrimaryFeeToken } from '@/helpers';
 import { useDataProviderControls } from '@/data';
+import { useRefreshData } from '@/hooks';
 
 const PAGE_TITLE = 'Chain & Coin Subscriptions';
 
@@ -49,6 +50,7 @@ interface ChainSubscriptionsProps {}
 
 export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const navigate = useNavigate();
+  const { refreshData } = useRefreshData();
   const { prepAddressDataReload } = useDataProviderControls();
 
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
@@ -72,6 +74,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const setSubscribedChainRegistryAtom = useSetAtom(subscribedChainRegistryAtom);
 
   const [activeTab, setActiveTab] = useState<SubscriptionTab>(SubscriptionTab.CHAINS_TAB);
+  const [initialChainIds, setInitialChainIds] = useState<string[]>([]);
 
   const initialSettings = {
     hasSetCoinList: true,
@@ -316,8 +319,18 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     // Save subscriptions first
     saveToState();
 
-    // Prep data reload sequence
-    prepAddressDataReload();
+    const chainsChanged =
+      selectedChainIds.length !== initialChainIds.length ||
+      selectedChainIds.some(id => !initialChainIds.includes(id));
+
+    if (chainsChanged) {
+      console.log('[ChainSubscriptions] Chains changed - triggering full reload');
+      // Prep data reload sequence
+      prepAddressDataReload();
+    } else {
+      console.log('[ChainSubscriptions] Only coins changed - refreshing wallet data');
+      refreshData({ validator: false });
+    }
 
     // Save to storage and account atom
     saveToLocalStorage();
@@ -343,6 +356,8 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   }, [networkLevelTab, networkLevel]);
 
   useEffect(() => {
+    setInitialChainIds(selectedChainIds);
+
     console.log('[ChainSubscriptions] Component mounted - loading full registry');
     loadFullRegistry();
 
