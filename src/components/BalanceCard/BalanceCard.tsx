@@ -51,6 +51,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const userAccount = useAtomValue(userAccountAtom);
   const getChainInfo = useAtomValue(chainInfoAtom);
   const chainId = useAtomValue(selectedValidatorChainAtom);
+  const selectedChainId = useAtomValue(selectedValidatorChainAtom);
 
   const chain = getChainInfo(
     currentStep === 0
@@ -156,21 +157,39 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
         <div className="py-4 flex flex-grow flex-col items-center relative">
           <div className="flex flex-grow flex-col items-center text-center w-full">
             <div className="flex justify-between items-center w-full px-4">
-              <div className="flex flex-1">
-                <span>&nbsp;</span>
+              {/* Left side - invisible button for balance */}
+              <div className="flex flex-1 justify-start">
+                {currentStep === 0 ? (
+                  isSymphonySubscribed ? (
+                    <Button
+                      variant="selectedEnabled"
+                      size="xsmall"
+                      className="px-1 rounded text-xs opacity-0 pointer-events-none"
+                      disabled
+                    >
+                      Reserve
+                    </Button>
+                  ) : (
+                    <div className="w-12" />
+                  )
+                ) : (
+                  <ChainSelectDialog
+                    buttonClassName="opacity-0 pointer-events-none"
+                    buttonText={selectedChainId}
+                    disabled
+                  />
+                )}
               </div>
-              <div className="flex flex-1">
-                <span>&nbsp;</span>
-              </div>
+
+              {/* Center title */}
               <div className="flex">
                 <p className="text-base text-neutral-1">{title}</p>
               </div>
-              <div className="flex flex-1">
-                <span>&nbsp;</span>
-              </div>
-              {currentStep === 0 ? (
-                isSymphonySubscribed ? (
-                  <div className="flex flex-1 justify-center">
+
+              {/* Right side - actual button */}
+              <div className="flex flex-1 justify-end">
+                {currentStep === 0 ? (
+                  isSymphonySubscribed ? (
                     <Button
                       variant="selectedEnabled"
                       size="xsmall"
@@ -179,17 +198,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
                     >
                       Reserve
                     </Button>
-                  </div>
+                  ) : null
                 ) : (
-                  <div className="flex flex-1">
-                    <span>&nbsp;</span>
-                  </div>
-                )
-              ) : (
-                <div className="flex flex-1 justify-center">
                   <ChainSelectDialog />
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (

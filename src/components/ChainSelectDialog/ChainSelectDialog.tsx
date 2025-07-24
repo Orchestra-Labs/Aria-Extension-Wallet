@@ -17,9 +17,17 @@ import { SimplifiedChainInfo } from '@/types';
 import { useRefreshData } from '@/hooks';
 import { filterAndSortChains } from '@/helpers';
 
-interface ChainSelectDialogProps {}
+interface ChainSelectDialogProps {
+  buttonClassName?: string;
+  buttonText?: string;
+  disabled?: boolean;
+}
 
-export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
+export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
+  buttonClassName = '',
+  buttonText = undefined,
+  disabled = false,
+}) => {
   const slideTrayRef = useRef<{ closeWithAnimation: () => void }>(null);
 
   const { refreshData } = useRefreshData();
@@ -62,8 +70,13 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
       chainInfo?.pretty_name,
     );
     return (
-      <Button variant="selectedEnabled" size="xsmall" className="px-1 rounded text-xs">
-        {chainInfo?.pretty_name || 'Unknown Chain'}
+      <Button
+        variant="selectedEnabled"
+        size="xsmall"
+        className={`px-1 rounded text-xs ${buttonClassName || ''}`}
+        disabled={disabled}
+      >
+        {buttonText || chainInfo?.pretty_name || 'Unknown Chain'}
       </Button>
     );
   }, [chainInfo]);
