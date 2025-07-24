@@ -284,6 +284,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             validators={filteredValidators}
             onClick={handleValidatorSelect}
             isSelectable
+            forceCurrentViewStyle
           />
         )}
 

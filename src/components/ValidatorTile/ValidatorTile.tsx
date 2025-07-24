@@ -51,6 +51,7 @@ interface ValidatorTileProps {
   combinedStakingInfo: CombinedStakingInfo;
   isSelectable?: boolean;
   onClick?: (validator: CombinedStakingInfo) => void;
+  forceCurrentViewStyle?: boolean;
 }
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
@@ -59,6 +60,7 @@ const ValidatorTileComponent = ({
   combinedStakingInfo,
   isSelectable = false,
   onClick,
+  forceCurrentViewStyle = false,
 }: ValidatorTileProps) => {
   // Refs and state
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
@@ -150,7 +152,7 @@ const ValidatorTileComponent = ({
 
   // Tile display configuration
   const getTileConfig = () => {
-    if (showCurrentValidators) {
+    if (showCurrentValidators || forceCurrentViewStyle) {
       return {
         value: formattedRewardAmount,
         subtitle:

@@ -11,6 +11,7 @@ interface ValidatorScrollerProps {
   onClick?: (asset: CombinedStakingInfo) => void;
   isSelectable?: boolean;
   lazyLoad?: boolean;
+  forceCurrentViewStyle?: boolean;
 }
 
 export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
@@ -18,6 +19,7 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
   isSelectable = false,
   onClick,
   lazyLoad = true,
+  forceCurrentViewStyle = false,
 }) => {
   const tileScrollerRef = useRef<TileScrollerHandle>(null);
   const { refreshData } = useRefreshData();
@@ -55,6 +57,7 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
               combinedStakingInfo={combinedStakingInfo}
               isSelectable={isSelectable}
               onClick={handleClick}
+              forceCurrentViewStyle={forceCurrentViewStyle}
             />
           </div>
         ))
