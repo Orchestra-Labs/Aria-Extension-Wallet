@@ -11,6 +11,7 @@ export * from './ChainTile';
 export * from './ConnectedServicesDialog';
 export * from './CreatePasswordForm';
 export * from './Header';
+export * from './InfoPanel';
 export * from './Loader';
 export * from './LoaderDots';
 export * from './MicrophoneButton';

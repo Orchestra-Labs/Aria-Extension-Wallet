@@ -15,6 +15,7 @@ import {
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
 import { IconContainer } from '@/assets/icons';
+import { InfoPanel, InfoPanelRow } from '../InfoPanel';
 
 interface AssetTileProps {
   asset: Asset;
@@ -110,20 +111,12 @@ export const AssetTile = ({
         </span>
       </div>
 
-      <div className="mb-4 min-h-[7.5rem] max-h-[7.5rem] overflow-hidden shadow-md bg-black p-2">
-        <p>
-          <strong>Name: </strong>
-          {title}
-        </p>
-        <p>
-          <strong>Ticker: </strong>
-          {symbol}
-        </p>
-        <p>
-          <strong>Sub-unit: </strong>
-          {denom}
-        </p>
-      </div>
+      {/* Asset Information */}
+      <InfoPanel>
+        <InfoPanelRow label="Name" value={title} />
+        <InfoPanelRow label="Ticker" value={symbol} />
+        <InfoPanelRow label="Sub-unit" value={denom} />
+      </InfoPanel>
 
       <div className="flex flex-col items-center justify-center grid grid-cols-3 w-full gap-x-4 px-2">
         <Button

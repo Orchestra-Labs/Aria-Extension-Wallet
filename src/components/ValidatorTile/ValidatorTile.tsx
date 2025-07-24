@@ -46,6 +46,7 @@ import { Loader } from '../Loader';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { AlertCircleIcon } from 'lucide-react';
 import { useValidatorActions } from '@/hooks';
+import { InfoPanel, InfoPanelRow } from '../InfoPanel';
 
 interface ValidatorTileProps {
   combinedStakingInfo: CombinedStakingInfo;
@@ -355,49 +356,67 @@ const ValidatorTileComponent = ({
               </div>
             )}
 
-            {/* TODO: make scrollable, make into a component, and pass an array of text and color maps */}
             {/* Validator Information */}
-            <div className="mb-4 min-h-[7.5rem] max-h-[7.5rem] overflow-hidden shadow-md bg-black p-2">
-              <p>
-                <strong>Status:</strong> <span className={textColor}>{statusLabel}</span>
-              </p>
-              <p className="line-clamp-1">
-                {' '}
-                <strong>Amount Staked:</strong> <span className="text-blue">{dialogSubTitle}</span>
-              </p>
+            <InfoPanel>
+              <InfoPanelRow
+                label="Status"
+                value={<span className={textColor}>{statusLabel}</span>}
+              />
+              <InfoPanelRow
+                label="Amount Staked"
+                value={<span className="text-blue">{dialogSubTitle}</span>}
+              />
+              <InfoPanelRow
+                label="APR"
+                value={<span className="text-blue">{theoreticalApr || '-'}%</span>}
+              />
+              <InfoPanelRow
+                label="Uptime"
+                value={<span className="text-blue">{uptime ? `${uptime}%` : '-'}</span>}
+              />
+              <InfoPanelRow
+                label="Voting Power"
+                value={<span className="text-blue">{votingPower ? `${votingPower}%` : '-'}</span>}
+              />
+
               {hasUnbonding && (
                 <>
-                  <p className="line-clamp-1">
-                    <strong>Amount Unstaking:</strong>{' '}
-                    <span className="text-warning">{amountUnstaking}</span>
-                  </p>
-                  <p className="line-clamp-1">
-                    <strong>Remaining Time to Unstake:</strong>{' '}
-                    <span className="text-warning">{unstakingTime}</span>
-                  </p>
-                  <p>
-                    <strong>Validator Commission:</strong> <span>{commission}</span>
-                  </p>
+                  <InfoPanelRow
+                    label="Amount Unstaking"
+                    value={<span className="text-warning">{amountUnstaking}</span>}
+                  />
+                  <InfoPanelRow
+                    label="Remaining Time to Unstake"
+                    value={<span className="text-warning">{unstakingTime}</span>}
+                  />
+                  <InfoPanelRow label="Validator Commission" value={commission} />
                 </>
               )}
-              <p className="truncate">
-                <strong>Website:</strong>{' '}
-                {isWebsiteValid ? (
-                  <a
-                    href={website.startsWith('http') ? website : `https://${website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {website}
-                  </a>
-                ) : (
-                  <span>{website}</span>
-                )}
-              </p>
-              <p className="line-clamp-2 max-h-[3.5rem] overflow-hidden">
-                <strong>Details:</strong> {validator.description.details}
-              </p>
-            </div>
+
+              <InfoPanelRow
+                label="Website"
+                value={
+                  isWebsiteValid ? (
+                    <a
+                      href={website.startsWith('http') ? website : `https://${website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="truncate"
+                    >
+                      {website}
+                    </a>
+                  ) : (
+                    <span>{website}</span>
+                  )
+                }
+              />
+
+              <InfoPanelRow
+                label="Details"
+                value={validator.description.details}
+                className="line-clamp-2"
+              />
+            </InfoPanel>
 
             {/* Action Selection */}
             {delegation && (
