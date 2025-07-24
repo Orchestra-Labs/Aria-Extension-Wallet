@@ -1,26 +1,21 @@
 import {
-  subscribedChainRegistryAtom,
   isFetchingValidatorDataAtom,
-  networkLevelAtom,
   validatorDataAtom,
   selectedValidatorChainAtom,
+  chainInfoAtom,
+  sessionWalletAtom,
 } from '@/atoms';
 import { fetchValidatorData } from '@/helpers';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { sessionWalletAtom } from '@/atoms/walletAtom';
 
 export function useValidatorDataRefresh() {
-  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const setValidatorState = useSetAtom(validatorDataAtom);
   const setIsFetchingData = useSetAtom(isFetchingValidatorDataAtom);
   const { chainWallets } = useAtomValue(sessionWalletAtom);
-  const networkLevel = useAtomValue(networkLevelAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
   const chainId = useAtomValue(selectedValidatorChainAtom);
 
   const refreshValidatorData = async () => {
-    console.log(
-      `[ValidatorRefresh] Starting refresh for chain: ${chainId} on network level: ${networkLevel}`,
-    );
     setIsFetchingData(true);
 
     try {
@@ -31,21 +26,16 @@ export function useValidatorDataRefresh() {
         return;
       }
 
-      // Get chain info based on current network level
-      const chain = chainRegistry[networkLevel][chainId];
+      const chain = getChainInfo(chainId);
       if (!chain) {
-        console.warn(`[ValidatorRefresh] No chain data for ${chainId} on ${networkLevel} network`);
         setValidatorState([]);
         return;
       }
 
-      console.log(
-        `[ValidatorRefresh] Fetching validators for ${chainId} on ${networkLevel} network`,
-      );
       console.log(`[ValidatorRefresh] Using wallet address: ${wallet.address}`);
 
       const startTime = Date.now();
-      const data = await fetchValidatorData(chainRegistry[networkLevel], chainId, wallet.address);
+      const data = await fetchValidatorData(chain, wallet.address);
 
       console.log(
         `[ValidatorRefresh] Completed fetch for ${chainId} in ${Date.now() - startTime}ms`,

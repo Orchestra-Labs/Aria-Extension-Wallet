@@ -24,15 +24,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <DataProvider />
-        <HashRouter>
-          <Suspense fallback={<ScreenLoader />}>
-            <InitWalletConnectManager>
-              <AppRouter />
-            </InitWalletConnectManager>
-            <Toaster />
-          </Suspense>
-        </HashRouter>
+        <DataProvider>
+          <HashRouter>
+            <Suspense fallback={<ScreenLoader />}>
+              <InitWalletConnectManager>
+                <AppRouter />
+              </InitWalletConnectManager>
+              <Toaster />
+            </Suspense>
+          </HashRouter>
+        </DataProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

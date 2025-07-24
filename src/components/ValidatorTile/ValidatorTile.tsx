@@ -168,14 +168,15 @@ const ValidatorTileComponent = ({
     }
 
     // For "All" view
+    const estimatedApr = parseFloat(theoreticalApr || '0');
     const uptimeValue = parseFloat(uptime || '0');
     const votingPowerValue = parseFloat(votingPower || '0');
     const numValidators = selectedValidators.length || 1;
     const evenSplit = 100 / numValidators;
 
     return {
-      value: `${theoreticalApr || '-'}% p.a.`,
-      subtitle: `${uptimeValue === 0 ? '-' : `${uptimeValue.toFixed(2)}%`} uptime`,
+      value: `${estimatedApr == 0 ? '-' : `${estimatedApr.toFixed(2)}%`} p.a.`,
+      subtitle: `${uptimeValue == 0 ? '-' : `${uptimeValue.toFixed(2)}%`} uptime`,
       subtitleStatus:
         uptimeValue === 0 ? TextFieldStatus.GOOD : getUptimeStatus(validator, uptimeValue),
       secondarySubtitle: `${votingPowerValue.toFixed(2)}%`,
@@ -368,11 +369,27 @@ const ValidatorTileComponent = ({
               />
               <InfoPanelRow
                 label="APR"
-                value={<span className="text-blue">{theoreticalApr || '-'}%</span>}
+                value={
+                  <span className="text-blue">
+                    {theoreticalApr
+                      ? parseFloat(theoreticalApr) == 0
+                        ? 'Not found'
+                        : parseFloat(theoreticalApr)
+                      : 'Not Found'}
+                  </span>
+                }
               />
               <InfoPanelRow
                 label="Uptime"
-                value={<span className="text-blue">{uptime ? `${uptime}%` : '-'}</span>}
+                value={
+                  <span className="text-blue">
+                    {uptime
+                      ? parseFloat(uptime) == 0
+                        ? 'Not Found'
+                        : parseFloat(uptime)
+                      : 'Not Found'}
+                  </span>
+                }
               />
               <InfoPanelRow
                 label="Voting Power"

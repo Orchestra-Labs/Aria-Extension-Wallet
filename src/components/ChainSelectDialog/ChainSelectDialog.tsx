@@ -30,6 +30,15 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
   const searchTerm = useAtomValue(dialogSearchTermAtom);
   const sortOrder = useAtomValue(chainDialogSortOrderAtom);
 
+  console.log('[ChainSelectDialog] subscribed chains:', subscribedChains);
+
+  useEffect(() => {
+    console.log('[ChainSelectDialog] Selected chain changed:', {
+      chainId: selectedChainId,
+      chainInfo,
+    });
+  }, [selectedChainId, chainInfo]);
+
   const searchType = SearchType.CHAIN;
 
   const resetDefaults = () => {
@@ -37,7 +46,10 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({}) => {
   };
 
   const handleChainSelection = (chain: SimplifiedChainInfo) => {
-    setSelectedChainId(chain.chain_id);
+    if (chain.chain_id !== selectedChainId) {
+      setSelectedChainId(chain.chain_id);
+    }
+
     slideTrayRef.current?.closeWithAnimation();
   };
 

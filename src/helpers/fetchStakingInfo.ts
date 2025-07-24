@@ -1,7 +1,6 @@
 import {
   CombinedStakingInfo,
   DelegationResponse,
-  LocalChainRegistry,
   MintParams,
   SigningInfo,
   SimplifiedChainInfo,
@@ -576,26 +575,42 @@ const fetchUptimeData = async (
 };
 
 export const fetchValidatorData = async (
-  chainRegistry: LocalChainRegistry,
-  chainID: string,
+  chain: SimplifiedChainInfo,
   delegatorAddress: string,
 ): Promise<CombinedStakingInfo[]> => {
-  console.log(`[ValidatorData] Starting fetch for chain: ${chainID}`);
-
   try {
-    const chain = chainRegistry[chainID];
     const { bech32_prefix: prefix, rest_uris: restUris } = chain;
 
     // Validate chain configuration
     if (!chain || !prefix || !restUris?.length) {
-      throw new Error(`Invalid chain configuration for ${chainID}`);
+      throw new Error(`Invalid chain configuration for ${chain.chain_id}`);
     }
 
-    console.log(`[ValidatorData] Starting parallel queries for chain ${chainID}`);
-    const startTime = Date.now();
-
     // First fetch validators separately since we need them for uptime calculation
-    const { validators } = await fetchValidators(prefix, restUris);
+    let validators: ValidatorInfo[] = [];
+    try {
+      const validatorsResponse = await fetchValidators(prefix, restUris);
+      validators = validatorsResponse.validators;
+      if (validators.length === 0) {
+        console.log(`[ValidatorData] No validators found for ${chain.chain_id}`);
+        return [];
+      }
+    } catch (error) {
+      console.error(`[ValidatorData] Error fetching validators for ${chain.chain_id}:`, error);
+      return [];
+    }
+
+    const defaultResponses = {
+      delegations: { delegations: [] as DelegationResponse[], pagination: null },
+      rewards: [] as { validator: string; rewards: any[] }[],
+      stakingParams: null as StakingParams | null,
+      unbondingDelegations: { delegations: [] as UnbondingDelegationResponse[], pagination: null },
+      communityTax: 0,
+      bondedRatio: 0,
+      inflation: 0,
+      uptimeMap: {} as Record<string, string>,
+      signedBlocksWindow: 10000,
+    };
 
     const [
       { delegations },
@@ -607,17 +622,39 @@ export const fetchValidatorData = async (
       inflation,
       { uptimeMap },
     ] = await Promise.all([
-      fetchDelegations(prefix, restUris, delegatorAddress),
-      fetchRewards(prefix, restUris, delegatorAddress),
-      fetchStakingParams(prefix, restUris),
-      fetchUnbondingDelegations(prefix, restUris, delegatorAddress),
-      fetchCommunityTax(prefix, restUris),
-      fetchBondedRatio(prefix, restUris),
-      fetchInflation(chain, restUris),
-      fetchUptimeData(prefix, restUris, validators),
+      fetchDelegations(prefix, restUris, delegatorAddress).catch(e => {
+        console.error(`Delegations error: ${e.message}`);
+        return defaultResponses.delegations;
+      }),
+      fetchRewards(prefix, restUris, delegatorAddress).catch(e => {
+        console.error(`Rewards error: ${e.message}`);
+        return defaultResponses.rewards;
+      }),
+      fetchStakingParams(prefix, restUris).catch(e => {
+        console.error(`Staking params error: ${e.message}`);
+        return defaultResponses.stakingParams;
+      }),
+      fetchUnbondingDelegations(prefix, restUris, delegatorAddress).catch(e => {
+        console.error(`Unbonding delegations error: ${e.message}`);
+        return defaultResponses.unbondingDelegations;
+      }),
+      fetchCommunityTax(prefix, restUris).catch(e => {
+        console.error(`Community tax error: ${e.message}`);
+        return defaultResponses.communityTax;
+      }),
+      fetchBondedRatio(prefix, restUris).catch(e => {
+        console.error(`Bonded ratio error: ${e.message}`);
+        return defaultResponses.bondedRatio;
+      }),
+      fetchInflation(chain, restUris).catch(e => {
+        console.error(`Inflation error: ${e.message}`);
+        return defaultResponses.inflation;
+      }),
+      fetchUptimeData(prefix, restUris, validators).catch(e => {
+        console.error(`Uptime data error: ${e.message}`);
+        return defaultResponses;
+      }),
     ]);
-
-    console.log(`[ValidatorData] Completed queries in ${Date.now() - startTime}ms`);
 
     // Process validator data
     const totalTokens = validators.reduce(
@@ -638,10 +675,12 @@ export const fetchValidatorData = async (
           u.validator_address === validatorAddress && u.delegator_address === delegatorAddress,
       );
 
-      const commissionRate = parseFloat(validator.commission.commission_rates.rate);
+      const commissionRate = parseFloat(validator.commission.commission_rates.rate) || 0;
       const theoreticalApr =
-        ((inflation * (1 - communityTax)) / bondedRatio) * (1 - commissionRate) * 100;
-      const tokens = parseFloat(validator.tokens);
+        totalTokens > 0
+          ? ((inflation * (1 - communityTax)) / bondedRatio) * (1 - commissionRate) * 100
+          : 0;
+      const tokens = parseFloat(validator.tokens) || 0;
       const votingPower =
         validator.status === BondStatus.BONDED ? ((tokens / totalTokens) * 100).toFixed(2) : '0';
 
@@ -650,7 +689,13 @@ export const fetchValidatorData = async (
         delegation: delegation?.delegation || defaultDelegation,
         balance: delegation?.balance || defaultBalance,
         rewards: rewardInfo?.rewards || [],
-        stakingParams,
+        stakingParams: stakingParams || {
+          unbonding_time: '21', // Default 21 days
+          max_validators: 0,
+          max_entries: 0,
+          historical_entries: 0,
+          bond_denom: '',
+        },
         commission: (commissionRate * 100).toFixed(2),
         theoreticalApr: theoreticalApr.toFixed(2),
         votingPower,
@@ -658,7 +703,10 @@ export const fetchValidatorData = async (
         unbondingBalance: unbonding
           ? {
               balance: unbonding.entries
-                .reduce((sum: number, e: { balance: string }) => sum + parseFloat(e.balance), 0)
+                .reduce(
+                  (sum: number, e: { balance: string }) => sum + (parseFloat(e.balance) || 0),
+                  0,
+                )
                 .toString(),
               completion_time: new Date(
                 Math.max(
@@ -674,7 +722,7 @@ export const fetchValidatorData = async (
 
     return result;
   } catch (error) {
-    console.error(`[ValidatorData] Error fetching data for chain ${chainID}:`, error);
+    console.error(`[ValidatorData] Error fetching data for chain ${chain.chain_id}:`, error);
     throw error;
   }
 };

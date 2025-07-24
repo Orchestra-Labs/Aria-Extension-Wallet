@@ -12,9 +12,21 @@ import {
 
 import { useRefreshData, useRegistryDataRefresh, useAddressGeneration } from '@/hooks';
 import { useAtom, useAtomValue } from 'jotai';
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-export const DataProvider: React.FC = () => {
+const DataProviderContext = createContext<{
+  prepAddressDataReload: () => void;
+}>({
+  prepAddressDataReload: () => console.warn('DataProvider not initialized'),
+});
+
+export const useDataProviderControls = () => useContext(DataProviderContext);
+
+interface DataProviderProps {
+  children?: React.ReactNode;
+}
+
+export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const { refreshData } = useRefreshData();
   const { refreshRegistry, subscribedChainRegistry } = useRegistryDataRefresh();
   const { generateAddresses } = useAddressGeneration();
@@ -43,6 +55,12 @@ export const DataProvider: React.FC = () => {
       !isGeneratingAddresses
     );
   }, [subscribedChainRegistry, userAccount, walletAddresses, isGeneratingAddresses]);
+
+  const prepAddressDataReload = useCallback(() => {
+    console.log('[DataProvider] Preparing address data reload');
+    setPhase2LoadComplete(false);
+    setPhase3LoadComplete(false);
+  }, []);
 
   // Initialize registry data when user account changes
   // Replace the current useEffect for address generation with this:
@@ -119,7 +137,11 @@ export const DataProvider: React.FC = () => {
     if (!userAccount || !phase3LoadComplete) return;
 
     refreshData();
-  }, [networkLevel, userAccount, phase3LoadComplete]);
+  }, [networkLevel]);
 
-  return null;
+  return (
+    <DataProviderContext.Provider value={{ prepAddressDataReload }}>
+      {children}
+    </DataProviderContext.Provider>
+  );
 };

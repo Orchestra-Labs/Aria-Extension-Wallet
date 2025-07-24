@@ -31,6 +31,7 @@ import {
 import { Button, Separator } from '@/ui-kit';
 import { Asset, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
 import { saveAccountByID, getPrimaryFeeToken } from '@/helpers';
+import { useDataProviderControls } from '@/data';
 
 const PAGE_TITLE = 'Chain & Coin Subscriptions';
 
@@ -48,6 +49,7 @@ interface ChainSubscriptionsProps {}
 
 export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const navigate = useNavigate();
+  const { prepAddressDataReload } = useDataProviderControls();
 
   const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const [networkLevelTab, setNetworkLevelTab] = useState<NetworkLevelTab>(NetworkLevelTab.MAINNET);
@@ -310,9 +312,17 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     setSubscribedChainRegistryAtom(updatedRegistry);
   };
 
-  const confirmSelection = () => {
-    saveToLocalStorage();
+  const confirmSelection = async () => {
+    // Save subscriptions first
     saveToState();
+
+    // Prep data reload sequence
+    prepAddressDataReload();
+
+    // Save to storage and account atom
+    saveToLocalStorage();
+
+    // Then close and return
     closeAndReturn();
   };
 
