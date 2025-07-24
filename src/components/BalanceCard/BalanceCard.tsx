@@ -11,6 +11,9 @@ import {
   validatorDataAtom,
   subscribedChainRegistryAtom,
   hasNonZeroAssetsAtom,
+  chainInfoAtom,
+  selectedValidatorChainAtom,
+  userAccountAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -20,8 +23,14 @@ import {
   ReceiveDialog,
   ValidatorSelectDialog,
 } from '@/components';
-import { convertToGreaterUnit, formatBalanceDisplay, getSymphonyChainId } from '@/helpers';
-import { ROUTES, DEFAULT_MAINNET_ASSET, NetworkLevel, DEFAULT_TESTNET_ASSET } from '@/constants';
+import {
+  convertToGreaterUnit,
+  formatBalanceDisplay,
+  getPrimaryFeeToken,
+  getSymphonyChainId,
+  getSymphonyDefaultAsset,
+} from '@/helpers';
+import { ROUTES } from '@/constants';
 import { useExchangeRate } from '@/hooks';
 
 interface BalanceCardProps {
@@ -39,6 +48,15 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const networkLevel = useAtomValue(networkLevelAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const hasNonZeroAssets = useAtomValue(hasNonZeroAssetsAtom);
+  const userAccount = useAtomValue(userAccountAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
+  const chainId = useAtomValue(selectedValidatorChainAtom);
+
+  const chain = getChainInfo(
+    currentStep === 0
+      ? userAccount?.settings.defaultChainID || getSymphonyChainId(networkLevel)
+      : chainId,
+  );
 
   console.log('[BalanceCard] Non-zero assets check:', {
     hasNonZeroAssets,
@@ -49,8 +67,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const [showReserveStatus, setShowReserveStatus] = useState(false);
   const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
-  const balanceDisplayUnit =
-    networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
+  // TODO: change this from default constant to default from account
+  const balanceDisplayUnit = getPrimaryFeeToken(chain) || getSymphonyDefaultAsset(networkLevel);
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;
 

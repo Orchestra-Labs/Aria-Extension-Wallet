@@ -280,6 +280,8 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     });
   };
 
+  // TODO: if default coin and chain are not included in the set of chains and coins here, update those to first in the list
+  // TODO: add method to select default coin and chain
   const saveToLocalStorage = () => {
     if (userAccount) {
       const updatedUserAccount = {
