@@ -29,3 +29,17 @@ export const DEFAULT_FEE_TOKEN = {
 };
 
 export const MAX_RETRIES_PER_QUERY = 3;
+
+export const KNOWN_EPOCH_BASED_CHAINS = [
+  'symphony-1',
+  'stargaze-1',
+  'juno-1',
+  'osmosis-1',
+  'comdex-1',
+  'injective-1',
+  'chihuahua-1',
+  'secret-4',
+  'umee-1',
+  'evmos_9001-2',
+  'gravity-bridge-3',
+];

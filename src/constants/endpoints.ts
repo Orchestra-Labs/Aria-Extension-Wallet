@@ -31,6 +31,10 @@ export const COSMOS_CHAIN_ENDPOINTS = {
 
   // tx module
   sendIbcMessage: '/cosmos/tx/v1beta1/txs',
+
+  // mint module
+  getMintParams: '/cosmos/mint/v1beta1/params',
+  getInflation: '/cosmos/mint/v1beta1/inflation',
 };
 
 export const SYMPHONY_ENDPOINTS = {
@@ -45,3 +49,8 @@ export const SYMPHONY_ENDPOINTS = {
   // treasury module
   getTobinTaxRate: '/symphony/treasury/v1beta1/tax_rate',
 };
+
+// TODO: get real info for this
+// export const SPECIALIZED_ENDPOINTS: Record<string, Record<string, string>> = {
+//   'stargaze-1': { mint: '/publicawesome/mint/v1beta1' },
+// };

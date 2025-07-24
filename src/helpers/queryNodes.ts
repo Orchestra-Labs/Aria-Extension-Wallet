@@ -3,6 +3,7 @@ import {
   DEFAULT_REST_TIMEOUT,
   MAX_RETRIES_PER_QUERY,
   QueryType,
+  SYMPHONY_ENDPOINTS,
 } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
@@ -192,6 +193,25 @@ const performRpcQuery = async (
   }
 };
 
+const getTranactionSigner = async (
+  endpoint: string,
+  uri: Uri,
+  mnemonic: string,
+  prefix: string,
+): Promise<SigningStargateClient> => {
+  const isSymphonyQuery = Object.values(SYMPHONY_ENDPOINTS).some(symphonyEndpoint =>
+    endpoint.startsWith(symphonyEndpoint),
+  );
+
+  console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
+  const offlineSigner = await createOfflineSignerByPrefix(mnemonic, prefix);
+
+  const signer = isSymphonyQuery
+    ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
+    : await SigningStargateClient.connectWithSigner(uri.address, offlineSigner);
+  return signer;
+};
+
 const queryWithRetry = async ({
   endpoint,
   useRPC = false,
@@ -202,7 +222,6 @@ const queryWithRetry = async ({
   fee,
   prefix,
   uris,
-  isSymphonyQuery = false,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -216,7 +235,6 @@ const queryWithRetry = async ({
   };
   prefix: string;
   uris: Uri[];
-  isSymphonyQuery?: boolean;
 }): Promise<RPCResponse> => {
   let attemptCount = 0;
   let lastError: any = null;
@@ -234,15 +252,11 @@ const queryWithRetry = async ({
 
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
-        const signer = await createOfflineSignerByPrefix(mnemonic, prefix);
 
-        console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
-        const client = isSymphonyQuery
-          ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer })
-          : await SigningStargateClient.connectWithSigner(uri.address, signer);
+        const transactionSigner = await getTranactionSigner(endpoint, uri, mnemonic, prefix);
 
         const result = await performRpcQuery(
-          client,
+          transactionSigner,
           address,
           messages,
           feeToken,

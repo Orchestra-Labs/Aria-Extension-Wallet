@@ -2,8 +2,9 @@ import {
   CombinedStakingInfo,
   DelegationResponse,
   LocalChainRegistry,
-  MintModuleParams,
+  MintParams,
   SigningInfo,
+  SimplifiedChainInfo,
   SlashingParams,
   StakingParams,
   UnbondingDelegationResponse,
@@ -14,8 +15,7 @@ import { queryRestNode } from './queryNodes';
 import {
   BondStatus,
   COSMOS_CHAIN_ENDPOINTS,
-  SYMPHONY_ENDPOINTS,
-  SYMPHONY_PREFIX,
+  KNOWN_EPOCH_BASED_CHAINS,
   SYMPHONY_CHAIN_ID_LIST,
 } from '@/constants';
 import { fromBase64, toBech32 } from '@cosmjs/encoding';
@@ -287,29 +287,171 @@ const fetchAllSigningInfos = async (prefix: string, restUris: Uri[]): Promise<Si
   return allInfos;
 };
 
-const fetchSymphonyInflation = async (restUris: Uri[]): Promise<number> => {
-  const prefix = SYMPHONY_PREFIX;
+// TODO: move to utils
+const getEpochsPerYear = (epochIdentifier: string): number => {
+  switch (epochIdentifier.toLowerCase()) {
+    case 'day':
+      return 365;
+    case 'week':
+      return 52;
+    case 'month':
+      return 12;
+    case 'hour':
+      return 365 * 24;
+    default:
+      console.warn(`Unknown epoch identifier: ${epochIdentifier}, defaulting to weekly`);
+      return 52;
+  }
+};
+
+const fetchEpochBasedInflation = async (
+  prefix: string,
+  restUris: Uri[],
+  mintModulePath: string,
+): Promise<number> => {
   try {
+    console.log(`[Endpoint] Starting epoch-based inflation calculation for ${mintModulePath}`);
+
     const [epochRes, paramsRes, poolRes] = await Promise.all([
-      queryRestNode({ prefix, restUris, endpoint: SYMPHONY_ENDPOINTS.getMintEpochProvisions }),
-      queryRestNode({ prefix, restUris, endpoint: SYMPHONY_ENDPOINTS.getMintParams }),
-      queryRestNode({ prefix, restUris, endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool }),
+      queryRestNode({
+        prefix,
+        restUris,
+        endpoint: `${mintModulePath}/epoch_provisions`,
+      }),
+      queryRestNode({
+        prefix,
+        restUris,
+        endpoint: `${mintModulePath}/params`,
+      }),
+      queryRestNode({
+        prefix,
+        restUris,
+        endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool,
+      }),
     ]);
 
-    const mintParams = paramsRes.params as unknown as MintModuleParams;
+    console.log('[Endpoint] Raw API responses:', {
+      epochProvisions: epochRes,
+      mintParams: paramsRes,
+      stakingPool: poolRes,
+    });
 
     const epochProvisions = parseFloat(epochRes.epoch_provisions || '0');
-    const stakingProportion = parseFloat(mintParams.distribution_proportions.staking || '0');
+    const params = paramsRes.params as unknown as MintParams;
+    const stakingProportion = parseFloat(params.distribution_proportions?.staking || '0');
     const bondedTokens = parseFloat(poolRes.pool?.bonded_tokens || '1');
 
-    const yearlyStakingProvisions = epochProvisions * 52 * stakingProportion;
-    const inflation = yearlyStakingProvisions / bondedTokens;
+    console.log('[Endpoint] Parsed values:', {
+      epochProvisions,
+      stakingProportion,
+      bondedTokens,
+      distributionProportions: params.distribution_proportions,
+      epochIdentifier: params.epoch_identifier,
+    });
 
-    return inflation;
+    const epochIdentifier = params.epoch_identifier || 'week';
+    const epochsPerYear = getEpochsPerYear(epochIdentifier);
+
+    console.log('[Endpoint] Epoch calculations:', {
+      epochIdentifier,
+      epochsPerYear,
+      getEpochsPerYear: getEpochsPerYear(epochIdentifier),
+    });
+
+    const yearlyStakingInflation =
+      (epochProvisions * epochsPerYear * stakingProportion) / bondedTokens;
+
+    console.log('[Endpoint] Final calculation:', {
+      yearlyStakingInflation,
+      calculation: `(${epochProvisions} * ${epochsPerYear} * ${stakingProportion}) / ${bondedTokens}`,
+    });
+
+    return yearlyStakingInflation;
   } catch (error) {
-    console.error('Error calculating inflation from Symphony mint module:', error);
+    console.error('[Endpoint] Epoch-based inflation calculation failed:', {
+      error,
+      mintModulePath,
+      restUris,
+    });
     return 0;
   }
+};
+
+const fetchStandardCosmosInflation = async (prefix: string, restUris: Uri[]): Promise<number> => {
+  try {
+    // Try direct inflation endpoint first
+    try {
+      const inflationRes = await queryRestNode({
+        prefix,
+        restUris,
+        endpoint: COSMOS_CHAIN_ENDPOINTS.getInflation,
+      });
+      if (inflationRes?.inflation) {
+        return parseFloat(inflationRes.inflation);
+      }
+    } catch (error) {
+      console.log('Direct inflation endpoint not available, falling back to params');
+    }
+
+    // Fallback to params-based calculation
+    const [paramsRes, poolRes] = await Promise.all([
+      queryRestNode({
+        prefix,
+        restUris,
+        endpoint: COSMOS_CHAIN_ENDPOINTS.getMintParams,
+      }),
+      queryRestNode({
+        prefix,
+        restUris,
+        endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool,
+      }),
+    ]);
+
+    const params = paramsRes.params as unknown as MintParams;
+    const bondedTokens = parseFloat(poolRes.pool?.bonded_tokens || '1');
+
+    // Try annual_provisions first
+    if (params.annual_provisions) {
+      return parseFloat(params.annual_provisions) / bondedTokens;
+    }
+
+    // Fallback to inflation rate parameters if available
+    if (params.inflation_min && params.inflation_max) {
+      return (parseFloat(params.inflation_min) + parseFloat(params.inflation_max)) / 2;
+    }
+
+    return 0;
+  } catch (error) {
+    console.error('Standard inflation calculation failed:', error);
+    return 0;
+  }
+};
+
+// TODO: move to utils
+export const getMintEndpoint = (
+  chainInfo: SimplifiedChainInfo,
+  // customMintPaths: Record<string, Record<string, string>> = {},
+): string => {
+  // Check custom paths first (e.g., Stargaze uses 'publicawesome')
+  // const customPath = customMintPaths[chainInfo.chain_id]?.mint;
+  // console.log('[Endpoint] Mint Endpoint:', chainInfo, customPath);
+  // if (customPath) return customPath;
+
+  // Use chain_name from registry
+  return `/${chainInfo.chain_name.replace(/\s+/g, '').toLowerCase()}/mint/v1beta1`;
+};
+
+const fetchInflation = async (chainInfo: SimplifiedChainInfo, restUris: Uri[]): Promise<number> => {
+  const mintEndpoint = getMintEndpoint(
+    chainInfo,
+    // SPECIALIZED_ENDPOINTS
+  );
+
+  if (KNOWN_EPOCH_BASED_CHAINS.includes(chainInfo.chain_id)) {
+    console.log('[Endpoint] Marking as epoch based chain:', chainInfo.chain_id);
+    return fetchEpochBasedInflation(chainInfo.bech32_prefix, restUris, mintEndpoint);
+  }
+  return fetchStandardCosmosInflation(chainInfo.bech32_prefix, restUris);
 };
 
 const fetchCommunityTax = async (prefix: string, restUris: Uri[]): Promise<number> => {
@@ -354,43 +496,83 @@ const fetchSignedBlocksWindow = async (prefix: string, restUris: Uri[]): Promise
   }
 };
 
-const convertPubKeyToValConsAddress = (pubKey: string, prefix = 'symphonyvalcons') => {
-  const decoded = fromBase64(pubKey);
-  const hashed = sha256(decoded).slice(0, 20);
-  return toBech32(prefix, hashed);
+const convertPubKeyToValConsAddress = (pubKey: string, prefix: string): string => {
+  try {
+    const decoded = fromBase64(pubKey);
+    const hashed = sha256(decoded).slice(0, 20);
+    return toBech32(prefix, hashed);
+  } catch (error) {
+    console.error('Error converting pubkey to valcons address:', error);
+    throw error;
+  }
 };
 
-const calculateAPR = (inflation: number, tax: number, ratio: number, commission: number) =>
-  ((inflation * (1 - tax)) / ratio) * (1 - commission) * 100;
-
-const buildUptimeMap = (
-  validators: ValidatorInfo[],
-  signingInfos: SigningInfo[],
-  signedBlocksWindow: number,
-): Record<string, string> => {
-  const signingInfoMap = signingInfos.reduce<Record<string, number>>((acc, info) => {
-    acc[info.address] = parseInt(info.missed_blocks_counter || '0');
-    return acc;
-  }, {});
-
-  return validators.reduce<Record<string, string>>((acc, validator) => {
-    const pubKey = validator.consensus_pubkey?.key;
-    if (!pubKey || validator.jailed) {
-      acc[validator.operator_address] = '0.00';
-      return acc;
-    }
-
-    const valcons = convertPubKeyToValConsAddress(pubKey);
-    const missed = signingInfoMap[valcons] ?? signedBlocksWindow;
-    const uptime = ((signedBlocksWindow - missed) / signedBlocksWindow) * 100;
-
-    acc[validator.operator_address] = uptime.toFixed(2);
-    return acc;
-  }, {});
-};
-
+// TODO: move to utils
 export const isSymphonyChain = (chainId: string): boolean => {
   return SYMPHONY_CHAIN_ID_LIST.includes(chainId);
+};
+
+const fetchUptimeData = async (
+  prefix: string,
+  restUris: Uri[],
+  validators: ValidatorInfo[],
+): Promise<{ uptimeMap: Record<string, string>; signedBlocksWindow: number }> => {
+  const defaultWindow = 10000;
+  const uptimeMap: Record<string, string> = {};
+
+  try {
+    // Get signed blocks window first
+    const signedBlocksWindow = await fetchSignedBlocksWindow(prefix, restUris).catch(
+      () => defaultWindow,
+    );
+
+    // Initialize all validators with default uptime
+    validators.forEach(validator => {
+      uptimeMap[validator.operator_address] = '0.00';
+    });
+
+    // Try to get all signing infos at once
+    const signingInfos = await fetchAllSigningInfos(prefix, restUris).catch(() => []);
+
+    if (signingInfos.length > 0) {
+      const signingInfoMap = signingInfos.reduce<Record<string, number>>((acc, info) => {
+        acc[info.address] = parseInt(info.missed_blocks_counter || '0');
+        return acc;
+      }, {});
+
+      validators.forEach(validator => {
+        if (validator.jailed) {
+          uptimeMap[validator.operator_address] = '0.00';
+          return;
+        }
+
+        const pubKey = validator.consensus_pubkey?.key;
+        if (!pubKey) {
+          uptimeMap[validator.operator_address] = '0.00';
+          return;
+        }
+
+        try {
+          const valcons = convertPubKeyToValConsAddress(pubKey, `${prefix}valcons`);
+          const missed = signingInfoMap[valcons] ?? signedBlocksWindow;
+          const uptime = ((signedBlocksWindow - missed) / signedBlocksWindow) * 100;
+          uptimeMap[validator.operator_address] = uptime.toFixed(2);
+        } catch (error) {
+          console.error(`Error calculating uptime for ${validator.operator_address}:`, error);
+          uptimeMap[validator.operator_address] = '0.00';
+        }
+      });
+    }
+
+    return { uptimeMap, signedBlocksWindow };
+  } catch (error) {
+    console.error('Error fetching uptime data:', error);
+    // Fallback: return default uptime values
+    validators.forEach(validator => {
+      uptimeMap[validator.operator_address] = '0.00';
+    });
+    return { uptimeMap, signedBlocksWindow: defaultWindow };
+  }
 };
 
 export const fetchValidatorData = async (
@@ -399,42 +581,23 @@ export const fetchValidatorData = async (
   delegatorAddress: string,
 ): Promise<CombinedStakingInfo[]> => {
   console.log(`[ValidatorData] Starting fetch for chain: ${chainID}`);
-  console.log(`[ValidatorData] Delegator address: ${delegatorAddress}`);
 
   try {
-    console.log(`[ValidatorData] Chain Registry details:`, chainRegistry);
     const chain = chainRegistry[chainID];
     const { bech32_prefix: prefix, rest_uris: restUris } = chain;
 
-    if (!chain) {
-      console.error(`[ValidatorData] Chain ${chainID} not found in registry`);
-      throw new Error(`Chain ${chainID} not found in registry`);
-    }
-
-    console.log(`[ValidatorData] Chain details - prefix: ${prefix}, REST URIs:`, restUris);
-
-    if (!prefix) {
-      console.error(`[ValidatorData] Missing bech32_prefix for chain ${chainID}`);
-      throw new Error(`Missing bech32_prefix for chain ${chainID}`);
-    }
-    if (!restUris?.length) {
-      console.error(`[ValidatorData] Missing rest_uris for chain ${chainID}`);
-      throw new Error(`Missing rest_uris for chain ${chainID}`);
-    }
-
-    const isSymphony = isSymphonyChain(chainID);
-    console.log(`[ValidatorData] Is Symphony chain: ${isSymphony}`);
-
-    if (isSymphony) {
-      const symphonyRestUris = chain.rest_uris;
-      console.log(`[ValidatorData] Symphony REST URIs:`, symphonyRestUris);
+    // Validate chain configuration
+    if (!chain || !prefix || !restUris?.length) {
+      throw new Error(`Invalid chain configuration for ${chainID}`);
     }
 
     console.log(`[ValidatorData] Starting parallel queries for chain ${chainID}`);
     const startTime = Date.now();
 
+    // First fetch validators separately since we need them for uptime calculation
+    const { validators } = await fetchValidators(prefix, restUris);
+
     const [
-      { validators },
       { delegations },
       rewards,
       stakingParams,
@@ -442,58 +605,45 @@ export const fetchValidatorData = async (
       communityTax,
       bondedRatio,
       inflation,
-      signingInfos,
-      signedBlocksWindow,
+      { uptimeMap },
     ] = await Promise.all([
-      fetchValidators(prefix, restUris),
       fetchDelegations(prefix, restUris, delegatorAddress),
       fetchRewards(prefix, restUris, delegatorAddress),
       fetchStakingParams(prefix, restUris),
       fetchUnbondingDelegations(prefix, restUris, delegatorAddress),
       fetchCommunityTax(prefix, restUris),
       fetchBondedRatio(prefix, restUris),
-      isSymphony ? fetchSymphonyInflation(restUris) : Promise.resolve(0),
-      isSymphony ? fetchAllSigningInfos(prefix, restUris) : Promise.resolve([]),
-      isSymphony ? fetchSignedBlocksWindow(prefix, restUris) : Promise.resolve(10000),
+      fetchInflation(chain, restUris),
+      fetchUptimeData(prefix, restUris, validators),
     ]);
 
-    console.log(
-      `[ValidatorData] Completed queries for chain ${chainID} in ${Date.now() - startTime}ms`,
+    console.log(`[ValidatorData] Completed queries in ${Date.now() - startTime}ms`);
+
+    // Process validator data
+    const totalTokens = validators.reduce(
+      (sum: number, v: ValidatorInfo) => sum + parseFloat(v.tokens),
+      0,
     );
-    console.log(`[ValidatorData] Found ${validators.length} validators`);
 
-    const totalTokens = validators.reduce((sum, v) => sum + parseFloat(v.tokens), 0);
-    const uptimeMap = buildUptimeMap(validators, signingInfos, signedBlocksWindow);
-
-    console.log(`[ValidatorData] Processing validator data for chain ${chainID}`);
-    const result = validators.map(validator => {
+    const result = validators.map((validator: ValidatorInfo) => {
       const validatorAddress = validator.operator_address;
-
-      const delegation = delegations.find(d => d.delegation.validator_address === validatorAddress);
-      const rewardInfo = rewards.find(r => r.validator === validatorAddress);
+      const delegation = delegations.find(
+        (d: DelegationResponse) => d.delegation.validator_address === validatorAddress,
+      );
+      const rewardInfo = rewards.find(
+        (r: { validator: string }) => r.validator === validatorAddress,
+      );
       const unbonding = unbondingDelegations.find(
-        u => u.validator_address === validatorAddress && u.delegator_address === delegatorAddress,
+        (u: UnbondingDelegationResponse) =>
+          u.validator_address === validatorAddress && u.delegator_address === delegatorAddress,
       );
 
       const commissionRate = parseFloat(validator.commission.commission_rates.rate);
-      const theoreticalApr = isSymphony
-        ? calculateAPR(inflation, communityTax, bondedRatio, commissionRate)
-        : ((inflation * (1 - communityTax)) / bondedRatio) * (1 - commissionRate) * 100;
-
+      const theoreticalApr =
+        ((inflation * (1 - communityTax)) / bondedRatio) * (1 - commissionRate) * 100;
       const tokens = parseFloat(validator.tokens);
       const votingPower =
         validator.status === BondStatus.BONDED ? ((tokens / totalTokens) * 100).toFixed(2) : '0';
-
-      const unbondingBalance = unbonding
-        ? {
-            balance: unbonding.entries
-              .reduce((sum, e) => sum + parseFloat(e.balance), 0)
-              .toString(),
-            completion_time: new Date(
-              Math.max(...unbonding.entries.map(e => +new Date(e.completion_time))),
-            ).toISOString(),
-          }
-        : defaultUnbonding;
 
       return {
         validator,
@@ -504,12 +654,24 @@ export const fetchValidatorData = async (
         commission: (commissionRate * 100).toFixed(2),
         theoreticalApr: theoreticalApr.toFixed(2),
         votingPower,
-        uptime: uptimeMap[validatorAddress] || '0.00',
-        unbondingBalance,
+        uptime: uptimeMap[validatorAddress] || '0',
+        unbondingBalance: unbonding
+          ? {
+              balance: unbonding.entries
+                .reduce((sum: number, e: { balance: string }) => sum + parseFloat(e.balance), 0)
+                .toString(),
+              completion_time: new Date(
+                Math.max(
+                  ...unbonding.entries.map((e: { completion_time: string }) =>
+                    new Date(e.completion_time).getTime(),
+                  ),
+                ),
+              ).toISOString(),
+            }
+          : defaultUnbonding,
       };
     });
 
-    console.log(`[ValidatorData] Successfully processed data for chain ${chainID}`);
     return result;
   } catch (error) {
     console.error(`[ValidatorData] Error fetching data for chain ${chainID}:`, error);

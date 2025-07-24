@@ -9,6 +9,7 @@ import {
 import { DEFAULT_EXTERNAL_GAS_PRICES, TransactionStatus, TransactionType } from '@/constants';
 import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
 import { useRefreshData } from './useRefreshData';
+import { selectedValidatorsAtom } from '@/atoms';
 
 interface HandleTransactionParams {
   action: 'stake' | 'unstake' | 'claim';
@@ -19,14 +20,26 @@ interface HandleTransactionParams {
   rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[];
 }
 
-export const useValidatorActions = (validator: CombinedStakingInfo) => {
+export const useValidatorActions = (validator?: CombinedStakingInfo) => {
+  const { refreshData } = useRefreshData();
+  const [selectedValidators] = useAtom(selectedValidatorsAtom);
+
   const setTransactionState = useSetAtom(validatorTransactionStateAtom);
   const [feeState, setFeeState] = useAtom(validatorFeeStateAtom);
-  const { refreshData } = useRefreshData();
-
   const stake = useSetAtom(executeStakeAtom);
   const unstake = useSetAtom(executeUnstakeAtom);
   const claim = useSetAtom(executeClaimAtom);
+
+  const getActiveValidator = () => {
+    // If validator is explicitly passed, use that
+    if (validator) return validator;
+
+    // If we have selected validators, use the first one (for stake/claim actions that need a validator)
+    if (selectedValidators.length > 0) return selectedValidators[0];
+
+    // Otherwise return undefined (will throw error for stake actions)
+    return undefined;
+  };
 
   const handleTransaction = async ({
     action,
@@ -36,15 +49,7 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
     delegations = [],
     rewards = [],
   }: HandleTransactionParams): Promise<TransactionResult | null> => {
-    console.log(
-      `[useValidatorActions] Starting ${isSimulation ? 'simulation' : 'transaction'} for ${action}`,
-    );
-    console.log('[useValidatorActions] Parameters:', {
-      amount,
-      toRestake,
-      delegations: Array.isArray(delegations) ? delegations.length : 1,
-      rewards: rewards.length,
-    });
+    const activeValidator = getActiveValidator();
 
     try {
       let result: TransactionResult;
@@ -59,11 +64,10 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
 
       switch (action) {
         case 'stake':
-          console.log('[useValidatorActions] Executing stake action');
           result = await stake({
             amount,
             denom: feeState.feeToken.denom,
-            validatorAddress: validator.validator.operator_address,
+            validatorAddress: activeValidator?.validator.operator_address as string,
             simulate: isSimulation,
           });
           break;
@@ -77,14 +81,14 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
         case 'claim':
           result = toRestake
             ? await claim({
-                validatorAddress: validator.validator.operator_address,
+                validatorAddress: activeValidator?.validator.operator_address as string,
                 delegations,
                 rewards,
                 isToRestake: toRestake,
                 simulate: isSimulation,
               })
             : await claim({
-                validatorAddress: validator.validator.operator_address,
+                validatorAddress: activeValidator?.validator.operator_address as string,
                 isToRestake: toRestake,
                 simulate: isSimulation,
               });
@@ -101,28 +105,16 @@ export const useValidatorActions = (validator: CombinedStakingInfo) => {
 
       if (result?.success && result.data?.code === 0) {
         if (isSimulation) {
-          // Update fee state with simulation results
           const gasWanted = parseFloat(result.data.gasWanted || '0');
           const gasPrice = feeState.feeToken.gasPriceStep.average;
           const feeInBaseUnits = gasWanted * gasPrice;
 
-          console.log('[useValidatorActions] Simulation results:', {
+          setFeeState(prev => ({
+            ...prev,
+            amount: feeInBaseUnits,
             gasWanted,
-            gasPrice,
-            feeInBaseUnits,
-            currentFeeState: feeState,
-          });
-
-          setFeeState(prev => {
-            const newState = {
-              ...prev,
-              amount: feeInBaseUnits,
-              gasWanted,
-              gasPrice: feeState.gasPrice || DEFAULT_EXTERNAL_GAS_PRICES.average,
-            };
-            console.log('[useValidatorActions] Setting new fee state:', newState);
-            return newState;
-          });
+            gasPrice: feeState.gasPrice || DEFAULT_EXTERNAL_GAS_PRICES.average,
+          }));
         } else {
           handleTransactionSuccess(
             result.data.txHash || '',

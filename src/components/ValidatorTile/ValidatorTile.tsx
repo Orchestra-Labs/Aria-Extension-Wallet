@@ -39,6 +39,7 @@ import {
   lastSimulationUpdateAtom,
   validatorCalculatedFeeAtom,
   chainInfoAtom,
+  selectedValidatorsAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -65,7 +66,9 @@ const ValidatorTileComponent = ({
 
   // Atoms
   const networkLevel = useAtomValue(networkLevelAtom);
-  const selectedValidators = useAtomValue(filteredValidatorsAtom);
+  const selectedValidators = useAtomValue(
+    isSelectable ? selectedValidatorsAtom : filteredValidatorsAtom,
+  );
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const isLoading = useAtomValue(isValidatorLoadingAtom);
@@ -168,9 +171,10 @@ const ValidatorTileComponent = ({
     const evenSplit = 100 / numValidators;
 
     return {
-      value: `${theoreticalApr || '0.00'}% p.a.`,
-      subtitle: `${uptimeValue.toFixed(2)}% uptime`,
-      subtitleStatus: getUptimeStatus(validator, uptimeValue),
+      value: `${theoreticalApr || '-'}% p.a.`,
+      subtitle: `${uptimeValue === 0 ? '-' : `${uptimeValue.toFixed(2)}%`} uptime`,
+      subtitleStatus:
+        uptimeValue === 0 ? TextFieldStatus.GOOD : getUptimeStatus(validator, uptimeValue),
       secondarySubtitle: `${votingPowerValue.toFixed(2)}%`,
       secondaryStatus: getVotingPowerStatus(votingPowerValue, evenSplit),
     };
