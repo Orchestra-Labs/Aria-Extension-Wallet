@@ -14,6 +14,7 @@ import {
   chainInfoAtom,
   selectedValidatorChainAtom,
   userAccountAtom,
+  isFetchingWalletDataAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -25,13 +26,13 @@ import {
 } from '@/components';
 import {
   convertToGreaterUnit,
-  formatBalanceDisplay,
+  formatUSD,
+  formatValueWithFallback,
   getPrimaryFeeToken,
   getSymphonyChainId,
   getSymphonyDefaultAsset,
 } from '@/helpers';
 import { ROUTES } from '@/constants';
-import { useExchangeRate } from '@/hooks';
 
 interface BalanceCardProps {
   currentStep: number;
@@ -52,6 +53,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const getChainInfo = useAtomValue(chainInfoAtom);
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
+  const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
 
   const chain = getChainInfo(
     currentStep === 0
@@ -66,7 +68,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   });
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
-  const { exchangeRate, isLoading: isExchangeRateLoading } = useExchangeRate();
 
   // TODO: change this from default constant to default from account
   const balanceDisplayUnit = getPrimaryFeeToken(chain) || getSymphonyDefaultAsset(networkLevel);
@@ -86,40 +87,70 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   let primaryText = '';
   let secondaryText;
 
-  const totalMLD = useMemo(() => {
+  const totalValue = useMemo(() => {
     return networkWalletAssets.reduce((sum, asset) => {
       const amount = new BigNumber(asset.amount || '0');
-      const rate = asset.denom === balanceDisplayUnit?.denom ? 1 : exchangeRate;
-      return sum.plus(amount.multipliedBy(rate || 0));
+      const price = asset.price || 0;
+      return sum.plus(amount.multipliedBy(price));
     }, new BigNumber(0));
-  }, [networkWalletAssets, exchangeRate, balanceDisplayUnit?.denom]);
+  }, [networkWalletAssets]);
+
+  const totalTokenAmount = useMemo(() => {
+    return networkWalletAssets.reduce((sum, asset) => {
+      return sum.plus(new BigNumber(asset.amount || '0'));
+    }, new BigNumber(0));
+  }, [networkWalletAssets]);
 
   if (currentStep === 0) {
     title = 'Total Available Balance';
-    primaryText = formatBalanceDisplay(totalMLD.toFixed(currentExponent), symbol);
+    primaryText = formatValueWithFallback(totalValue, totalTokenAmount, symbol);
+    // Update the staking rewards calculation in BalanceCard.tsx
   } else if (currentStep === 1) {
     title = 'Total Staking Rewards';
 
-    const totalStakedRewards = validatorData.reduce((sum, item) => {
-      const rewardSum = item.rewards?.reduce(
-        (accum, reward) => accum + parseFloat(reward.amount || '0'),
-        0,
-      );
-      return sum + (rewardSum || 0);
-    }, 0);
+    // Calculate both token amount and USD value for rewards
+    const { totalRewardsTokenAmount, totalRewardsValue } = validatorData.reduce(
+      (acc, validator) => {
+        validator.rewards?.forEach(reward => {
+          const rewardAmount = new BigNumber(reward.amount || '0');
+          if (rewardAmount.isZero()) return;
 
-    primaryText = formatBalanceDisplay(
-      convertToGreaterUnit(totalStakedRewards, 6).toFixed(6),
-      symbol,
+          // Find the asset to get price and decimals
+          const asset = networkWalletAssets.find(a => a.denom === reward.denom);
+          const decimals = asset?.exponent || 6;
+          const price = asset?.price || 0;
+
+          // Convert reward amount to human-readable format
+          const humanReadableAmount = rewardAmount.dividedBy(10 ** decimals);
+
+          acc.totalRewardsTokenAmount = acc.totalRewardsTokenAmount.plus(humanReadableAmount);
+          acc.totalRewardsValue = acc.totalRewardsValue.plus(
+            humanReadableAmount.multipliedBy(price),
+          );
+        });
+        return acc;
+      },
+      { totalRewardsTokenAmount: new BigNumber(0), totalRewardsValue: new BigNumber(0) },
     );
 
+    primaryText = formatValueWithFallback(totalRewardsValue, totalRewardsTokenAmount, symbol, val =>
+      formatUSD(val),
+    );
+
+    // Calculate staked balance (secondary text)
     const totalStakedMLD = validatorData
       .filter(item => item.balance?.denom === balanceDisplayUnit?.denom)
       .reduce((sum, item) => sum + parseFloat(item.balance?.amount || '0'), 0);
 
-    secondaryText = formatBalanceDisplay(
-      convertToGreaterUnit(totalStakedMLD, currentExponent).toFixed(currentExponent),
+    // Find the primary asset to get its price
+    const primaryAsset = networkWalletAssets.find(a => a.denom === balanceDisplayUnit?.denom);
+    const stakedValue = new BigNumber(totalStakedMLD).multipliedBy(primaryAsset?.price || 0);
+
+    secondaryText = formatValueWithFallback(
+      stakedValue,
+      convertToGreaterUnit(totalStakedMLD, currentExponent),
       symbol,
+      val => `Balance: ${formatUSD(val)}`,
     );
   }
 
@@ -205,7 +236,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
               </div>
             </div>
 
-            {isInitialDataLoad || (currentStep === 0 && isExchangeRateLoading) ? (
+            {isInitialDataLoad || (currentStep === 0 && isFetchingWallet) ? (
               <Loader scaledHeight />
             ) : (
               <>

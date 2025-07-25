@@ -355,6 +355,8 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       isFeeToken: feeTokens.has(base),
       networkName,
       networkID,
+      coinGeckoId: asset.coingecko_id || undefined,
+      price: 0,
     };
   }
 

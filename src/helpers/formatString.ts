@@ -1,3 +1,5 @@
+import BigNumber from 'bignumber.js';
+
 export const safeTrimLowerCase = (str: string | undefined): string => {
   return (str || '').trim().toLowerCase();
 };
@@ -65,4 +67,36 @@ export const formatLowBalanceDisplay = (number: string, symbol: string): string 
   }
 
   return formatBalanceDisplay(number, symbol);
+};
+
+export const formatUSD = (value: string | number): string => {
+  // Convert to number if it's a string
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+
+  // Handle invalid numbers
+  if (isNaN(num)) return '$0.00';
+
+  // Format with USD standards:
+  // - Dollar sign prefix
+  // - Commas as thousand separators
+  // - Exactly 2 decimal places
+  // - Negative numbers in parentheses (optional)
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num);
+};
+
+export const formatValueWithFallback = (
+  value: BigNumber | number | string,
+  fallbackValue: BigNumber | number | string,
+  symbol: string,
+  formatFn: (val: string) => string = formatUSD,
+): string => {
+  const numValue = new BigNumber(value.toString());
+  return numValue.isZero()
+    ? formatBalanceDisplay(new BigNumber(fallbackValue.toString()).toFixed(), symbol)
+    : formatFn(numValue.toString());
 };

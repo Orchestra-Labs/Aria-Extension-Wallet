@@ -27,6 +27,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: SYMPHONY_MAINNET_ID,
+    price: 0,
   },
   ukhd: {
     denom: 'uhkd',
@@ -39,6 +40,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: SYMPHONY_MAINNET_ID,
+    price: 0,
   },
   uvnd: {
     denom: 'uaux',
@@ -51,6 +53,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     exponent: GREATER_EXPONENT_DEFAULT,
     networkName: 'Symphony Testnet',
     networkID: SYMPHONY_MAINNET_ID,
+    price: 0,
   },
   [DEFAULT_DENOM]: {
     denom: DEFAULT_DENOM,
@@ -64,6 +67,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     isFeeToken: true,
     networkName: 'Symphony Testnet',
     networkID: SYMPHONY_MAINNET_ID,
+    price: 0,
   },
 };
 
@@ -80,6 +84,7 @@ export const SYMPHONY_TESTNET_ASSET_REGISTRY: AssetRegistry = {
     isFeeToken: true,
     networkName: 'Symphony Testnet',
     networkID: SYMPHONY_TESTNET_ID,
+    price: 0,
   },
 };
 
@@ -211,6 +216,7 @@ export const DEFAULT_MAINNET_REGISTRY: LocalChainRegistry = {
         isFeeToken: true,
         networkName: 'Stargaze',
         networkID: 'stargaze-1',
+        price: 0,
       },
     },
   },
@@ -278,6 +284,7 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
         logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.png',
         networkName: 'Osmosis Testnet',
         networkID: 'osmo-test-5',
+        price: 0,
       },
     },
   },
@@ -322,6 +329,7 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
         isFeeToken: true,
         networkName: 'Stargaze Testnet',
         networkID: 'elgafar-1',
+        price: 0,
       },
     },
   },
