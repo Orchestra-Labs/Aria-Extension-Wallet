@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { EyeOpen, EyeClose } from '@/assets/icons';
 import { InputStatus, ROUTES } from '@/constants';
 import { Button, Input } from '@/ui-kit';
-import { tryAuthorizeAccess } from '@/helpers';
+import {
+  tryAuthorizeAccess,
+  clearLoginAttempts,
+  isLoginAllowed,
+  getRemainingWaitTime,
+  recordFailedLoginAttempt,
+} from '@/helpers';
 import { useSetAtom } from 'jotai';
 import { isLoggedInAtom } from '@/atoms';
 
@@ -16,6 +22,8 @@ export const Login: React.FC = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState<InputStatus>(InputStatus.NEUTRAL);
   const [passwordMessage, setPasswordMessage] = useState<string>('');
+  const [isLoginDisabled, setIsLoginDisabled] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(0);
 
   // Reset status on typing
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,27 +49,94 @@ export const Login: React.FC = () => {
     }
   };
 
+  // In your handleUnlock function, modify the else block:
   const handleUnlock = async () => {
+    if (isLoginDisabled) return;
+
     const authStatus = await tryAuthorizeAccess(password);
 
     if (authStatus === 'success') {
+      clearLoginAttempts();
       setIsLoggedIn(true);
       navigate(ROUTES.APP.ROOT);
-    } else if (authStatus === 'no_wallet') {
-      setPasswordStatus(InputStatus.ERROR);
-      setPasswordMessage('No wallet found.  Make or import a new one.');
     } else {
-      setPasswordStatus(InputStatus.ERROR);
-      setPasswordMessage('Incorrect password.');
+      // Record the failed attempt
+      recordFailedLoginAttempt();
+
+      const waitTime = getRemainingWaitTime();
+      setRemainingTime(waitTime);
+      setIsLoginDisabled(true);
+
+      if (authStatus === 'no_wallet') {
+        setPasswordStatus(InputStatus.ERROR);
+        setPasswordMessage('No wallet found. Make or import a new one.');
+      } else {
+        setPasswordStatus(InputStatus.ERROR);
+        setPasswordMessage('Incorrect password.');
+      }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isLoginDisabled) {
       e.preventDefault();
       handleUnlock();
     }
   };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    if (remainingTime > 0) {
+      intervalId = setInterval(() => {
+        setRemainingTime(prevTime => {
+          const newTime = prevTime - 1000;
+
+          if (newTime <= 0) {
+            clearInterval(intervalId);
+            setIsLoginDisabled(false);
+            setPasswordStatus(InputStatus.NEUTRAL);
+            setPasswordMessage('');
+            return 0;
+          }
+
+          return newTime;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [remainingTime]);
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    if (passwordStatus === InputStatus.ERROR) {
+      timeoutId = setTimeout(() => {
+        setPasswordStatus(InputStatus.NEUTRAL);
+        setPasswordMessage('');
+      }, 5000);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [passwordStatus]);
+
+  // Check login attempts on component mount
+  useEffect(() => {
+    const checkLoginAttempts = () => {
+      if (!isLoginAllowed()) {
+        const waitTime = getRemainingWaitTime();
+        setIsLoginDisabled(true);
+        setRemainingTime(waitTime);
+      }
+    };
+
+    checkLoginAttempts();
+  }, []);
 
   return (
     <div className="mt-6 h-full">
@@ -81,16 +156,17 @@ export const Login: React.FC = () => {
             type={passwordVisible ? 'text' : 'password'}
             value={password}
             onChange={handlePasswordChange}
-            onKeyDown={e => handleKeyDown(e)}
+            onKeyDown={handleKeyDown}
             onPaste={handlePasswordPaste}
             icon={passwordVisible ? <EyeOpen width={20} /> : <EyeClose width={20} />}
             iconRole="button"
             onIconClick={() => setPasswordVisible(!passwordVisible)}
+            disabled={isLoginDisabled}
           />
         </form>
         <div className="flex flex-col gap-y-4 w-full justify-between gap-x-5 pb-2">
-          <Button className="w-full text-black" onClick={handleUnlock}>
-            Unlock
+          <Button className="w-full text-black" onClick={handleUnlock} disabled={isLoginDisabled}>
+            {isLoginDisabled ? `Wait ${Math.ceil(remainingTime / 1000)}s...` : 'Unlock'}
           </Button>
           <div>
             <span className="text-base text-white mr-1">Don't have a wallet yet?</span>

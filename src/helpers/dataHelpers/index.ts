@@ -4,6 +4,7 @@ export * from './chainRegistry';
 export * from './crypto';
 export * from './ibcChannels';
 export * from './localStorage';
+export * from './loginAttempts';
 export * from './password';
 export * from './prefixes';
 export * from './session';
