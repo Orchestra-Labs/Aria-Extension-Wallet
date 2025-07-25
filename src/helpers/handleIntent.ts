@@ -5,7 +5,12 @@ import {
   stakeToValidator,
 } from '@/helpers/stakingTransactions';
 import { Intent, CombinedStakingInfo, Asset } from '@/types';
-import { GREATER_EXPONENT_DEFAULT } from '@/constants';
+import {
+  DEFAULT_FEE_TOKEN,
+  GREATER_EXPONENT_DEFAULT,
+  LOCAL_CHAIN_REGISTRY,
+  SYMPHONY_MAINNET_ID,
+} from '@/constants';
 
 type ValidatorTarget =
   | string
@@ -64,6 +69,10 @@ export const handleIntent = async (
   console.log('[handleIntent] Wallet asset found:', walletAsset);
   console.log('[handleIntent] Available balance:', available);
 
+  // TODO: get chain information dynamically.  pass in registry, check validator lists for matches, etc
+  const chain = LOCAL_CHAIN_REGISTRY.mainnet[SYMPHONY_MAINNET_ID];
+  const feeToken = DEFAULT_FEE_TOKEN;
+
   const resolveValidator = (input: ValidatorTarget): CombinedStakingInfo | undefined => {
     if (typeof input === 'object') {
       return (
@@ -99,13 +108,13 @@ export const handleIntent = async (
       );
 
       const ops = targets.map(v => v.validator.operator_address);
-      const fee = await simulateFee(() => claimRewards(address, ops, true));
+      const fee = await simulateFee(() => claimRewards(address, ops, chain, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claim fee');
         return;
       }
 
-      return await claimRewards(address, ops);
+      return await claimRewards(address, ops, chain);
     }
 
     case 'claimAndRestake': {
@@ -118,13 +127,13 @@ export const handleIntent = async (
         rewards: v.rewards,
       }));
 
-      const fee = await simulateFee(() => claimAndRestake(targets, rewards, true));
+      const fee = await simulateFee(() => claimAndRestake(chain, targets, rewards, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claimAndRestake fee');
         return;
       }
 
-      return await claimAndRestake(targets, rewards);
+      return await claimAndRestake(chain, targets, rewards);
     }
 
     case 'unstake': {
@@ -136,14 +145,25 @@ export const handleIntent = async (
         }));
 
       const fee = await simulateFee(() =>
-        claimAndUnstake({ delegations: targets, amount: amount?.toString(), simulateOnly: true }),
+        claimAndUnstake({
+          chain,
+          delegations: targets,
+          amount: amount?.toString(),
+          feeToken,
+          simulateOnly: true,
+        }),
       );
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for unstake fee');
         return;
       }
 
-      return await claimAndUnstake({ delegations: targets, amount: amount?.toString() });
+      return await claimAndUnstake({
+        chain,
+        delegations: targets,
+        amount: amount?.toString(),
+        feeToken,
+      });
     }
 
     case 'stake': {
@@ -159,7 +179,15 @@ export const handleIntent = async (
       }
 
       const fee = await simulateFee(() =>
-        stakeToValidator('1', resolvedDenom, address, validator.validator.operator_address, true),
+        stakeToValidator(
+          '1',
+          resolvedDenom,
+          address,
+          validator.validator.operator_address,
+          chain,
+          feeToken,
+          true,
+        ),
       );
       if (fee === null || fee >= available) {
         console.error('[handleIntent] Insufficient balance for stake fee');
@@ -198,6 +226,8 @@ export const handleIntent = async (
         resolvedDenom,
         address,
         validator.validator.operator_address,
+        chain,
+        feeToken,
       );
 
       return {

@@ -1,13 +1,11 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-import { walletAddressAtom } from '@/atoms';
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { isLoggedInAtom } from '@/atoms/isLoggedInAtom';
 import { ScreenLoader } from '@/components';
-import { getAddress, getSessionToken, userCanLogIn } from '@/helpers';
+import { getSessionToken, userCanLogIn } from '@/helpers';
 import { getAccountByID } from '@/helpers/dataHelpers/account';
-import { useRefreshData } from '@/hooks';
 
 interface AuthContextType {
   canLogIn: boolean;
@@ -25,26 +23,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // TODO: expire after given timeframe away from wallet (unless remember me is enabled)
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const canLogIn = userCanLogIn();
-  const { refreshData } = useRefreshData();
 
   const isLoggedIn = useAtomValue(isLoggedInAtom);
-  const setWalletAddress = useSetAtom(walletAddressAtom);
   const setUserAccount = useSetAtom(userAccountAtom);
 
   const [loading, setLoading] = useState(true);
 
   const initializeWallet = async () => {
     if (!isLoggedIn) return;
+
     const sessionToken = getSessionToken();
-    if (!sessionToken?.mnemonic) {
-      return;
-    }
+    if (!sessionToken?.mnemonic) return;
 
     try {
-      const address = await getAddress(sessionToken.mnemonic);
-      setWalletAddress(address);
-      refreshData({ address });
-
       const accountData = getAccountByID(sessionToken.accountID);
       setUserAccount(accountData);
     } catch (error) {

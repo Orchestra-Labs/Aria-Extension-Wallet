@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { CHAIN_ENDPOINTS } from '@/constants';
+import { COSMOS_CHAIN_ENDPOINTS } from '@/constants';
 import { queryRestNode } from '@/helpers';
 import { Asset, CustomQueryOptions } from '@/types';
+import { useAtomValue } from 'jotai';
+import { subscribedChainRegistryAtom } from '@/atoms';
 
 type BalancesResponseDto = {
   balances: Asset[];
@@ -10,13 +12,33 @@ type BalancesResponseDto = {
 
 export type RequestParams = {
   walletAddress: string;
+  chainID: string;
 };
 
-const getBalancesRequest = async ({ walletAddress }: RequestParams) => {
+const getBalancesRequest = async ({ walletAddress, chainID }: RequestParams) => {
+  console.log('[getBalancesRequest] walletAddress:', walletAddress);
+  console.log('[getBalancesRequest] chainID:', chainID);
+
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const chain = chainRegistry.mainnet[chainID];
+  const prefix = chain.bech32_prefix;
+  const restUris = chain.rest_uris;
+
+  console.log('[getBalancesRequest] prefix:', prefix);
+  console.log('[getBalancesRequest] restUris:', restUris);
+  console.log(
+    '[getBalancesRequest] endpoint:',
+    `${COSMOS_CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
+  );
+
   // Use queryNode to try querying balances across nodes
   const response = await queryRestNode({
-    endpoint: `${CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
+    endpoint: `${COSMOS_CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
+    prefix,
+    restUris,
   });
+
+  console.log('[getBalancesRequest] response:', response);
 
   if (!response.balances) {
     // TODO: show error to user
@@ -28,7 +50,7 @@ const getBalancesRequest = async ({ walletAddress }: RequestParams) => {
 
 export function useGetBalancesQuery(params: RequestParams, options?: CustomQueryOptions) {
   return useQuery({
-    queryKey: [CHAIN_ENDPOINTS.getBalance, params],
+    queryKey: [COSMOS_CHAIN_ENDPOINTS.getBalance, params],
     queryFn: () => getBalancesRequest(params),
     ...options,
   });

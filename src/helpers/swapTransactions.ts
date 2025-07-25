@@ -1,11 +1,7 @@
-import { incrementErrorCount, performRpcQuery, selectNodeProviders } from './queryNodes';
-import { SwapObject, TransactionResult, RPCResponse, Asset } from '@/types';
-import { CHAIN_ENDPOINTS, DELAY_BETWEEN_NODE_ATTEMPTS, MAX_NODES_PER_QUERY } from '@/constants';
-import { createOfflineSignerFromMnemonic } from './dataHelpers/wallet';
-import { delay } from './timer';
-import { getValidFeeDenom } from './feeDenom';
-import { getSessionToken } from './dataHelpers';
-import { getSigningSymphonyClient, symphony } from '@orchestra-labs/symphonyjs';
+import { SwapObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
+import { COSMOS_CHAIN_ENDPOINTS, SYMPHONY_PREFIX } from '@/constants';
+import { symphony } from '@orchestra-labs/symphonyjs';
+import { queryRpcNode } from './queryNodes';
 
 const { swapSend } = symphony.market.v1beta1.MessageComposer.withTypeUrl;
 
@@ -21,75 +17,82 @@ export const isValidSwap = ({
   return result;
 };
 
-// TODO: merge in with queryNodes.  do not need separate signer if endpoint and message object are used
-const queryWithRetry = async ({
-  endpoint,
-  walletAddress,
-  messages = [],
-  feeDenom,
-  simulateOnly = false,
-}: {
-  endpoint: string;
-  walletAddress: string;
-  messages?: any[];
-  feeDenom: string;
-  simulateOnly?: boolean;
-}): Promise<any> => {
-  const providers = selectNodeProviders();
-  console.log('Selected node providers:', providers);
+// TODO: merge in with queryNodes.  add message object to query and parameter to determine which signer to use
+// const queryWithRetry = async ({
+//   endpoint,
+//   walletAddress,
+//   messages = [],
+//   feeDenom,
+//   simulateOnly = false,
+// }: {
+//   endpoint: string;
+//   walletAddress: string;
+//   messages?: any[];
+//   feeDenom: string;
+//   simulateOnly?: boolean;
+// }): Promise<any> => {
+//   const chain = LOCAL_CHAIN_REGISTRY[DEFAULT_CHAIN_ID];
+//   const providers = chain.rpc_uris;
+//   const prefix = chain.bech32_prefix;
+//   console.log('Selected node providers:', providers);
 
-  let numberAttempts = 0;
+//   let numberAttempts = 0;
 
-  while (numberAttempts < MAX_NODES_PER_QUERY) {
-    for (const provider of providers) {
-      try {
-        const queryMethod = provider.rpc;
-        console.log(`Querying node ${queryMethod} with endpoint: ${endpoint}`);
+//   while (numberAttempts < MAX_RETRIES_PER_QUERY) {
+//     for (const provider of providers) {
+//       try {
+//         const queryMethod = provider.address;
+//         console.log(`Querying node ${queryMethod} with endpoint: ${endpoint}`);
 
-        const sessionToken = getSessionToken();
-        if (!sessionToken) {
-          console.error('Error- getSessionTokenFailed');
-          return;
-        }
-        const offlineSigner = await createOfflineSignerFromMnemonic(sessionToken.mnemonic || '');
+//         const sessionToken = getSessionToken();
+//         if (!sessionToken) {
+//           console.error('Error- getSessionTokenFailed');
+//           return;
+//         }
+//         const offlineSigner = await createOfflineSignerByPrefix(
+//           sessionToken.mnemonic || '',
+//           prefix,
+//         );
 
-        const client = await getSigningSymphonyClient({
-          rpcEndpoint: queryMethod,
-          signer: offlineSigner,
-        });
+//         // TODO: is this the only part different between here and queryNodes?
+//         const client = await getSigningSymphonyClient({
+//           rpcEndpoint: queryMethod,
+//           signer: offlineSigner,
+//         });
 
-        const result = await performRpcQuery(
-          client,
-          walletAddress,
-          messages,
-          feeDenom,
-          simulateOnly,
-        );
-        return result;
-      } catch (error) {
-        incrementErrorCount(provider.rpc);
-        console.error('Error querying node:', error);
-      }
-      numberAttempts++;
+//         const result = await performRpcQuery(
+//           client,
+//           walletAddress,
+//           messages,
+//           feeDenom,
+//           simulateOnly,
+//         );
+//         return result;
+//       } catch (error) {
+//         // incrementErrorCount(provider.rpc);
+//         console.error('Error querying node:', error);
+//       }
+//       numberAttempts++;
 
-      if (numberAttempts >= MAX_NODES_PER_QUERY) {
-        break;
-      }
+//       if (numberAttempts >= MAX_RETRIES_PER_QUERY) {
+//         break;
+//       }
 
-      await delay(DELAY_BETWEEN_NODE_ATTEMPTS);
-    }
-  }
+//       await delay(DELAY_BETWEEN_NODE_ATTEMPTS);
+//     }
+//   }
 
-  throw new Error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`);
-};
+//   throw new Error(`All node query attempts failed after ${MAX_RETRIES_PER_QUERY} attempts.`);
+// };
 
 export const swapTransaction = async (
   fromAddress: string,
   swapObject: SwapObject,
+  rpcUris: Uri[],
   simulateOnly: boolean = false,
 ): Promise<TransactionResult> => {
   console.log('Attempting swap with object:', swapObject);
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
     swapSend({
@@ -104,16 +107,14 @@ export const swapTransaction = async (
   ];
 
   try {
-    const feeDenom = getValidFeeDenom(
-      swapObject.sendObject.denom,
-      swapObject.sendObject.symphonyAssets,
-    );
-    console.log('Swap fee denom:', feeDenom);
-    const response = await queryWithRetry({
+    const feeToken = swapObject.sendObject.feeToken;
+    console.log('Swap fee token:', feeToken);
+    const response = await queryRpcNode({
       endpoint,
-      walletAddress: fromAddress,
+      prefix: SYMPHONY_PREFIX,
+      rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 
@@ -152,9 +153,10 @@ export const swapTransaction = async (
 export const multiSwapTransaction = async (
   fromAddress: string,
   swapObjects: SwapObject[],
+  rpcUris: Uri[],
   simulateOnly: boolean = false,
 ): Promise<TransactionResult> => {
-  const endpoint = CHAIN_ENDPOINTS.sendMessage;
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = swapObjects.map(swapObject =>
     swapSend({
@@ -169,15 +171,13 @@ export const multiSwapTransaction = async (
   );
 
   try {
-    const feeDenom = getValidFeeDenom(
-      swapObjects[0].sendObject.denom,
-      swapObjects[0].sendObject.symphonyAssets,
-    );
-    const response = await queryWithRetry({
+    const feeToken = swapObjects[0].sendObject.feeToken;
+    const response = await queryRpcNode({
       endpoint,
-      walletAddress: fromAddress,
+      prefix: SYMPHONY_PREFIX,
+      rpcUris,
       messages,
-      feeDenom,
+      feeToken,
       simulateOnly,
     });
 

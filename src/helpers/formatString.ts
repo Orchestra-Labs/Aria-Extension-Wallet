@@ -1,3 +1,7 @@
+export const safeTrimLowerCase = (str: string | undefined): string => {
+  return (str || '').trim().toLowerCase();
+};
+
 export const removeTrailingZeroes = (num: string | number): string => {
   const numberString = String(num);
   const cleanedNumber = parseFloat(numberString).toString();
@@ -43,4 +47,22 @@ export const formatBalanceDisplay = (number: string, symbol: string): string => 
 
   const formattedAmount = formatNumberWithCommas(removeTrailingZeroes(stringToFormat));
   return `${formattedAmount} ${symbol}`;
+};
+
+export const formatLowBalanceDisplay = (number: string, symbol: string): string => {
+  const num = parseFloat(number);
+
+  console.log('Before formatting:', {
+    rawNumber: number,
+    parsedNumber: num,
+    symbol,
+  });
+
+  if (num > 0 && num < 1) {
+    return num.toFixed(4) + ' ' + symbol;
+  } else if (num < 10) {
+    return num.toFixed(2) + ' ' + symbol;
+  }
+
+  return formatBalanceDisplay(number, symbol);
 };

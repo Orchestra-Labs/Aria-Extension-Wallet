@@ -3,19 +3,40 @@ import BigNumber from 'bignumber.js';
 import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 
-import { CHAIN_ENDPOINTS, GREATER_EXPONENT_DEFAULT, LOCAL_ASSET_REGISTRY } from '@/constants';
-import { receiveStateAtom, sendStateAtom } from '@/atoms';
-import { isValidSwap, queryRestNode } from '@/helpers';
+import {
+  SYMPHONY_ENDPOINTS,
+  GREATER_EXPONENT_DEFAULT,
+  QueryType,
+  SYMPHONY_MAINNET_ASSET_REGISTRY,
+} from '@/constants';
+import {
+  subscribedChainRegistryAtom,
+  receiveStateAtom,
+  sendStateAtom,
+  networkLevelAtom,
+} from '@/atoms';
+import { getSymphonyChainId, isValidSwap, queryRestNode } from '@/helpers';
 
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+
+  // Safely get chain info with fallback to DEFAULT_CHAIN_ID
+  const symphonyChainId = getSymphonyChainId(networkLevel);
+  const getChainInfo = (chainId: string) => {
+    return chainRegistry[networkLevel][chainId] || chainRegistry[networkLevel][symphonyChainId];
+  };
+
+  const chainInfo = getChainInfo(sendState.chainID);
+  const prefix = chainInfo?.bech32_prefix || '';
+  const restUris = chainInfo?.rest_uris || [];
 
   const sendAsset = sendState.asset;
   const receiveAsset = receiveState.asset;
-
-  const sendDenom = sendState.asset?.denom || '';
-  const receiveDenom = receiveState.asset?.denom || '';
+  const sendDenom = sendState.asset.denom;
+  const receiveDenom = receiveState.asset.denom;
 
   // Check if swap is valid
   const validSwap = isValidSwap({ sendAsset, receiveAsset });
@@ -29,23 +50,34 @@ export function useExchangeRate() {
         return '1';
       }
 
+      // TODO: get exponent from the asset itself
       // Format the offer amount to the smallest unit
-      const exponent = LOCAL_ASSET_REGISTRY[sendAsset]?.exponent || GREATER_EXPONENT_DEFAULT;
+      const exponent = SYMPHONY_MAINNET_ASSET_REGISTRY[sendAsset].exponent;
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
+
+      if (!restUris.length) {
+        throw new Error(`No REST endpoints available for chain ${sendState.chainID}`);
+      }
 
       // Use queryRestNode to query exchange rates
       const response = await queryRestNode({
-        endpoint: `${CHAIN_ENDPOINTS.swap}offerCoin=${formattedOfferAmount}${sendAsset}&askDenom=${receiveAsset}`,
-        queryType: 'GET',
+        endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=${formattedOfferAmount}${sendAsset}&askDenom=${receiveAsset}`,
+        queryType: QueryType.GET,
+        prefix,
+        restUris,
       });
 
-      const returnExchange = (response.return_coin?.amount / Math.pow(10, exponent)).toFixed(
+      if (!response?.return_coin?.amount) {
+        throw new Error('Invalid response from swap endpoint');
+      }
+
+      const returnExchange = (response.return_coin.amount / Math.pow(10, exponent)).toFixed(
         GREATER_EXPONENT_DEFAULT,
       );
 
       return returnExchange;
     },
-    enabled: validSwap && !!sendDenom && !!receiveDenom,
+    enabled: validSwap && !!sendDenom && !!receiveDenom && !!chainInfo,
     staleTime: 30000, // Consider the data stale after 30 seconds
     refetchInterval: 60000, // Refetch every 60 seconds
   });

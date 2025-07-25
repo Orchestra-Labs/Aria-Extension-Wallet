@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
-import { LogoIcon } from '@/assets/icons';
+import { IconContainer, LogoIcon } from '@/assets/icons';
 import { Asset } from '@/types';
 import { SortDialog } from '../SortDialog';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -9,10 +8,15 @@ import {
   assetDialogSortOrderAtom,
   assetDialogSortTypeAtom,
   dialogSearchTermAtom,
+  filteredDialogAssetsAtom,
+  filteredReceiveAssetsAtom,
+  isFetchingRegistryDataAtom,
   receiveStateAtom,
   sendStateAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
+import { AssetScroller } from '../AssetScroller';
+import { AssetSortType, SearchType, SortOrder, SYMPHONY_MAINNET_ASSET_REGISTRY } from '@/constants';
 
 interface AssetSelectDialogProps {
   isReceiveDialog?: boolean;
@@ -25,46 +29,60 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
 }) => {
   const slideTrayRef = useRef<{ closeWithAnimation: () => void }>(null);
 
+  const currentStateAtomSource = isReceiveDialog ? receiveStateAtom : sendStateAtom;
+  const filteredAssetsAtomSource = isReceiveDialog
+    ? filteredReceiveAssetsAtom
+    : filteredDialogAssetsAtom;
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(assetDialogSortOrderAtom);
   const setSortType = useSetAtom(assetDialogSortTypeAtom);
-  const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
+  const currentState = useAtomValue(currentStateAtomSource);
+  const filteredAssets = useAtomValue(filteredAssetsAtomSource);
+  const isFetchingRegistry = useAtomValue(isFetchingRegistryDataAtom);
 
   const [dialogSelectedAsset, setDialogSelectedAsset] = useState(currentState.asset);
 
+  const searchType = SearchType.ASSET;
+
+  const alt = dialogSelectedAsset.symbol || 'Unknown Asset';
+  const logo = dialogSelectedAsset.logo || SYMPHONY_MAINNET_ASSET_REGISTRY.note.logo;
+  const icon = (
+    <LogoIcon
+      className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
+      width={20}
+    />
+  );
+  const triggerComponent = logo ? (
+    <IconContainer
+      src={logo}
+      alt={alt}
+      className="h-7 w-7 hover:bg-blue-hover hover:text-blue-dark hover:border hover:border-solid hover:border-blue-hover cursor-pointer"
+    />
+  ) : (
+    <IconContainer icon={icon} alt={alt} className="h-7 w-7" />
+  );
+
   const resetDefaults = () => {
     setSearchTerm('');
-    setSortOrder('Desc');
-    setSortType('name');
+    setSortOrder(SortOrder.DESC);
+    setSortType(AssetSortType.NAME);
+  };
+
+  const handleAssetSelection = (asset: Asset) => {
+    console.log('[AssetSelectDialog] Selected asset:', asset);
+    console.log('[AssetSelectDialog] Current asset:', currentState.asset);
+    onClick(asset);
+    slideTrayRef.current?.closeWithAnimation();
   };
 
   useEffect(() => {
     setDialogSelectedAsset(currentState.asset);
   }, [currentState.asset]);
 
-  const handleAssetSelection = (asset: Asset) => {
-    onClick(asset);
-    slideTrayRef.current?.closeWithAnimation();
-  };
-
   return (
     <SlideTray
       ref={slideTrayRef}
-      triggerComponent={
-        dialogSelectedAsset.logo ? (
-          <img
-            src={dialogSelectedAsset.logo}
-            alt={dialogSelectedAsset.symbol || 'Unknown Asset'}
-            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
-            width={20}
-          />
-        ) : (
-          <LogoIcon
-            className="h-7 w-7 text-neutral-1 hover:bg-blue-hover hover:text-blue-dark cursor-pointer"
-            width={20}
-          />
-        )
-      }
+      triggerComponent={triggerComponent}
       title={isReceiveDialog ? 'Receive' : 'Send'}
       onClose={resetDefaults}
       showBottomBorder
@@ -76,19 +94,34 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
             Selected: <span className="text-blue">{dialogSelectedAsset.symbol || 'None'}</span>
           </div>
           <div className="flex justify-end w-[5rem]">
-            <SortDialog isDialog />
+            <SortDialog
+              searchType={searchType}
+              exclude={isReceiveDialog ? [AssetSortType.AMOUNT] : undefined}
+              isDialog
+            />
           </div>
         </div>
 
-        <TileScroller
-          activeIndex={0}
-          isSelectable={true}
-          onSelectAsset={handleAssetSelection}
-          isDialog={true}
-          isReceiveDialog={isReceiveDialog}
-        />
+        {isFetchingRegistry ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-base text-neutral-1">Loading assets...</p>
+          </div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-base text-neutral-1">No assets found</p>
+          </div>
+        ) : (
+          <AssetScroller
+            assets={filteredAssets}
+            onClick={handleAssetSelection}
+            isSelectable
+            isReceiveDialog={isReceiveDialog}
+            // NOTE: lazyload is breaking here.  don't know why
+            lazyLoad={false}
+          />
+        )}
 
-        <SearchBar isDialog />
+        <SearchBar searchType={searchType} isDialog />
       </div>
     </SlideTray>
   );

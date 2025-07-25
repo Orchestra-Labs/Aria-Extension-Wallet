@@ -1,14 +1,25 @@
-import { useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import React, { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { LogoIcon } from '@/assets/icons';
-import { userWalletAtom } from '@/atoms';
 import { OptionsDialog } from '@/components';
-import { ROUTES } from '@/constants';
+import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
+import { networkLevelAtom, sessionWalletAtom, userAccountAtom } from '@/atoms';
+import { Button } from '@/ui-kit';
 
 const MainLayout: React.FC = () => {
-  const userWallet = useAtomValue(userWalletAtom);
+  const [networkLevel, setNetworkLevel] = useAtom(networkLevelAtom);
+  const userWallet = useAtomValue(sessionWalletAtom);
+  const userAccount = useAtomValue(userAccountAtom);
+
+  const toggleNetworkLevel = () => {
+    setNetworkLevel(prev =>
+      prev === NetworkLevel.MAINNET ? NetworkLevel.TESTNET : NetworkLevel.MAINNET,
+    );
+  };
+
+  const showTestnetButton = userAccount?.settings[SettingsOption.TESTNET_ACCESS] ?? false;
 
   return (
     <div className="max-w-full bg-background-dark-grey flex flex-col w-[420px] h-[600px]">
@@ -36,6 +47,17 @@ const MainLayout: React.FC = () => {
             <History width="100%" height="100%" />
           </NavLink>
         </Button> */}
+          {showTestnetButton && (
+            <Button
+              variant={networkLevel === NetworkLevel.MAINNET ? 'default' : 'secondary'}
+              size="medium"
+              onClick={toggleNetworkLevel}
+              className="px-3 py-1 rounded-md font-medium"
+            >
+              {networkLevel === NetworkLevel.MAINNET ? 'Mainnet' : 'Testnet'}
+            </Button>
+          )}
+
           <OptionsDialog />
         </div>
       </header>

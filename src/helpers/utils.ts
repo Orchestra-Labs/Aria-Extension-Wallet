@@ -1,9 +1,16 @@
-import { TransactionState } from '@/types';
+import { Asset, SimplifiedChainInfo, TransactionState } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
 import { isValidSend } from './sendTransactions';
-import { TextFieldStatus } from '@/constants';
+import {
+  DEFAULT_MAINNET_ASSET,
+  DEFAULT_TESTNET_ASSET,
+  NetworkLevel,
+  SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
+  TextFieldStatus,
+} from '@/constants';
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs, { strict: false }));
@@ -55,11 +62,6 @@ export const isValidTransaction = async ({
   sendState: TransactionState;
   receiveState: TransactionState;
 }) => {
-  if (sendState.networkLevel !== receiveState.networkLevel) {
-    console.warn('[isValidTransaction] Network levels do not match');
-    return false;
-  }
-
   if (!(sendAddress && recipientAddress)) {
     return false;
   }
@@ -87,3 +89,52 @@ export const calculateRemainingTime = (completionTime: string): string => {
 
   return `${days}d ${hours}h ${minutes}m`;
 };
+
+export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => {
+  if (!chain?.assets) {
+    console.warn('[Utils] No assets found for chain:', chain?.chain_id);
+    return null;
+  }
+
+  // First try to find an asset that matches the first fee token denom
+  const chainFeeList = chain.fees || [];
+  if (chainFeeList.length > 0) {
+    const primaryFeeDenom = chainFeeList[0].denom;
+    const matchingAsset = Object.values(chain.assets).find(
+      asset => asset.denom === primaryFeeDenom,
+    );
+
+    if (matchingAsset) {
+      console.log(`[Utils] Found fee token for chain ${chain.chain_id}:`, primaryFeeDenom);
+      return matchingAsset;
+    }
+  }
+
+  // Then try to find an asset marked as isFeeToken
+  const feeTokenAsset = Object.values(chain.assets).find(asset => asset.isFeeToken);
+  if (feeTokenAsset) {
+    console.log(`[Utils] Found isFeeToken asset for chain ${chain.chain_id}:`, feeTokenAsset.denom);
+    return feeTokenAsset;
+  }
+
+  // Fallback to the first asset if no fee token is found
+  const firstAsset = Object.values(chain.assets)[0];
+  if (firstAsset) {
+    console.log(
+      `[Utils] Using first asset as fallback for chain ${chain.chain_id}:`,
+      firstAsset.denom,
+    );
+    return firstAsset;
+  }
+
+  console.warn(`[Utils] No suitable fee token found for chain ${chain.chain_id}`);
+  return null;
+};
+
+export function getSymphonyChainId(networkLevel: NetworkLevel): string {
+  return networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
+}
+
+export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
+  return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
+}

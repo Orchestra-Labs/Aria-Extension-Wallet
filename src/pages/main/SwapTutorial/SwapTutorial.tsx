@@ -6,9 +6,8 @@ import selectPageImage from '@/assets/images/receive_asset_tile.png';
 import sendImage from '@/assets/images/swap_enabled.png';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants';
-import { useAtom, useAtomValue } from 'jotai';
-import { isInitialDataLoadAtom } from '@/atoms';
-import { userAccountAtom } from '@/atoms/accountAtom';
+import { useAtom } from 'jotai';
+import { userAccountAtom } from '@/atoms';
 import { saveAccountByID } from '@/helpers';
 
 const PAGE_TITLE = 'Swap Tutorial';
@@ -45,8 +44,10 @@ export const SwapTutorial = () => {
 
   const [activeScreen, setActiveScreen] = useState(0);
 
-  const isInitialDataLoad = useAtomValue(isInitialDataLoadAtom);
   const [userAccount, setUserAccount] = useAtom(userAccountAtom);
+
+  console.log('[SwapTutorial] userAccount:', userAccount);
+  console.log('[SwapTutorial] isLastStep:', activeScreen === STEPS.length - 1);
 
   const nextStep = () => setActiveScreen(current => Math.min(current + 1, STEPS.length - 1));
   const prevStep = () => setActiveScreen(current => Math.max(current - 1, 0));
@@ -55,6 +56,8 @@ export const SwapTutorial = () => {
   const isLastStep = activeScreen === STEPS.length - 1;
 
   const confirmHasViewedTutorial = () => {
+    console.log('[SwapTutorial] confirmHasViewedTutorial - userAccount:', userAccount); // Additional debug log
+
     if (userAccount) {
       const updatedUserAccount = {
         ...userAccount,
@@ -64,17 +67,18 @@ export const SwapTutorial = () => {
         },
       };
 
-      console.log('updated user account', updatedUserAccount);
+      console.log('[SwapTutorial] updated user account', updatedUserAccount);
 
       // Update state and save to local storage
       setUserAccount(updatedUserAccount);
       saveAccountByID(updatedUserAccount);
     } else {
-      console.warn('userAccount is undefined');
+      console.warn('[SwapTutorial] userAccount is undefined');
     }
   };
 
   const closeAndReturn = () => {
+    console.log('[SwapTutorial] closeAndReturn called'); // Debug log
     confirmHasViewedTutorial();
     navigate(ROUTES.APP.ROOT);
   };
@@ -125,7 +129,7 @@ export const SwapTutorial = () => {
               <Button
                 className="w-full"
                 onClick={isLastStep ? closeAndReturn : nextStep}
-                disabled={isLastStep && isInitialDataLoad}
+                disabled={isLastStep && !userAccount}
               >
                 {isLastStep ? 'Done' : 'Next'}
               </Button>

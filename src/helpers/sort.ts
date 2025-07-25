@@ -1,51 +1,115 @@
-import { Asset, CombinedStakingInfo } from '@/types';
-import { stripNonAlphanumerics } from './formatString';
-import { BondStatus, ValidatorSortType, ValidatorStatusFilter } from '@/constants';
+import { Asset, CombinedStakingInfo, SimplifiedChainInfo } from '@/types';
+import { safeTrimLowerCase, stripNonAlphanumerics } from './formatString';
+import {
+  AssetSortType,
+  BondStatus,
+  SortOrder,
+  SYMPHONY_MAINNET_ID,
+  SYMPHONY_TESTNET_ID,
+  ValidatorSortType,
+  ValidatorStatusFilter,
+} from '@/constants';
+
+function isPriorityCoin(asset: Asset): boolean {
+  // Check if this is a fee token for its chain
+  const isPriorityCoin = asset.isFeeToken || false;
+  return isPriorityCoin;
+}
+
+function getSortValue(asset: Asset, sortType: AssetSortType): string {
+  switch (sortType) {
+    case AssetSortType.NAME:
+      return safeTrimLowerCase(asset.name);
+    case AssetSortType.AMOUNT:
+      return asset.amount;
+    default:
+      return safeTrimLowerCase(asset.name);
+  }
+}
+
+function sortAssets(
+  assets: Asset[],
+  searchTerm: string,
+  sortType: AssetSortType,
+  sortOrder: SortOrder,
+): Asset[] {
+  const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
+
+  return assets.sort((a, b) => {
+    const valueA = getSortValue(a, sortType);
+    const valueB = getSortValue(b, sortType);
+
+    if (sortType === AssetSortType.NAME && lowercasedSearchTerm) {
+      const aFields = [a.name, a.networkName, a.networkID].map(f => safeTrimLowerCase(f));
+      const bFields = [b.name, b.networkName, b.networkID].map(f => safeTrimLowerCase(f));
+
+      const aMatches = aFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
+      const bMatches = bFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
+
+      const aTotalMatches = aMatches.reduce((sum, m) => sum + m, 0 as number);
+      const bTotalMatches = bMatches.reduce((sum, m) => sum + m, 0 as number);
+
+      // First sort by total number of matches (descending)
+      if (aTotalMatches !== bTotalMatches) {
+        return bTotalMatches - aTotalMatches;
+      }
+
+      // Then sort by individual field matches in order: name, networkName, networkID
+      for (let i = 0; i < aMatches.length; i++) {
+        if (aMatches[i] !== bMatches[i]) {
+          return bMatches[i] - aMatches[i];
+        }
+      }
+
+      // If still tied, prioritize priority assets
+      const aIsPriority = isPriorityCoin(a);
+      const bIsPriority = isPriorityCoin(b);
+      if (aIsPriority !== bIsPriority) {
+        return aIsPriority ? -1 : 1;
+      }
+
+      // If still tied, prioritize Symphony assets
+      const aIsSymphony =
+        a.networkID === SYMPHONY_MAINNET_ID || a.networkID === SYMPHONY_TESTNET_ID;
+      const bIsSymphony =
+        b.networkID === SYMPHONY_MAINNET_ID || b.networkID === SYMPHONY_TESTNET_ID;
+      if (aIsSymphony !== bIsSymphony) {
+        return aIsSymphony ? -1 : 1;
+      }
+    }
+
+    return sortOrder === SortOrder.ASC
+      ? valueA.localeCompare(valueB)
+      : valueB.localeCompare(valueA);
+  });
+}
 
 export function filterAndSortAssets(
   assets: Asset[],
   searchTerm: string,
-  sortType: 'name' | 'amount',
-  sortOrder: 'Asc' | 'Desc',
+  sortType: AssetSortType,
+  sortOrder: SortOrder,
   showAllAssets: boolean = true,
-): typeof assets {
-  const lowercasedSearchTerm = searchTerm.toLowerCase();
+): Asset[] {
+  const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
 
-  // Filter assets based on search term
-  const filteredAssets = assets.filter(
-    asset =>
-      asset.denom.toLowerCase().includes(lowercasedSearchTerm) ||
-      asset.symbol?.toLowerCase().includes(lowercasedSearchTerm),
-  );
-
-  // Filter for non-zero values if required
-  const finalAssets = showAllAssets
-    ? filteredAssets
-    : filteredAssets.filter(asset => parseFloat(asset.amount) > 0);
-
-  // Sort the assets based on type and order
-  return finalAssets.sort((a, b) => {
-    let valueA: string | number;
-    let valueB: string | number;
-
-    if (sortType === 'name') {
-      valueA = stripNonAlphanumerics(a.symbol?.toLowerCase() || a.denom.toLowerCase());
-      valueB = stripNonAlphanumerics(b.symbol?.toLowerCase() || b.denom.toLowerCase());
-
-      return sortOrder === 'Asc'
-        ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-        : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
-    } else {
-      valueA = parseFloat(a.amount);
-      valueB = parseFloat(b.amount);
+  // First filter the assets
+  const filteredAssets = assets.filter(asset => {
+    if (!showAllAssets && parseFloat(asset.amount) <= 0) return false;
+    if (lowercasedSearchTerm) {
+      return (
+        safeTrimLowerCase(asset.name).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(asset.symbol).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(asset.denom).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(asset.networkName).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(asset.networkID).includes(lowercasedSearchTerm)
+      );
     }
-
-    if (sortOrder === 'Asc') {
-      return valueA > valueB ? 1 : -1;
-    } else {
-      return valueA < valueB ? 1 : -1;
-    }
+    return true;
   });
+
+  // Then sort all assets together according to the specified rules
+  return sortAssets(filteredAssets, searchTerm, sortType, sortOrder);
 }
 
 const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStatusFilter) => {
@@ -59,10 +123,30 @@ const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStat
 };
 
 const hasUserActivity = (validator: CombinedStakingInfo) => {
+  console.log('[Sort Validators] Checking validator activity:', {
+    validatorAddress: validator.validator.operator_address,
+    moniker: validator.validator.description.moniker,
+    balanceAmount: validator.balance.amount,
+    unbondingBalance: validator.unbondingBalance?.balance || '0',
+  });
+
   const isDelegatedTo = parseFloat(validator.balance.amount) > 0;
+  console.log('[Sort Validators] isDelegatedTo:', isDelegatedTo, {
+    amount: validator.balance.amount,
+    parsedAmount: parseFloat(validator.balance.amount),
+  });
+
   const isUnbondingFrom =
     validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
+  console.log('[Sort Validators] isUnbondingFrom:', isUnbondingFrom, {
+    unbondingBalance: validator.unbondingBalance?.balance || '0',
+    parsedUnbondingBalance: validator.unbondingBalance
+      ? parseFloat(validator.unbondingBalance.balance)
+      : 0,
+  });
+
   const userEngaged = isDelegatedTo || isUnbondingFrom;
+  console.log('[Sort Validators] Final userEngaged result:', userEngaged);
 
   return userEngaged;
 };
@@ -71,40 +155,52 @@ export function filterAndSortValidators(
   validators: CombinedStakingInfo[],
   searchTerm: string,
   sortType: ValidatorSortType,
-  sortOrder: 'Asc' | 'Desc',
+  sortOrder: SortOrder,
   showCurrentValidators: boolean,
   statusFilter: ValidatorStatusFilter,
 ): typeof validators {
-  const lowercasedSearchTerm = searchTerm.toLowerCase();
+  const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
+  console.log('[filterAndSortValidators] searchTerm:', lowercasedSearchTerm);
+  console.log('[filterAndSortValidators] sortType:', sortType);
+  console.log('[filterAndSortValidators] sortOrder:', sortOrder);
+  console.log('[filterAndSortValidators] showCurrentValidators:', showCurrentValidators);
+  console.log('[filterAndSortValidators] statusFilter:', statusFilter);
+  console.log('[filterAndSortValidators] initial count:', validators.length);
 
   const filteredByStatus = validators.filter(validator => {
-    const shouldIncludeValidator =
-      statusMatch(validator, statusFilter) || hasUserActivity(validator);
-
-    return shouldIncludeValidator;
+    const match = statusMatch(validator, statusFilter);
+    const hasActivity = hasUserActivity(validator);
+    return match || hasActivity;
   });
+  console.log('[filterAndSortValidators] after status filter:', filteredByStatus.length);
 
   const filteredValidators = filteredByStatus.filter(validator => {
-    const matchesSearch = validator.validator.description.moniker
-      .toLowerCase()
-      .includes(lowercasedSearchTerm);
-    return matchesSearch;
+    const moniker = safeTrimLowerCase(validator.validator.description.moniker);
+    return moniker.includes(lowercasedSearchTerm);
   });
+  console.log('[filterAndSortValidators] after search filter:', filteredValidators.length);
 
+  console.log('[filterAndSortValidators] show current validators?:', showCurrentValidators);
   const finalValidators = showCurrentValidators
     ? filteredValidators.filter(validator => hasUserActivity(validator))
     : filteredValidators;
+  console.log('[filterAndSortValidators] after current validator filter:', finalValidators.length);
 
-  return finalValidators.sort((a, b) => {
-    let valueA, valueB;
+  const sorted = finalValidators.sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
 
     switch (sortType) {
       case ValidatorSortType.NAME:
-        valueA = stripNonAlphanumerics(a.validator.description.moniker.toLowerCase());
-        valueB = stripNonAlphanumerics(b.validator.description.moniker.toLowerCase());
-        return sortOrder === 'Asc'
-          ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-          : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
+        const monikerA = safeTrimLowerCase(a.validator.description.moniker);
+        const monikerB = safeTrimLowerCase(b.validator.description.moniker);
+        valueA = stripNonAlphanumerics(monikerA);
+        valueB = stripNonAlphanumerics(monikerB);
+        const result =
+          sortOrder === SortOrder.ASC
+            ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
+            : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
+        return result;
 
       case ValidatorSortType.DELEGATION:
         valueA = parseFloat(a.delegation.shares);
@@ -132,6 +228,47 @@ export function filterAndSortValidators(
         break;
     }
 
-    return sortOrder === 'Asc' ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
+    const result =
+      sortOrder === SortOrder.ASC ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
+    return result;
   });
+
+  console.log('[filterAndSortValidators] final sorted count:', sorted.length);
+  return sorted;
+}
+
+export function filterAndSortChains(
+  chains: SimplifiedChainInfo[],
+  searchTerm: string,
+  sortOrder: SortOrder,
+): SimplifiedChainInfo[] {
+  const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
+
+  return chains
+    .filter(
+      chain =>
+        safeTrimLowerCase(chain.chain_name).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(chain.chain_id).includes(lowercasedSearchTerm),
+    )
+    .sort((a, b) => {
+      const valueA = safeTrimLowerCase(a.chain_name);
+      const valueB = safeTrimLowerCase(b.chain_name);
+
+      const compareResult =
+        sortOrder === SortOrder.ASC ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+
+      // If names are equal, prioritize Symphony chains
+      if (compareResult === 0) {
+        const aIsSymphony =
+          a.chain_id === SYMPHONY_MAINNET_ID || a.chain_id === SYMPHONY_TESTNET_ID;
+        const bIsSymphony =
+          b.chain_id === SYMPHONY_MAINNET_ID || b.chain_id === SYMPHONY_TESTNET_ID;
+
+        if (aIsSymphony !== bIsSymphony) {
+          return aIsSymphony ? -1 : 1;
+        }
+      }
+
+      return compareResult;
+    });
 }

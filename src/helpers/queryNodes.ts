@@ -1,17 +1,21 @@
 import {
-  CHAIN_NODES,
-  DELAY_BETWEEN_NODE_ATTEMPTS,
-  LOCAL_ASSET_REGISTRY,
-  MAX_NODES_PER_QUERY,
+  DEFAULT_FEE_TOKEN,
+  DEFAULT_REST_TIMEOUT,
+  MAX_RETRIES_PER_QUERY,
+  QueryType,
+  SYMPHONY_ENDPOINTS,
 } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
-import { createOfflineSignerFromMnemonic, getAddress } from './dataHelpers/wallet';
 import { delay } from './timer';
-import { RPCResponse } from '@/types';
-import { getNodeErrorCounts, getSessionToken, storeNodeErrorCounts } from './dataHelpers';
+import { FeeToken, RPCResponse, Uri } from '@/types';
+import {
+  createOfflineSignerByPrefix,
+  getAddressByChainPrefix,
+  getSessionToken,
+} from './dataHelpers';
+import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
 
 //indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
-
 const isIndexerError = (error: any): boolean => {
   return (
     error?.message?.includes('transaction indexing is disabled') ||
@@ -19,66 +23,59 @@ const isIndexerError = (error: any): boolean => {
   );
 };
 
-// Select and prioritize node providers based on their error counts
-export const selectNodeProviders = () => {
-  const errorCounts = getNodeErrorCounts();
-  console.log('Fetching node error counts:', errorCounts);
-
-  const providers = CHAIN_NODES.symphonytestnet.map(provider => ({
-    ...provider,
-    failCount: errorCounts[provider.rpc] || 0,
-  }));
-
-  console.log('Providers with fail counts:', providers);
-
-  return providers.sort((a, b) => a.failCount - b.failCount);
-};
-
-// Increment the error count for a specific provider
-export const incrementErrorCount = (nodeProvider: string): void => {
-  const errorCounts = getNodeErrorCounts();
-  console.log(`Incrementing error count for provider: ${nodeProvider}`);
-
-  errorCounts[nodeProvider] = (errorCounts[nodeProvider] || 0) + 1;
-  storeNodeErrorCounts(errorCounts);
-
-  console.log(`Updated error counts for ${nodeProvider}:`, errorCounts[nodeProvider]);
-};
-
 // Helper: Perform a REST API query to a selected node
-const performRestQuery = async (
-  endpoint: string,
-  queryMethod: string,
-  queryType: 'POST' | 'GET',
-) => {
-  console.log(
-    `Performing REST query to ${endpoint} with method ${queryMethod} and type ${queryType}`,
-  );
+// TODO: make queryType an enum
+const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
+  const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
+  const uriEndpoint = `${adjustedUri}${endpoint}`;
+  // console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
-  const response = await fetch(`${queryMethod}${endpoint}`, {
-    method: queryType,
-    body: null,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
 
-  if (!response.ok) {
-    console.error('Node query failed:', response);
-    throw new Error('Node query failed');
+  try {
+    const response = await fetch(`${uriEndpoint}`, {
+      method: queryType,
+      body: null,
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.error('[queryNodes] Node query failed:', response);
+      throw new Error('Node query failed');
+    }
+
+    const responseBody = await response.json();
+
+    // console.log(
+    //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
+    //   responseBody,
+    // );
+    return responseBody;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${DEFAULT_REST_TIMEOUT}ms`);
+      }
+      throw error;
+    }
+
+    // Handle non-Error throwables
+    throw new Error(`Unknown error occurred: ${String(error)}`);
   }
-
-  const responseBody = await response.json();
-  console.log('REST query successful, response:', responseBody);
-
-  return responseBody;
 };
 
-// TODO: modify to support multi-send
 // Helper: Perform an RPC query using signing, such as for claiming rewards or staking
-export const performRpcQuery = async (
+const performRpcQuery = async (
   client: SigningStargateClient,
   walletAddress: string,
   messages: any[],
-  feeDenom: string,
+  feeToken: FeeToken,
   simulateOnly = false,
   fee?: {
     amount: { denom: string; amount: string }[];
@@ -86,76 +83,133 @@ export const performRpcQuery = async (
   },
   memo: string = 'wallet',
 ): Promise<RPCResponse> => {
-  console.log('Performing RPC query...');
-  console.log('Client:', client);
-  console.log('Wallet Address:', walletAddress);
-  console.log('Messages:', messages);
-  console.log('Fee Denom:', feeDenom);
-  console.log('Simulate Only:', simulateOnly);
-  console.log('Fee:', fee);
+  console.log('[queryNodes] Performing RPC query...');
+  console.log('[queryNodes] Fee Token:', feeToken);
 
   try {
     let calculatedFee = fee;
+    let gasPrice = feeToken.gasPriceStep.average; // Start with average
+    let attempts = 0;
+    const maxAttempts = 2; // Try average first, then high if needed
 
-    if (!fee || !calculatedFee) {
-      console.log('Calculating fee...');
-      const defaultGasPrice = GasPrice.fromString(`0.025${feeDenom}`);
-      let gasEstimation = await client.simulate(walletAddress, messages, '');
-      console.log('Gas Estimation:', gasEstimation);
+    while (attempts < maxAttempts) {
+      try {
+        if (!calculatedFee) {
+          console.log('[queryNodes] Calculating fee...');
+          const feeDenom = feeToken.denom;
+          const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
 
-      gasEstimation = Math.ceil(gasEstimation * 1.1);
-      console.log('Adjusted Gas Estimation:', gasEstimation);
+          // Simulate transaction to get gas estimate
+          const gasEstimation = await client.simulate(walletAddress, messages, memo);
+          console.log('[queryNodes] Raw Gas Estimation:', gasEstimation);
 
-      calculatedFee = {
-        amount: [
-          {
-            denom: feeDenom,
-            amount: (gasEstimation * defaultGasPrice.amount.toFloatApproximation()).toFixed(0),
-          },
-        ],
-        gas: gasEstimation.toString(),
-      };
+          // Add buffer (30% more gas than estimated)
+          const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
+          console.log('[queryNodes] Buffered Gas Estimation:', bufferedGasEstimation);
+
+          // Calculate fee amount
+          const feeAmount = Math.ceil(
+            bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
+          );
+          console.log('[queryNodes] Calculated Fee Amount:', feeAmount);
+
+          calculatedFee = {
+            amount: [
+              {
+                denom: feeDenom,
+                amount: feeAmount.toString(),
+              },
+            ],
+            gas: bufferedGasEstimation.toString(),
+          };
+        }
+
+        console.log('[queryNodes] Final Calculated Fee:', calculatedFee);
+
+        if (simulateOnly) {
+          console.log('[queryNodes] Simulation success, returning fee info.');
+          return {
+            code: 0,
+            message: 'Simulation success',
+            fee: calculatedFee,
+            gasWanted: calculatedFee.gas,
+          };
+        }
+
+        const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
+        console.log('[queryNodes] Transaction result:', result);
+
+        if (result.code === 0) {
+          return {
+            code: 0,
+            txHash: result.transactionHash,
+            gasUsed: result.gasUsed?.toString(),
+            gasWanted: result.gasWanted?.toString(),
+            message: 'Transaction success',
+          };
+        }
+
+        // Handle specific error codes
+        if (result.code === 13) {
+          // 13 = insufficient fee
+          throw new Error('Insufficient fee');
+        }
+
+        console.error('[queryNodes] Transaction failed with code:', result.code);
+        throw new Error(`Transaction failed with code ${result.code}`);
+      } catch (error: any) {
+        console.error('[queryNodes] Error during RPC query:', error);
+
+        // Check if we should retry with higher gas price
+        if (
+          attempts < maxAttempts - 1 &&
+          (error.message.includes('insufficient fee') || error.code === 13)
+        ) {
+          attempts++;
+          gasPrice = feeToken.gasPriceStep.high; // Switch to high gas price
+          calculatedFee = undefined; // Force recalculation
+          console.log(`[queryNodes] Retrying with higher gas price: ${gasPrice}`);
+          continue;
+        }
+
+        // If we have an indexer error, handle specially
+        if (isIndexerError(error)) {
+          console.log('Indexer error detected.');
+          return {
+            code: 1,
+            message: 'Node indexer disabled',
+            txHash: error.txHash || 'unknown',
+          };
+        }
+
+        throw error;
+      }
     }
 
-    if (simulateOnly) {
-      console.log('Simulation success, returning fee info.');
-      return {
-        code: 0,
-        message: 'Simulation success',
-        fee: calculatedFee,
-        gasWanted: calculatedFee.gas,
-      };
-    }
-
-    const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
-    console.log('Transaction result:', result);
-
-    if (result.code === 0) {
-      return {
-        code: 0,
-        txHash: result.transactionHash,
-        gasUsed: result.gasUsed?.toString(),
-        gasWanted: result.gasWanted?.toString(),
-        message: 'Transaction success',
-      };
-    }
-
-    console.error('Transaction failed with code:', result.code);
-    throw new Error(`Transaction failed with ${result.code}`);
+    throw new Error('All fee adjustment attempts failed');
   } catch (error: any) {
-    console.error('Error during RPC query:', error);
-
-    if (isIndexerError(error)) {
-      console.log('Indexer error detected.');
-      return {
-        code: 1,
-        message: 'Node indexer disabled',
-        txHash: error.txHash || 'unknown',
-      };
-    }
-
+    console.error('[queryNodes] Final error:', error);
     throw error;
   }
+};
+
+const getTranactionSigner = async (
+  endpoint: string,
+  uri: Uri,
+  mnemonic: string,
+  prefix: string,
+): Promise<SigningStargateClient> => {
+  const isSymphonyQuery = Object.values(SYMPHONY_ENDPOINTS).some(symphonyEndpoint =>
+    endpoint.startsWith(symphonyEndpoint),
+  );
+
+  console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
+  const offlineSigner = await createOfflineSignerByPrefix(mnemonic, prefix);
+
+  const signer = isSymphonyQuery
+    ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
+    : await SigningStargateClient.connectWithSigner(uri.address, offlineSigner);
+  return signer;
 };
 
 const queryWithRetry = async ({
@@ -163,81 +217,72 @@ const queryWithRetry = async ({
   useRPC = false,
   queryType = 'GET',
   messages = [],
-  feeDenom,
+  feeToken = DEFAULT_FEE_TOKEN,
   simulateOnly = false,
   fee,
+  prefix,
+  uris,
 }: {
   endpoint: string;
   useRPC?: boolean;
   queryType?: 'GET' | 'POST';
   messages?: any[];
-  feeDenom: string;
+  feeToken?: FeeToken;
   simulateOnly?: boolean;
   fee?: {
     amount: { denom: string; amount: string }[];
     gas: string;
   };
+  prefix: string;
+  uris: Uri[];
 }): Promise<RPCResponse> => {
-  console.log('Querying with retry...');
-  console.log('Endpoint:', endpoint);
-  console.log('Use RPC:', useRPC);
-  console.log('Query Type:', queryType);
-  console.log('Messages:', messages);
-  console.log('Fee Denom:', feeDenom);
-  console.log('Simulate Only:', simulateOnly);
-
-  const providers = selectNodeProviders();
-  console.log('Providers selected for retry:', providers);
-
-  let numberAttempts = 0;
+  let attemptCount = 0;
   let lastError: any = null;
 
-  while (numberAttempts < MAX_NODES_PER_QUERY) {
-    for (const provider of providers) {
-      try {
-        const queryMethod = useRPC ? provider.rpc : provider.rest;
-        console.log('Using query method:', queryMethod);
+  // TODO: add rest.cosmos.directory/[chain name] (i.e. rest.cosmos.directory/symphony) or rest.testcosmos.directory/[chain name] to start of list before querying.
+  const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
+  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= uris.length - 1) {
+    const uriIndex = attemptCount % shuffledUris.length;
+    const uri = shuffledUris[uriIndex];
 
-        if (useRPC) {
-          const sessionToken = getSessionToken();
-          if (!sessionToken) {
-            throw new Error("Session token doesn't exist");
-          }
-          const mnemonic = sessionToken.mnemonic;
-          const address = await getAddress(mnemonic);
-          const offlineSigner = await createOfflineSignerFromMnemonic(mnemonic);
-          const client = await SigningStargateClient.connectWithSigner(queryMethod, offlineSigner);
+    try {
+      if (useRPC) {
+        const sessionToken = getSessionToken();
+        if (!sessionToken) throw new Error("Session token doesn't exist");
 
-          const result = await performRpcQuery(
-            client,
-            address,
-            messages,
-            feeDenom,
-            simulateOnly,
-            fee,
-          );
-          return result;
-        } else {
-          const result = await performRestQuery(endpoint, queryMethod, queryType);
-          return result;
-        }
-      } catch (error) {
-        lastError = error;
-        console.error('Error querying node:', error);
+        const mnemonic = sessionToken.mnemonic;
+        const address = await getAddressByChainPrefix(mnemonic, prefix);
 
-        if (!isIndexerError(error)) {
-          incrementErrorCount(provider.rpc);
-        }
+        const transactionSigner = await getTranactionSigner(endpoint, uri, mnemonic, prefix);
+
+        const result = await performRpcQuery(
+          transactionSigner,
+          address,
+          messages,
+          feeToken,
+          simulateOnly,
+          fee,
+        );
+        return result;
+      } else {
+        const result = await performRestQuery(uri.address, endpoint, queryType);
+        return result;
       }
+    } catch (error) {
+      console.error(`[queryNodes] ${error}`);
 
-      numberAttempts++;
-      if (numberAttempts >= MAX_NODES_PER_QUERY) break;
-      await delay(DELAY_BETWEEN_NODE_ATTEMPTS);
+      attemptCount++;
+      lastError = error;
+
+      const backoff = Math.min(2 ** attemptCount * 500, 5000);
+      console.log(
+        `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
+      );
+      await delay(backoff);
     }
   }
 
   if (isIndexerError(lastError)) {
-    console.log('Indexer error detected during retries.');
     return {
       code: 0,
       message: 'Transaction likely successful (indexer disabled)',
@@ -245,49 +290,55 @@ const queryWithRetry = async ({
     };
   }
 
-  console.error(`All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts.`, lastError);
-  throw new Error(
-    `All node query attempts failed after ${MAX_NODES_PER_QUERY} attempts. ${lastError?.message || ''}`,
-  );
+  throw new Error(`All ${MAX_RETRIES_PER_QUERY} attempts failed. ${lastError?.message || ''}`);
 };
 
 export const queryRestNode = async ({
   endpoint,
-  queryType = 'GET',
-  feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
+  queryType = QueryType.GET,
+  prefix,
+  restUris,
 }: {
   endpoint: string;
-  queryType?: 'GET' | 'POST';
-  feeDenom?: string;
+  queryType?: QueryType;
+  prefix: string;
+  restUris: Uri[];
 }) =>
   queryWithRetry({
     endpoint,
     useRPC: false,
     queryType,
-    feeDenom,
+    prefix,
+    uris: restUris,
   });
 
 export const queryRpcNode = async ({
   endpoint,
   messages,
-  feeDenom = LOCAL_ASSET_REGISTRY.note.denom,
+  feeToken = DEFAULT_FEE_TOKEN,
   simulateOnly = false,
   fee,
+  prefix,
+  rpcUris,
 }: {
   endpoint: string;
+  prefix: string;
+  rpcUris: Uri[];
   messages?: any[];
-  feeDenom?: string;
+  feeToken?: FeeToken;
   simulateOnly?: boolean;
   fee?: {
     amount: { denom: string; amount: string }[];
     gas: string;
   };
-}) =>
+}): Promise<RPCResponse> =>
   queryWithRetry({
     endpoint,
     useRPC: true,
     messages,
-    feeDenom,
+    feeToken,
     simulateOnly,
     fee,
+    prefix,
+    uris: rpcUris,
   });

@@ -1,12 +1,11 @@
 import { useAtomValue } from 'jotai';
 
-import { walletStateAtom } from '@/atoms';
-import { DEFAULT_CHAIN_ID } from '@/constants';
+import { chainWalletAtom } from '@/atoms';
 
-export const useWCAddress = () => {
-  const { address } = useAtomValue(walletStateAtom);
+export const useWCAddress = (chainId: string) => {
+  const { address } = useAtomValue(chainWalletAtom(chainId));
 
-  const wcAddress = `cosmos:${DEFAULT_CHAIN_ID}:${address}`;
+  const wcAddress = `cosmos:${chainId}:${address}`;
 
   return {
     address: wcAddress,

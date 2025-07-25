@@ -11,7 +11,24 @@ import {
 import { filterAndSortValidators } from '@/helpers';
 import { ValidatorStatusFilter } from '@/constants';
 
-export const showCurrentValidatorsAtom = atom<boolean>(true);
+const _showCurrentValidatorsOverrideAtom = atom<boolean | null>(null);
+const _autoShowCurrentValidatorsAtom = atom(get => {
+  const validatorData = get(validatorDataAtom);
+  return validatorData.some(validator => parseFloat(validator.balance.amount) > 0);
+});
+
+// Public combined atom (similar to selectedAssetAtom)
+export const showCurrentValidatorsAtom = atom(
+  get => {
+    const override = get(_showCurrentValidatorsOverrideAtom);
+    const autoValue = get(_autoShowCurrentValidatorsAtom);
+    return override !== null ? override : autoValue;
+  },
+  (_, set, newValue: boolean) => {
+    set(_showCurrentValidatorsOverrideAtom, newValue);
+  },
+);
+
 export const validatorDataAtom = atom<CombinedStakingInfo[]>([]);
 export const selectedValidatorsAtom = atom<CombinedStakingInfo[]>([]);
 export const validatorStatusFilterAtom = atom<ValidatorStatusFilter>(
@@ -23,8 +40,13 @@ export const filteredValidatorsAtom = atom(get => {
   const searchTerm = get(searchTermAtom);
   const sortOrder = get(validatorSortOrderAtom);
   const sortType = get(validatorSortTypeAtom);
-  const showCurrentValidators = get(showCurrentValidatorsAtom);
   const statusFilter = get(validatorStatusFilterAtom);
+  const showCurrentValidators = get(showCurrentValidatorsAtom);
+
+  console.group('[filteredValidatorsAtom]');
+  console.log('validatorData length:', validatorData.length);
+  console.log('showCurrentValidators:', showCurrentValidators);
+  console.groupEnd();
 
   return filterAndSortValidators(
     validatorData,

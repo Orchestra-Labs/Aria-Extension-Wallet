@@ -4,7 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { COSMOS_SIGNING_METHODS, ROUTES } from '@/constants';
-import { walletkit } from '@/helpers/walletConnect';
+import { walletkit } from '@/helpers';
 import { useApproveWCTransactionMutation } from '@/queries';
 
 import { useSupportedWCNamespaces } from './useSupportedWCNamespaces';
@@ -16,6 +16,7 @@ export const useWalletConnectEventsManager = ({ initialized }: Params) => {
   const { mutate: approveWCTransaction } = useApproveWCTransactionMutation({
     retry: 3,
   });
+
   const { supportedNamespaces } = useSupportedWCNamespaces();
   const { toast } = useToast();
 

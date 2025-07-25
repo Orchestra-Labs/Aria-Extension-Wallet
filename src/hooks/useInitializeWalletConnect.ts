@@ -12,7 +12,7 @@ export const useInitializeWalletConnect = () => {
   const initializeWalletConnect = async () => {
     if (!isLoggedIn) return;
 
-    const sessionToken = await getSessionToken();
+    const sessionToken = getSessionToken();
 
     if (!sessionToken?.mnemonic) {
       return;

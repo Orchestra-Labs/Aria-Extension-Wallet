@@ -1,10 +1,9 @@
 import { Input } from '@/ui-kit';
 import { AssetSelectDialog } from '@/components';
-import { cn, getRegexForDecimals } from '@/helpers/utils';
+import { cn, getRegexForDecimals, formatNumberWithCommas, stripNonNumerics } from '@/helpers';
 import { Asset } from '@/types';
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { GREATER_EXPONENT_DEFAULT, InputStatus } from '@/constants';
-import { formatNumberWithCommas, stripNonNumerics } from '@/helpers';
 
 interface AssetInputProps {
   isDisabled?: boolean;
@@ -54,9 +53,11 @@ export const AssetInput: React.FC<AssetInputProps> = ({
   addClearMaxMargin = false,
   ...props
 }) => {
-  const [localInputValue, setLocalInputValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   const prevValueRef = useRef<string>('');
+
+  const [localInputValue, setLocalInputValue] = useState<string>('');
+
   const currentAsset = assetState;
   const currentExponent = currentAsset?.exponent ?? GREATER_EXPONENT_DEFAULT;
 

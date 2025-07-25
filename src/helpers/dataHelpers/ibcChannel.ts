@@ -2,6 +2,7 @@ import { NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
 import { getLocalStorageItem, removeLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { IBCConnectionFile } from '@/types';
 
+// TODO: don't need this file, ibcChannels.ts, and cosmosChainInfo.ts
 const IBC_FILE_KEY_PREFIX = {
   testnet: 'testnet_ibcFileCache_',
   mainnet: 'mainnet_ibcFileCache_',

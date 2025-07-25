@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { usePermission } from 'react-use';
 import { Button } from '@/ui-kit';
 import { MicIcon, SquareIcon } from 'lucide-react';
-import { openMediaOnboardingTab } from '@/helpers';
+import { getSymphonyChainId, openMediaOnboardingTab } from '@/helpers';
 import { handleIntent } from '@/helpers/handleIntent';
 import { Intent } from '@/types';
 import { useAtomValue } from 'jotai';
-import { walletStateAtom, validatorDataAtom, symphonyAssetsAtom } from '@/atoms';
+import { validatorDataAtom, symphonyAssetsAtom, chainWalletAtom, networkLevelAtom } from '@/atoms';
 import { useRefreshData } from '@/hooks';
 
 export const MicrophoneButton: React.FC = () => {
@@ -14,15 +14,19 @@ export const MicrophoneButton: React.FC = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const { refreshData } = useRefreshData();
 
+  const networkLevel = useAtomValue(networkLevelAtom);
+
+  const symphonyChainId = getSymphonyChainId(networkLevel);
+
+  const wallet = useAtomValue(chainWalletAtom(symphonyChainId));
+  const validators = useAtomValue(validatorDataAtom);
+  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
+
   const [micStatus, setMicStatus] = useState<'neutral' | 'granted' | 'denied'>('neutral');
   const [isRecording, setIsRecording] = useState(false);
   const [, setAudioUrl] = useState<string | null>(null);
   const [, setTranscript] = useState<string | null>(null);
   const [, setIntent] = useState<Intent | null>(null);
-
-  const wallet = useAtomValue(walletStateAtom);
-  const validators = useAtomValue(validatorDataAtom);
-  const symphonyAssets = useAtomValue(symphonyAssetsAtom);
 
   const permissionState = usePermission({ name: 'microphone' });
   const micGranted = permissionState === 'granted';

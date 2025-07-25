@@ -1,48 +1,87 @@
-import { walletAssetsAtom, walletAddressAtom, isFetchingWalletDataAtom } from '@/atoms';
-import { userAccountAtom } from '@/atoms/accountAtom';
-import { DEFAULT_SUBSCRIPTION } from '@/constants';
+import { isFetchingWalletDataAtom, subscribedChainRegistryAtom, networkLevelAtom } from '@/atoms';
 import { fetchWalletAssets } from '@/helpers';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { sessionWalletAtom, updateChainWalletAtom } from '@/atoms/walletAtom';
+import { userAccountAtom } from '@/atoms';
 
-export function useWalletAssetsRefresh() {
-  const [walletAddress] = useAtom(walletAddressAtom);
-  const setWalletAssets = useSetAtom(walletAssetsAtom);
+export function useWalletDataRefresh() {
   const setIsFetchingData = useSetAtom(isFetchingWalletDataAtom);
+  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
+  const updateChainWallet = useSetAtom(updateChainWalletAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
   const userAccount = useAtomValue(userAccountAtom);
+  const sessionWallet = useAtomValue(sessionWalletAtom);
 
-  const refreshWalletAssets = async (address?: string) => {
-    const targetAddress = address || walletAddress;
-    const subscriptions =
-      userAccount?.settings.subscribedTo &&
-      Object.keys(userAccount.settings.subscribedTo).length > 0
-        ? userAccount.settings.subscribedTo
-        : DEFAULT_SUBSCRIPTION;
+  const refreshWalletAssets = async () => {
+    setIsFetchingData(true);
 
-    // this should query for all chains with chain ID
-    if (targetAddress) {
-      setIsFetchingData(true);
+    try {
+      if (!userAccount || !sessionWallet || Object.keys(sessionWallet.chainWallets).length === 0) {
+        console.warn('[refreshWallet] Cannot refresh - missing user account or session wallet');
+        return;
+      }
 
-      try {
-        const assetsPromises = Object.entries(subscriptions).map(([networkID, subscription]) => {
-          return fetchWalletAssets(targetAddress, networkID, subscription);
+      const hasAddresses = Object.values(sessionWallet.chainWallets).some(w => w.address);
+      if (!hasAddresses) {
+        console.warn('[refreshWallet] Cannot refresh - no wallet addresses available');
+        return;
+      }
+
+      // Get all chains for the current network level
+      const currentNetworkChains = chainRegistry[networkLevel];
+      const chainSubscriptions = userAccount.settings.chainSubscriptions;
+      const networkSubscriptions = userAccount.settings.chainSubscriptions[networkLevel];
+
+      console.log(
+        `[refreshWallet] Refreshing for ${networkLevel} chains:`,
+        Object.keys(currentNetworkChains),
+      );
+
+      // Iterate through all chains in the current network level
+      for (const [chainId, chainInfo] of Object.entries(currentNetworkChains)) {
+        const wallet = sessionWallet.chainWallets[chainId];
+
+        if (!wallet?.address) {
+          // console.log(`[refreshWallet] No wallet address for ${chainId}, skipping`);
+          continue;
+        }
+
+        // Get subscribed denoms for this chain
+        const subscribedDenoms = networkSubscriptions[chainId] || [];
+        console.log(`[refreshWallet] Subscribed denoms for ${chainId}:`, subscribedDenoms);
+
+        console.log(`[refreshWallet] Fetching assets for ${chainId}`);
+        console.log(`[refreshWallet] Chain details:`, {
+          bech32_prefix: chainInfo.bech32_prefix,
+          rest_uris: chainInfo.rest_uris,
+          assets: Object.keys(chainInfo.assets || {}),
         });
 
-        const allAssets = (await Promise.all(assetsPromises)).flat();
+        try {
+          const assets = await fetchWalletAssets(
+            wallet.address,
+            chainId,
+            chainSubscriptions,
+            currentNetworkChains,
+          );
 
-        setWalletAssets(allAssets);
-      } catch (error) {
-        console.error('Error refreshing wallet assets:', error);
-      } finally {
-        setIsFetchingData(false);
+          if (assets.length > 0) {
+            console.log(`[refreshWallet] Found assets for ${chainId}:`, assets);
+            console.log(`[refreshWallet] Current wallet:`, sessionWallet);
+            updateChainWallet({ chainId, assets });
+          } else {
+            console.log(`[refreshWallet] No assets found for ${chainId}`);
+          }
+        } catch (error) {
+          console.error(`[refreshWallet] Error fetching assets for ${chainId}:`, error);
+        }
       }
-    } else {
-      console.warn('No wallet address provided for refreshing wallet assets');
+    } catch (error) {
+      console.error('[UseWalletDataRefresh] Error:', error);
+    } finally {
+      setIsFetchingData(false);
     }
   };
 
-  const triggerWalletDataRefresh = (address?: string) => {
-    refreshWalletAssets(address);
-  };
-
-  return { triggerWalletDataRefresh };
+  return { triggerWalletDataRefresh: refreshWalletAssets };
 }

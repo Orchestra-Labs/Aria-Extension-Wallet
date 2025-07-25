@@ -4,6 +4,7 @@ export function useGetBalances(params: Partial<RequestParams>) {
   const { data, error, isLoading } = useGetBalancesQuery(
     {
       walletAddress: params.walletAddress!,
+      chainID: params.chainID!,
     },
     {
       enabled: !!params.walletAddress,

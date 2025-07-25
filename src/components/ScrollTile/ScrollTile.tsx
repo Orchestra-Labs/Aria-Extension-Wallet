@@ -1,4 +1,3 @@
-import { LogoIcon } from '@/assets/icons';
 import { TextFieldStatus } from '@/constants';
 import { cn, selectTextColorByStatus, truncateString } from '@/helpers';
 
@@ -48,7 +47,7 @@ export const ScrollTile = ({
   return (
     <div className={tileClasses} onClick={onClick}>
       <div className="rounded-full h-9 w-9 bg-neutral-2 p-1 flex items-center justify-center select-none">
-        {icon || <LogoIcon />}
+        {icon}
       </div>
       <div className="flex flex-col ml-3 select-none">
         <h6 className={`text-base ${textColor} text-left line-clamp-1 select-none`}>

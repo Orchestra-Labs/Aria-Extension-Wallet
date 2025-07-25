@@ -72,7 +72,7 @@ Performs a full TypeScript type check.
 
 Builds the app and creates a aria-wallet.zip file for distribution.
 
-### `yarn reset`
+### `yarn reinstall`
 
 Deletes node_modules and yarn.lock and reinstalls dependencies.
 

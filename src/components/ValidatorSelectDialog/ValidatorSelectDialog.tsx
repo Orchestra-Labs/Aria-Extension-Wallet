@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, SlideTray } from '@/ui-kit';
-import { TileScroller } from '../TileScroller';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -9,25 +8,23 @@ import {
   selectedValidatorsAtom,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
+  resetValidatorTransactionAtom,
+  isValidatorLoadingAtom,
+  isValidatorSuccessAtom,
+  validatorErrorAtom,
+  validatorTxFailedAtom,
+  validatorTxHash,
+  validatorCalculatedFeeAtom,
+  lastSimulationUpdateAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
-import {
-  claimAndRestake,
-  claimRewards,
-  formatBalanceDisplay,
-  truncateWalletAddress,
-  claimAndUnstake,
-} from '@/helpers';
+import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
 import { CombinedStakingInfo } from '@/types';
-import { useRefreshData, useToast } from '@/hooks';
-import {
-  DEFAULT_ASSET,
-  GREATER_EXPONENT_DEFAULT,
-  TransactionType,
-  ValidatorSortType,
-} from '@/constants';
+import { useRefreshData, useValidatorActions } from '@/hooks';
+import { ValidatorSortType, SortOrder, SearchType } from '@/constants';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { Loader } from '../Loader';
+import { ValidatorScroller } from '../ValidatorScroller';
 
 interface ValidatorSelectDialogProps {
   buttonText: string;
@@ -40,9 +37,10 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   buttonVariant,
   isClaimDialog = false,
 }) => {
-  const { toast } = useToast();
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
+
   const { refreshData } = useRefreshData();
+  const { runTransaction, runSimulation } = useValidatorActions();
 
   const setSearchTerm = useSetAtom(dialogSearchTermAtom);
   const setSortOrder = useSetAtom(validatorDialogSortOrderAtom);
@@ -50,106 +48,41 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const isLoading = useAtomValue(isValidatorLoadingAtom);
+  const isSuccess = useAtomValue(isValidatorSuccessAtom);
+  const transactionError = useAtomValue(validatorErrorAtom);
+  const transactionFailed = useAtomValue(validatorTxFailedAtom);
+  const transactionHash = useAtomValue(validatorTxHash);
+  const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
+  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
+  const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
+
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
-  const [transactionSuccess, setTransactionSuccess] = useState<{
-    transactionType?: TransactionType;
-    success: boolean;
-    txHash?: string;
-  }>({
-    success: false,
-  });
-  const [simulatedFee, setSimulatedFee] = useState<{
-    fee: string;
-    textClass: 'text-error' | 'text-warn' | 'text-blue';
-  } | null>({ fee: '0 MLD', textClass: 'text-blue' });
+
+  const searchType = SearchType.VALIDATOR;
 
   const allValidatorsSelected = selectedValidators.length === filteredValidators.length;
   const noValidatorsSelected = selectedValidators.length === 0;
 
   const unbondingDays = `${filteredValidators[0]?.stakingParams?.unbonding_time || 0} days`;
-  const slideTrayIsOpen = slideTrayRef.current && slideTrayRef.current.isOpen();
-
-  const calculateTotalRewards = () => {
-    const totalRewards = selectedValidators.reduce((sum, validator) => {
-      const totalReward = validator.rewards.reduce(
-        (rewardSum, reward) => rewardSum + parseFloat(reward.amount),
-        0,
-      );
-      return sum + totalReward;
-    }, 0);
-
-    return totalRewards;
-  };
 
   const calculateTotalDelegations = () => {
-    const totalDelegations = selectedValidators.reduce(
+    return selectedValidators.reduce(
       (sum, validator) => sum + parseFloat(validator.delegation.shares || '0'),
       0,
     );
-
-    return totalDelegations;
-  };
-
-  const setAsLoading = (transactionType: TransactionType) => {
-    setIsLoading(true);
-    setTransactionSuccess(prev => ({
-      ...prev,
-      transactionType: transactionType,
-    }));
-  };
-
-  const handleTransactionSuccess = (txHash: string) => {
-    if (slideTrayIsOpen) {
-      setTransactionSuccess(prev => ({
-        ...prev,
-        success: true,
-        txHash,
-      }));
-
-      setTimeout(() => {
-        setTransactionSuccess(prev => ({
-          ...prev,
-          success: false,
-        }));
-      }, 3000);
-    } else {
-      const displayTransactionHash = truncateWalletAddress('', transactionSuccess.txHash as string);
-
-      toast({
-        title: `${transactionSuccess.transactionType} success!`,
-        description: `Transaction hash: ${displayTransactionHash}`,
-      });
-      setTransactionSuccess(prev => ({
-        ...prev,
-        success: false,
-      }));
-    }
-  };
-
-  const handleTransactionError = (errorMessage: string) => {
-    if (slideTrayIsOpen) {
-      setError(errorMessage);
-
-      setTimeout(() => {
-        setError('');
-      }, 3000);
-    } else {
-      toast({
-        title: `${transactionSuccess.transactionType} failed!`,
-        description: errorMessage,
-      });
-      setError('');
-    }
   };
 
   const resetDefaults = () => {
+    // NOTE: reset atom states
+    resetTransactionStates();
     setSearchTerm('');
-    setSortOrder('Desc');
+    setSortOrder(SortOrder.DESC);
     setSortType(ValidatorSortType.NAME);
     setSelectedValidators([]);
-    setIsClaimToRestake(true);
+
+    // NOTE: reset local states
+    setIsClaimToRestake(false);
   };
 
   const handleSelectAll = () => {
@@ -170,142 +103,86 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     );
   };
 
-  const handleClaimToWallet = async (isSimulation: boolean = false) => {
-    if (!isSimulation) setAsLoading(TransactionType.CLAIM_TO_WALLET);
-
-    try {
-      const result = await claimRewards(
-        filteredValidators[0].delegation.delegator_address,
-        selectedValidators.map(v => v.delegation.validator_address),
-        isSimulation,
-      );
-
-      if (isSimulation) return result;
-
-      if (result.success && result.data?.code === 0) {
-        handleTransactionSuccess(result.data.txHash as string);
-      } else {
-        const errorMessage = `Claim failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = `Claim failed: ${error || 'No error message provided'}`;
-      handleTransactionError(errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
-    }
-  };
-
-  const handleClaimAndRestake = async (isSimulation: boolean = false) => {
-    if (!isSimulation) setAsLoading(TransactionType.CLAIM_TO_RESTAKE);
-
-    try {
-      const validatorRewards = selectedValidators.map(v => ({
-        validator: v.delegation.validator_address,
-        rewards: v.rewards,
-      }));
-
-      const claimResult = await claimAndRestake(
-        selectedValidators.map(v => ({
-          delegation: v.delegation,
-          balance: v.balance,
-        })),
-        validatorRewards,
-        isSimulation,
-      );
-
-      if (isSimulation) return claimResult;
-
-      if (claimResult.success && claimResult.data?.code === 0) {
-        handleTransactionSuccess(claimResult.data.txHash as string);
-      } else {
-        const errorMessage = `Claim to restake failed: ${claimResult.message || 'No error message provided'}`;
-        handleTransactionError(errorMessage);
-      }
-    } catch (error) {
-      const errorMessage = `Claim to restake failed: ${error || 'No error message provided'}`;
-      handleTransactionError(errorMessage);
-    } finally {
-      if (!isSimulation) setIsLoading(false);
-    }
-  };
-
-  const handleUnstake = async (simulateOnly: boolean = false) => {
-    if (!simulateOnly) setAsLoading(TransactionType.UNSTAKE);
+  const handleAction = async ({ isSimulation = false }: { isSimulation?: boolean } = {}) => {
+    if (noValidatorsSelected) return;
 
     const delegations = selectedValidators.map(validator => ({
       delegation: validator.delegation,
       balance: validator.balance,
     }));
 
+    const rewards = selectedValidators.map(v => ({
+      validator: v.delegation.validator_address,
+      rewards: v.rewards,
+    }));
+
+    const actionFn = isSimulation ? runSimulation : runTransaction;
+
     try {
-      const result = await claimAndUnstake({
-        delegations: delegations,
-        simulateOnly,
-      });
-
-      if (simulateOnly) return result;
-
-      if (result.success && result.data?.code === 0) {
-        handleTransactionSuccess(result.data.txHash as string);
+      if (isClaimDialog) {
+        if (isClaimToRestake) {
+          // Claim to restake
+          await actionFn('claim', '0', true, delegations, rewards);
+        } else {
+          // Claim to wallet
+          await actionFn('claim', '0', false, delegations, rewards);
+        }
       } else {
-        const errorMessage = `Unstake failed: ${result.message || 'No error message provided'}`;
-        handleTransactionError(errorMessage);
+        // Unstake
+        await actionFn('unstake', calculateTotalDelegations().toString(), false, delegations);
       }
+
+      setLastUpdateTime(Date.now());
     } catch (error) {
-      const errorMessage = `Unstake failed: ${error || 'No error message provided'}`;
-      handleTransactionError(errorMessage);
-    } finally {
-      if (!simulateOnly) setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
+      console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, errorMessage);
+      throw error;
     }
   };
 
-  const formatFee = (amount: number, gasWanted: number) => {
-    const defaultGasPrice = 0.025;
-    const exponent = GREATER_EXPONENT_DEFAULT;
-    const symbol = DEFAULT_ASSET.symbol || 'MLD';
-    const feeAmount = gasWanted * defaultGasPrice;
-    const feeInGreaterUnit = feeAmount / Math.pow(10, exponent);
-
-    const feePercentage = feeInGreaterUnit ? (feeInGreaterUnit / amount) * 100 : 0;
-
-    setSimulatedFee({
-      fee: formatBalanceDisplay(feeInGreaterUnit.toFixed(exponent), symbol),
-      textClass:
-        feePercentage > 1 ? 'text-error' : feePercentage > 0.75 ? 'text-warn' : 'text-blue',
-    });
-  };
-
-  const updateFee = async () => {
-    if (noValidatorsSelected) {
-      return;
-    }
-
-    try {
-      let totalAmount = isClaimDialog ? calculateTotalRewards() : calculateTotalDelegations();
-      let simulationResult = isClaimDialog
-        ? isClaimToRestake
-          ? await handleClaimAndRestake(true)
-          : await handleClaimToWallet(true)
-        : await handleUnstake(true);
-
-      if (simulationResult) {
-        formatFee(totalAmount, parseFloat(simulationResult.data?.gasWanted || '0'));
-      }
-    } catch (error) {
-      console.error('Simulation error:', error);
-    }
-  };
+  const canRunSimulation = () => !noValidatorsSelected;
 
   useEffect(() => {
-    if (slideTrayIsOpen && !isLoading) updateFee();
-  }, [slideTrayIsOpen, selectedValidators, isClaimDialog, isLoading]);
+    let intervalId: NodeJS.Timeout;
+
+    const setupInterval = () => {
+      intervalId = setInterval(() => {
+        if (canRunSimulation()) {
+          handleAction({ isSimulation: true });
+          setLastUpdateTime(Date.now());
+        } else {
+          clearInterval(intervalId);
+        }
+      }, 5000);
+    };
+
+    if (canRunSimulation()) {
+      if (Date.now() - lastUpdateTime > 5000) {
+        handleAction({ isSimulation: true });
+        setLastUpdateTime(Date.now());
+      }
+
+      setupInterval();
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [selectedValidators]);
 
   useEffect(() => {
-    if (transactionSuccess.success) {
+    if (isSuccess) {
       refreshData();
     }
-  }, [transactionSuccess.success]);
+  }, [isSuccess]);
+
+  useEffect(() => {
+    return () => {
+      resetDefaults();
+    };
+  }, []);
 
   return (
     <SlideTray
@@ -378,11 +255,11 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             </Button>
           </div>
           <div className="flex-1 flex justify-end">
-            <SortDialog isValidatorSort isDialog />
+            <SortDialog searchType={searchType} isDialog />
           </div>
         </div>
 
-        {transactionSuccess.success || isLoading ? (
+        {isSuccess || isLoading || transactionFailed ? (
           <div className="flex flex-col flex-grow w-full border border-neutral-3 rounded-md items-center justify-center px-[1.5rem]">
             {isLoading && (
               <div className="flex flex-grow items-center px-4">
@@ -390,26 +267,28 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
               </div>
             )}
 
-            {transactionSuccess.success && (
+            {isSuccess && (
               <TransactionResultsTile
                 isSuccess
-                txHash={truncateWalletAddress('', transactionSuccess.txHash as string)}
+                txHash={truncateWalletAddress('', transactionHash)}
                 size="md"
               />
             )}
 
-            {error && <TransactionResultsTile isSuccess={false} size="md" message={error} />}
+            {transactionFailed && (
+              <TransactionResultsTile isSuccess={false} size="md" message={transactionError} />
+            )}
           </div>
         ) : (
-          <TileScroller
-            activeIndex={1}
-            onSelectValidator={handleValidatorSelect}
+          <ValidatorScroller
+            validators={filteredValidators}
+            onClick={handleValidatorSelect}
             isSelectable
-            isDialog
+            forceCurrentViewStyle
           />
         )}
 
-        <SearchBar isDialog isValidatorSearch />
+        <SearchBar searchType={searchType} isDialog />
 
         <div className="flex justify-center space-x-4">
           <Button
@@ -417,13 +296,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
             size="medium"
             className="mb-1 w-[44%]"
             disabled={selectedValidators.length === 0 || isLoading}
-            onClick={() =>
-              isClaimDialog
-                ? isClaimToRestake
-                  ? handleClaimAndRestake(false)
-                  : handleClaimToWallet(false)
-                : handleUnstake(false)
-            }
+            onClick={() => handleAction()}
           >
             {isClaimDialog ? `Claim ${isClaimToRestake ? 'to Restake' : 'to Wallet'}` : 'Unstake'}
           </Button>
@@ -431,8 +304,10 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
         <div className="flex justify-between items-center text-blue text-sm font-bold w-full">
           <p>Fee</p>
-          <p className={simulatedFee?.textClass}>
-            {simulatedFee && selectedValidators.length > 0 ? simulatedFee.fee : '-'}
+          <p className={calculatedFee.textClass}>
+            {calculatedFee && calculatedFee.feeAmount > 0
+              ? formatBalanceDisplay(`${calculatedFee.calculatedFee}`, calculatedFee.feeUnit)
+              : '-'}
           </p>
         </div>
       </div>
