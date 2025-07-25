@@ -28,6 +28,8 @@ export interface Asset {
   isFeeToken?: boolean;
   networkName: string;
   networkID: string;
+  coinGeckoId?: string;
+  price: number;
 }
 
 export interface AssetRegistry {

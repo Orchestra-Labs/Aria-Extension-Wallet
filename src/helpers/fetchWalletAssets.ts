@@ -8,13 +8,61 @@ const adjustAmountByExponent = (amount: string, exponent: number): string => {
   return (parseFloat(amount) / divisor).toFixed(exponent);
 };
 
+const fetchCoinGeckoPrices = async (coinGeckoIds: string[]): Promise<Record<string, number>> => {
+  if (!coinGeckoIds.length) return {};
+
+  try {
+    const batchSize = 50;
+    const priceData: Record<string, number> = {};
+
+    for (let i = 0; i < coinGeckoIds.length; i += batchSize) {
+      const batch = coinGeckoIds.slice(i, i + batchSize);
+
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+
+        const response = (await Promise.race([
+          fetch(
+            `https://api.coingecko.com/api/v3/simple/price?ids=${batch.join(',')}&vs_currencies=usd`,
+            { signal: controller.signal },
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), 2000),
+          ),
+        ])) as Response;
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          console.error('Failed to fetch prices from CoinGecko');
+          continue;
+        }
+
+        const data = (await response.json()) as Record<string, { usd: number }>;
+        Object.entries(data).forEach(([id, priceInfo]) => {
+          priceData[id] = priceInfo.usd;
+        });
+      } catch (error) {
+        console.error('Error fetching CoinGecko prices batch:', error);
+        continue;
+      }
+    }
+
+    return priceData;
+  } catch (error) {
+    console.error('Error in fetchCoinGeckoPrices:', error);
+    return {};
+  }
+};
+
 const resolveIbcDenom = async (
   ibcDenom: string,
   prefix: string,
   restUris: Uri[],
 ): Promise<string> => {
   try {
-    const denomHash = ibcDenom.slice(4); // Remove the "ibc/" prefix
+    const denomHash = ibcDenom.slice(4);
     const getIBCInfoEndpoint = COSMOS_CHAIN_ENDPOINTS.getIBCInfo;
 
     // TODO: could get transfer channel data.  useful for determining chain ID?
@@ -39,32 +87,20 @@ const resolveIbcDenom = async (
 
 const getBalances = async (
   walletAddress: string,
-  prefix: string,
   restUris: Uri[],
-): Promise<Asset[]> => {
+): Promise<Array<{ denom: string; amount: string }>> => {
   const getBalanceEndpoint = COSMOS_CHAIN_ENDPOINTS.getBalance;
   const fullEndpoint = `${getBalanceEndpoint}${walletAddress}`;
-
-  console.log(`[FetchWalletAssets] wallet: ${walletAddress}`);
-  console.log(`[FetchWalletAssets] full endpoint: ${fullEndpoint}`);
-  console.log(`[FetchWalletAssets] prefix: ${prefix}`);
-  console.log(`[FetchWalletAssets] nodes to try:`, restUris);
 
   for (const uri of restUris) {
     const url = `${uri.address}${fullEndpoint}`;
     try {
-      console.log(`[FetchWalletAssets] trying: ${url}`);
       const response = await fetch(url);
       const json = await response.json();
-
-      console.log(`[FetchWalletAssets] response status: ${response.status}`);
-      console.log(`[FetchWalletAssets] response body:`, json);
 
       if (response.ok && json.balances) {
         return json.balances;
       }
-
-      console.warn(`[FetchWalletAssets] no balances from: ${uri.address}`);
     } catch (err) {
       console.error(`[FetchWalletAssets] failed to fetch from ${uri.address}`, err);
     }
@@ -95,13 +131,8 @@ export async function fetchWalletAssets(
   const networkSubscriptions = subscriptions[networkLevel] || {};
   const thisChainSubscribedDenoms = networkSubscriptions[chainID] || [];
 
-  console.log(`[FetchWalletAssets] Processing ${networkID} (${networkLevel})`);
-  console.log(`[FetchWalletAssets] Chain info:`, chainInfo);
-
-  console.log(`[FetchWalletAssets] Network Subscriptions:`, networkSubscriptions);
-  console.log(`[FetchWalletAssets] Subscribed denoms for ${chainID}:`, thisChainSubscribedDenoms);
   // Create zero-balance assets for this chain's specific subscriptions
-  const subscribedAssets = thisChainSubscribedDenoms
+  const subscribedAssets: Asset[] = thisChainSubscribedDenoms
     .map(denom => {
       const metadata = chainInfo.assets?.[denom];
       if (!metadata) {
@@ -114,6 +145,7 @@ export async function fetchWalletAssets(
         isIbc: false,
         networkID,
         networkName: chainInfo.pretty_name || chainInfo.chain_name || networkID,
+        price: 0,
       };
     })
     .filter((a): a is Asset => a !== null);
@@ -128,35 +160,50 @@ export async function fetchWalletAssets(
       return subscribedAssets;
     }
 
-    console.log(`[FetchWalletAssets] Fetching balances for ${walletAddress} on ${networkID}`);
-    const rawCoins: Asset[] = await getBalances(walletAddress, prefix, restUris);
-    console.log(`[FetchWalletAssets] Raw balances for ${networkID}:`, rawCoins);
+    const [rawCoins, coinGeckoPrices] = await Promise.all([
+      getBalances(walletAddress, restUris),
+      (async () => {
+        const coinGeckoIds = new Set<string>();
+
+        subscribedAssets.forEach(asset => {
+          if (asset.coinGeckoId) {
+            coinGeckoIds.add(asset.coinGeckoId);
+          }
+        });
+
+        Object.values(chainRegistry).forEach(chain => {
+          Object.values(chain.assets || {}).forEach(asset => {
+            if (asset.coinGeckoId) {
+              coinGeckoIds.add(asset.coinGeckoId);
+            }
+          });
+        });
+
+        return fetchCoinGeckoPrices(Array.from(coinGeckoIds));
+      })(),
+    ]);
 
     const resolvedAssets = await Promise.all(
       rawCoins.map(async coin => {
         let baseDenom = coin.denom;
         let isIbc = false;
 
-        console.log(`[FetchWalletAssets] Raw coin:`, coin);
-
         if (coin.denom.startsWith(IBC_PREFIX)) {
-          console.log(`[FetchWalletAssets] Resolving IBC denom ${coin.denom}`);
           try {
             baseDenom = await resolveIbcDenom(coin.denom, prefix, restUris);
             baseDenom = safeTrimLowerCase(baseDenom);
             isIbc = true;
-            console.log(`[FetchWalletAssets] Resolved IBC denom to base denom: ${baseDenom}`);
           } catch (err) {
             console.warn(`[FetchWalletAssets] Failed to resolve IBC denom: ${coin.denom}`, err);
             return null;
           }
         }
 
-        console.log(`[FetchWalletAssets] Searching for metadata for ${baseDenom}`);
         let metadata: Asset | undefined;
+        let coinGeckoId: string | undefined;
 
         // Search through all chains in the registry for matching denom
-        for (const [chainId, chain] of Object.entries(chainRegistry)) {
+        for (const chain of Object.values(chainRegistry)) {
           if (!chain.assets) continue;
 
           for (const [key, asset] of Object.entries(chain.assets)) {
@@ -165,11 +212,7 @@ export async function fetchWalletAssets(
 
             if (normalizedDenom === baseDenom || normalizedKey === baseDenom) {
               metadata = asset;
-              console.log(
-                `[FetchWalletAssets] Found match in ${chainId} (matched ${
-                  normalizedDenom === baseDenom ? 'denom' : 'key'
-                }: ${key})`,
-              );
+              coinGeckoId = asset.coinGeckoId;
               break;
             }
           }
@@ -183,13 +226,13 @@ export async function fetchWalletAssets(
         }
 
         const amount = adjustAmountByExponent(coin.amount, metadata.exponent);
+        const price = coinGeckoId ? coinGeckoPrices[coinGeckoId] || 0 : 0;
+
         return {
-          name: metadata.name,
+          ...metadata,
           denom: baseDenom,
-          symbol: metadata.symbol,
-          logo: metadata.logo,
-          exponent: metadata.exponent,
           amount,
+          price,
           isIbc,
           networkID,
           networkName,
@@ -197,8 +240,7 @@ export async function fetchWalletAssets(
       }),
     );
 
-    const validAssets = resolvedAssets.filter((a): a is Asset => a !== null);
-    console.log(`[FetchWalletAssets] Valid assets before filtering:`, validAssets);
+    const validAssets: Asset[] = resolvedAssets.filter((a): a is Asset => a !== null);
 
     // Create a set of all subscribed denoms across the entire network
     const allNetworkSubscribedDenoms = new Set<string>();
@@ -215,14 +257,17 @@ export async function fetchWalletAssets(
     // Add zero balances for this chain's specific subscriptions
     const zeroBalancesToAdd =
       thisChainSubscribedDenoms.length > 0
-        ? subscribedAssets.filter(
-            subAsset => !networkFilteredAssets.some(asset => asset.denom === subAsset.denom),
-          )
+        ? subscribedAssets
+            .filter(
+              subAsset => !networkFilteredAssets.some(asset => asset.denom === subAsset.denom),
+            )
+            .map(asset => ({
+              ...asset,
+              price: asset.coinGeckoId ? coinGeckoPrices[asset.coinGeckoId] || 0 : 0,
+            }))
         : [];
 
-    const finalAssets = [...networkFilteredAssets, ...zeroBalancesToAdd];
-    console.log(`[FetchWalletAssets] Final assets for ${networkID}:`, finalAssets);
-    return finalAssets;
+    return [...networkFilteredAssets, ...zeroBalancesToAdd];
   } catch (error) {
     console.error(`[FetchWalletAssets] Error for ${networkID}:`, error);
     return subscribedAssets;
