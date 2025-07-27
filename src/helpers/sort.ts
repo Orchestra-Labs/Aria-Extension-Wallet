@@ -157,50 +157,61 @@ export function filterAndSortValidators(
     : filteredValidators;
 
   const sorted = finalValidators.sort((a, b) => {
-    let valueA: any;
-    let valueB: any;
-
     switch (sortType) {
-      case ValidatorSortType.NAME:
-        const monikerA = safeTrimLowerCase(a.validator.description.moniker);
-        const monikerB = safeTrimLowerCase(b.validator.description.moniker);
-        valueA = stripNonAlphanumerics(monikerA);
-        valueB = stripNonAlphanumerics(monikerB);
-        const result =
-          sortOrder === SortOrder.ASC
-            ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-            : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
-        return result;
+      case ValidatorSortType.NAME: {
+        const monikerA = stripNonAlphanumerics(safeTrimLowerCase(a.validator.description.moniker));
+        const monikerB = stripNonAlphanumerics(safeTrimLowerCase(b.validator.description.moniker));
+        return sortOrder === SortOrder.ASC
+          ? monikerA.localeCompare(monikerB, undefined, { sensitivity: 'base' })
+          : monikerB.localeCompare(monikerA, undefined, { sensitivity: 'base' });
+      }
 
-      case ValidatorSortType.DELEGATION:
-        valueA = parseFloat(a.delegation.shares);
-        valueB = parseFloat(b.delegation.shares);
-        break;
+      case ValidatorSortType.DELEGATION: {
+        const valueA = parseFloat(a.delegation.shares) || 0;
+        const valueB = parseFloat(b.delegation.shares) || 0;
 
-      case ValidatorSortType.REWARDS:
-        valueA = a.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
-        valueB = b.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
-        break;
+        if (sortOrder === SortOrder.ASC) {
+          if (valueA === 0 && valueB !== 0) return -1;
+          if (valueB === 0 && valueA !== 0) return 1;
+          return valueA - valueB;
+        } else {
+          if (valueA === 0 && valueB !== 0) return 1;
+          if (valueB === 0 && valueA !== 0) return -1;
+          return valueB - valueA;
+        }
+      }
 
-      case ValidatorSortType.APR:
-        valueA = parseFloat(a.theoreticalApr ?? '0');
-        valueB = parseFloat(b.theoreticalApr ?? '0');
-        break;
+      case ValidatorSortType.REWARDS: {
+        const valueA = a.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
+        const valueB = b.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
 
-      case ValidatorSortType.VOTING_POWER:
-        valueA = parseFloat(a.votingPower ?? '0');
-        valueB = parseFloat(b.votingPower ?? '0');
-        break;
+      case ValidatorSortType.APR: {
+        const valueA = parseFloat(a.theoreticalApr ?? '0');
+        const valueB = parseFloat(b.theoreticalApr ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
 
-      case ValidatorSortType.UPTIME:
-        valueA = parseFloat(a.uptime ?? '0');
-        valueB = parseFloat(b.uptime ?? '0');
-        break;
+      case ValidatorSortType.VOTING_POWER: {
+        const valueA = parseFloat(a.votingPower ?? '0');
+        const valueB = parseFloat(b.votingPower ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
+
+      case ValidatorSortType.UPTIME: {
+        const valueA = parseFloat(a.uptime ?? '0');
+        const valueB = parseFloat(b.uptime ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
+
+      default: {
+        // Fallback to name sorting if unknown sort type
+        const monikerA = stripNonAlphanumerics(safeTrimLowerCase(a.validator.description.moniker));
+        const monikerB = stripNonAlphanumerics(safeTrimLowerCase(b.validator.description.moniker));
+        return monikerA.localeCompare(monikerB, undefined, { sensitivity: 'base' });
+      }
     }
-
-    const result =
-      sortOrder === SortOrder.ASC ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
-    return result;
   });
 
   return sorted;
