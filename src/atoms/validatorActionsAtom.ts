@@ -2,9 +2,10 @@ import { atom } from 'jotai';
 import { TransactionStatus } from '@/constants';
 import { chainWalletAtom, selectedValidatorChainAtom, chainInfoAtom } from '@/atoms';
 import { validatorFeeStateAtom, validatorTransactionStateAtom } from './validatorStateAtom';
-import { DelegationResponse } from '@/types';
+import { FullValidatorInfo } from '@/types';
 import { claimAndRestake, claimAndUnstake, claimRewards, stakeToValidator } from '@/helpers';
 
+// TODO: may not need this pass-through file
 export const executeStakeAtom = atom(
   null,
   async (
@@ -73,17 +74,16 @@ export const executeUnstakeAtom = atom(
     get,
     set,
     {
-      amount,
-      delegations,
+      amount = undefined,
+      validatorInfoArray,
       simulate,
     }: {
-      amount: string;
-      delegations: DelegationResponse[];
+      amount?: string;
+      validatorInfoArray: FullValidatorInfo[];
       simulate: boolean;
     },
   ) => {
     const getChainInfo = get(chainInfoAtom);
-
     const chainId = get(selectedValidatorChainAtom);
     const feeState = get(validatorFeeStateAtom);
     const chain = getChainInfo(chainId);
@@ -98,7 +98,7 @@ export const executeUnstakeAtom = atom(
       const result = await claimAndUnstake({
         chain,
         amount,
-        delegations,
+        validatorInfoArray,
         feeToken: feeState.feeToken,
         simulateOnly: simulate,
       });
@@ -130,26 +130,18 @@ export const executeClaimAtom = atom(
     get,
     set,
     {
-      validatorAddress,
-      delegations = [],
-      rewards = [],
+      validatorInfoArray = [],
       isToRestake,
       simulate,
     }: {
-      validatorAddress: string;
-      // TODO: keep consistent
-      delegations?: DelegationResponse | DelegationResponse[];
-      // TODO: cast to type
-      rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[];
+      validatorInfoArray?: FullValidatorInfo[];
       isToRestake: boolean;
       simulate: boolean;
     },
   ) => {
     const getChainInfo = get(chainInfoAtom);
-
     const chainId = get(selectedValidatorChainAtom);
     const feeState = get(validatorFeeStateAtom);
-    const walletState = get(chainWalletAtom(chainId));
     const chain = getChainInfo(chainId);
 
     try {
@@ -161,21 +153,9 @@ export const executeClaimAtom = atom(
 
       let result;
       if (isToRestake) {
-        result = await claimAndRestake(
-          chain,
-          delegations || {},
-          rewards,
-          feeState.feeToken,
-          simulate,
-        );
+        result = await claimAndRestake(chain, validatorInfoArray, feeState.feeToken, simulate);
       } else {
-        result = await claimRewards(
-          walletState.address,
-          validatorAddress,
-          chain,
-          feeState.feeToken,
-          simulate,
-        );
+        result = await claimRewards(chain, validatorInfoArray, feeState.feeToken, simulate);
       }
 
       if (result.success) {

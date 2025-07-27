@@ -23,9 +23,14 @@ export interface ValidatorInfo {
   };
 }
 
+export interface Coin {
+  denom: string;
+  amount: string;
+}
+
 export interface ValidatorReward {
-  validator: string;
-  rewards: any[];
+  validator_address: string;
+  reward: Coin[];
 }
 
 export interface DelegationResponse {
@@ -53,11 +58,11 @@ export interface StakingParams {
   bond_denom: string;
 }
 
-export interface CombinedStakingInfo {
+export interface FullValidatorInfo {
   delegation: DelegationResponse['delegation'];
   balance: DelegationResponse['balance'];
   validator: ValidatorInfo;
-  rewards: ValidatorReward['rewards'];
+  rewards: Coin[];
   stakingParams?: StakingParams | null;
   commission: string;
   theoreticalApr?: string;

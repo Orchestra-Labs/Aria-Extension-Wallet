@@ -4,7 +4,6 @@ import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   dialogSearchTermAtom,
-  filteredDialogValidatorsAtom,
   selectedValidatorsAtom,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
@@ -16,10 +15,11 @@ import {
   validatorTxHash,
   validatorCalculatedFeeAtom,
   lastSimulationUpdateAtom,
+  dialogValidatorsAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
-import { CombinedStakingInfo } from '@/types';
+import { FullValidatorInfo } from '@/types';
 import { useRefreshData, useValidatorActions } from '@/hooks';
 import { ValidatorSortType, SortOrder, SearchType } from '@/constants';
 import { TransactionResultsTile } from '../TransactionResultsTile';
@@ -46,8 +46,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortOrder = useSetAtom(validatorDialogSortOrderAtom);
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
-  const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
-
+  const getDialogValidators = useAtomValue(dialogValidatorsAtom);
   const isLoading = useAtomValue(isValidatorLoadingAtom);
   const isSuccess = useAtomValue(isValidatorSuccessAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
@@ -56,8 +55,10 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
+  const filteredValidators = getDialogValidators(isClaimDialog);
 
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
+  const [isTransactionInProgress, setIsTransactionInProgress] = useState(false);
 
   const searchType = SearchType.VALIDATOR;
 
@@ -65,13 +66,6 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const noValidatorsSelected = selectedValidators.length === 0;
 
   const unbondingDays = `${filteredValidators[0]?.stakingParams?.unbonding_time || 0} days`;
-
-  const calculateTotalDelegations = () => {
-    return selectedValidators.reduce(
-      (sum, validator) => sum + parseFloat(validator.delegation.shares || '0'),
-      0,
-    );
-  };
 
   const resetDefaults = () => {
     // NOTE: reset atom states
@@ -93,7 +87,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     setSelectedValidators([]);
   };
 
-  const handleValidatorSelect = (validator: CombinedStakingInfo) => {
+  const handleValidatorSelect = (validator: FullValidatorInfo) => {
     setSelectedValidators(prev =>
       prev.some(v => v.delegation.validator_address === validator.delegation.validator_address)
         ? prev.filter(
@@ -106,30 +100,22 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const handleAction = async ({ isSimulation = false }: { isSimulation?: boolean } = {}) => {
     if (noValidatorsSelected) return;
 
-    const delegations = selectedValidators.map(validator => ({
-      delegation: validator.delegation,
-      balance: validator.balance,
-    }));
-
-    const rewards = selectedValidators.map(v => ({
-      validator: v.delegation.validator_address,
-      rewards: v.rewards,
-    }));
-
     const actionFn = isSimulation ? runSimulation : runTransaction;
 
     try {
+      setIsTransactionInProgress(true);
+
       if (isClaimDialog) {
         if (isClaimToRestake) {
           // Claim to restake
-          await actionFn('claim', '0', true, delegations, rewards);
+          await actionFn('claim', undefined, true, selectedValidators);
         } else {
           // Claim to wallet
-          await actionFn('claim', '0', false, delegations, rewards);
+          await actionFn('claim', undefined, false, selectedValidators);
         }
       } else {
         // Unstake
-        await actionFn('unstake', calculateTotalDelegations().toString(), false, delegations);
+        await actionFn('unstake', undefined, false, selectedValidators);
       }
 
       setLastUpdateTime(Date.now());
@@ -137,39 +123,45 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
       console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, errorMessage);
       throw error;
+    } finally {
+      setIsTransactionInProgress(false);
     }
   };
 
-  const canRunSimulation = () => !noValidatorsSelected;
+  const canRunSimulation = () =>
+    slideTrayRef.current?.isOpen() && !noValidatorsSelected && !isTransactionInProgress;
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
 
-    const setupInterval = () => {
-      intervalId = setInterval(() => {
-        if (canRunSimulation()) {
-          handleAction({ isSimulation: true });
-          setLastUpdateTime(Date.now());
-        } else {
+    const runSimulationIfNeeded = () => {
+      if (canRunSimulation() && Date.now() - lastUpdateTime > 5000) {
+        if (intervalId) {
           clearInterval(intervalId);
         }
-      }, 5000);
-    };
 
-    if (canRunSimulation()) {
-      if (Date.now() - lastUpdateTime > 5000) {
         handleAction({ isSimulation: true });
         setLastUpdateTime(Date.now());
       }
+    };
 
-      setupInterval();
-    }
+    runSimulationIfNeeded();
+
+    // Set up interval for periodic checks
+    intervalId = setInterval(runSimulationIfNeeded, 5000);
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
+  }, [selectedValidators]);
+
+  useEffect(() => {
+    if (canRunSimulation()) {
+      handleAction({ isSimulation: true });
+      setLastUpdateTime(Date.now());
+    }
   }, [selectedValidators]);
 
   useEffect(() => {

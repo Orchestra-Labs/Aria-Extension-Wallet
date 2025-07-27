@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { CombinedStakingInfo, ValidatorLogoInfo } from '@/types';
+import { FullValidatorInfo, ValidatorLogoInfo } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
@@ -49,23 +49,23 @@ import { useValidatorActions } from '@/hooks';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
 
 interface ValidatorTileProps {
-  combinedStakingInfo: CombinedStakingInfo;
+  fullValidatorInfo: FullValidatorInfo;
   isSelectable?: boolean;
-  onClick?: (validator: CombinedStakingInfo) => void;
+  onClick?: (validator: FullValidatorInfo) => void;
   forceCurrentViewStyle?: boolean;
 }
 
 // TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 // TODO: if no staking denom, disable staking features
 const ValidatorTileComponent = ({
-  combinedStakingInfo,
+  fullValidatorInfo: combinedStakingInfo,
   isSelectable = false,
   onClick,
   forceCurrentViewStyle = false,
 }: ValidatorTileProps) => {
   // Refs and state
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
-  const { runTransaction, runSimulation } = useValidatorActions(combinedStakingInfo);
+  const { runTransaction, runSimulation } = useValidatorActions();
 
   // Atoms
   const networkLevel = useAtomValue(networkLevelAtom);
@@ -98,18 +98,8 @@ const ValidatorTileComponent = ({
     error: false,
   });
 
-  const {
-    validator,
-    delegation,
-    balance,
-    rewards,
-    unbondingBalance,
-    theoreticalApr,
-    uptime,
-    votingPower,
-  } = combinedStakingInfo;
-  const delegationResponse = { delegation, balance };
-
+  const { validator, delegation, rewards, unbondingBalance, theoreticalApr, uptime, votingPower } =
+    combinedStakingInfo;
   // Asset info
   const stakingDenom = chain.staking_denoms[0];
   const asset = chain.assets?.[stakingDenom] || DEFAULT_MAINNET_ASSET;
@@ -222,19 +212,13 @@ const ValidatorTileComponent = ({
     try {
       switch (selectedAction) {
         case 'stake':
-          await actionFn('stake', amount.toString());
+          await actionFn('stake', amount.toString(), false, [combinedStakingInfo]);
           break;
         case 'unstake':
-          await actionFn('unstake', amount.toString(), false, [delegationResponse]);
+          await actionFn('unstake', amount.toString(), false, [combinedStakingInfo]);
           break;
         case 'claim':
-          await actionFn(
-            'claim',
-            '0',
-            isClaimToRestake,
-            [delegationResponse],
-            [{ validator: validator.operator_address, rewards }],
-          );
+          await actionFn('claim', undefined, isClaimToRestake, [combinedStakingInfo]);
           break;
       }
 

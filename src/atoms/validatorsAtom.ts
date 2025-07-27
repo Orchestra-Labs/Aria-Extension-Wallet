@@ -1,4 +1,4 @@
-import { CombinedStakingInfo } from '@/types';
+import { FullValidatorInfo } from '@/types';
 import { atom } from 'jotai';
 import {
   validatorSortOrderAtom,
@@ -8,7 +8,7 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
 } from '@/atoms';
-import { filterAndSortValidators } from '@/helpers';
+import { filterAndSortDialogValidators, filterAndSortValidators } from '@/helpers';
 import { ValidatorStatusFilter } from '@/constants';
 
 const _showCurrentValidatorsOverrideAtom = atom<boolean | null>(null);
@@ -29,8 +29,8 @@ export const showCurrentValidatorsAtom = atom(
   },
 );
 
-export const validatorDataAtom = atom<CombinedStakingInfo[]>([]);
-export const selectedValidatorsAtom = atom<CombinedStakingInfo[]>([]);
+export const validatorDataAtom = atom<FullValidatorInfo[]>([]);
+export const selectedValidatorsAtom = atom<FullValidatorInfo[]>([]);
 export const validatorStatusFilterAtom = atom<ValidatorStatusFilter>(
   ValidatorStatusFilter.STATUS_ACTIVE,
 );
@@ -72,5 +72,22 @@ export const filteredDialogValidatorsAtom = atom(get => {
     sortOrder,
     true,
     statusFilter,
+  );
+});
+
+export const dialogValidatorsAtom = atom(get => (isClaimDialog: boolean) => {
+  const validatorData = get(validatorDataAtom);
+  const searchTerm = get(dialogSearchTermAtom);
+  const sortOrder = get(validatorDialogSortOrderAtom);
+  const sortType = get(validatorDialogSortTypeAtom);
+  const statusFilter = get(validatorStatusFilterAtom);
+
+  return filterAndSortDialogValidators(
+    validatorData,
+    searchTerm,
+    sortType,
+    sortOrder,
+    statusFilter,
+    isClaimDialog,
   );
 });

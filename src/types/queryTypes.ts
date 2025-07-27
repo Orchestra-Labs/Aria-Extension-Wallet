@@ -1,4 +1,10 @@
-import { StakingParams, UnbondingDelegationEntry, ValidatorInfo } from './validatorData';
+import {
+  Coin,
+  StakingParams,
+  UnbondingDelegationEntry,
+  ValidatorInfo,
+  ValidatorReward,
+} from './validatorData';
 
 export interface Pagination {
   next_key: string | null;
@@ -37,6 +43,12 @@ export interface TransactionSuccess {
   txHash?: string;
 }
 
+// API response matches Cosmos SDK standard
+export interface RewardsResponse {
+  rewards: ValidatorReward[];
+  total: Coin[];
+}
+
 export interface RPCResponse {
   code: number;
   txhash?: string;
@@ -70,13 +82,8 @@ export interface RPCResponse {
   };
 
   // Rewards fields
-  rewards?:
-    | Array<{
-        validator_address: string;
-        reward: any[];
-      }>
-    | any[]; // Allow both formats of rewards
-  reward?: any[]; // For single validator rewards
+  rewards?: RewardsResponse;
+  reward?: ValidatorReward[]; // For single validator rewards
 
   params?: StakingParams;
 

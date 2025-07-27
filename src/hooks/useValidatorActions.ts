@@ -1,5 +1,5 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { CombinedStakingInfo, DelegationResponse, TransactionResult } from '@/types';
+import { FullValidatorInfo, TransactionResult } from '@/types';
 import { validatorFeeStateAtom, validatorTransactionStateAtom } from '@/atoms/validatorStateAtom';
 import {
   executeClaimAtom,
@@ -12,17 +12,17 @@ import { useRefreshData } from './useRefreshData';
 import { selectedValidatorsAtom } from '@/atoms';
 
 interface HandleTransactionParams {
+  // TODO: use enum
   action: 'stake' | 'unstake' | 'claim';
   isSimulation: boolean;
   amount?: string;
   toRestake?: boolean;
-  delegations?: DelegationResponse[];
-  rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[];
+  validatorInfoArray?: FullValidatorInfo[];
 }
 
-export const useValidatorActions = (validator?: CombinedStakingInfo) => {
+export const useValidatorActions = () => {
   const { refreshData } = useRefreshData();
-  const [selectedValidators] = useAtom(selectedValidatorsAtom);
+  const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
 
   const setTransactionState = useSetAtom(validatorTransactionStateAtom);
   const [feeState, setFeeState] = useAtom(validatorFeeStateAtom);
@@ -30,27 +30,13 @@ export const useValidatorActions = (validator?: CombinedStakingInfo) => {
   const unstake = useSetAtom(executeUnstakeAtom);
   const claim = useSetAtom(executeClaimAtom);
 
-  const getActiveValidator = () => {
-    // If validator is explicitly passed, use that
-    if (validator) return validator;
-
-    // If we have selected validators, use the first one (for stake/claim actions that need a validator)
-    if (selectedValidators.length > 0) return selectedValidators[0];
-
-    // Otherwise return undefined (will throw error for stake actions)
-    return undefined;
-  };
-
   const handleTransaction = async ({
     action,
     isSimulation,
-    amount = '0',
+    amount = undefined,
     toRestake = false,
-    delegations = [],
-    rewards = [],
+    validatorInfoArray = [],
   }: HandleTransactionParams): Promise<TransactionResult | null> => {
-    const activeValidator = getActiveValidator();
-
     try {
       let result: TransactionResult;
       const startTime = performance.now();
@@ -64,34 +50,33 @@ export const useValidatorActions = (validator?: CombinedStakingInfo) => {
 
       switch (action) {
         case 'stake':
+          const stakeAmount = amount || '0';
+          const validatorAddress =
+            validatorInfoArray.length > 0
+              ? validatorInfoArray[0].validator.operator_address
+              : selectedValidators[0].validator.operator_address;
           result = await stake({
-            amount,
+            amount: stakeAmount,
             denom: feeState.feeToken.denom,
-            validatorAddress: activeValidator?.validator.operator_address as string,
+            validatorAddress: validatorAddress,
             simulate: isSimulation,
           });
           break;
         case 'unstake':
           result = await unstake({
             amount,
-            delegations,
+            validatorInfoArray:
+              validatorInfoArray.length > 0 ? validatorInfoArray : selectedValidators,
             simulate: isSimulation,
           });
           break;
         case 'claim':
-          result = toRestake
-            ? await claim({
-                validatorAddress: activeValidator?.validator.operator_address as string,
-                delegations,
-                rewards,
-                isToRestake: toRestake,
-                simulate: isSimulation,
-              })
-            : await claim({
-                validatorAddress: activeValidator?.validator.operator_address as string,
-                isToRestake: toRestake,
-                simulate: isSimulation,
-              });
+          result = await claim({
+            validatorInfoArray:
+              validatorInfoArray.length > 0 ? validatorInfoArray : selectedValidators,
+            isToRestake: toRestake,
+            simulate: isSimulation,
+          });
           break;
         default:
           throw new Error('Invalid validator action');
@@ -127,6 +112,7 @@ export const useValidatorActions = (validator?: CombinedStakingInfo) => {
                   ? TransactionType.CLAIM_TO_RESTAKE
                   : TransactionType.CLAIM_TO_WALLET,
           );
+          setSelectedValidators([]);
           refreshData();
         }
         return result;
@@ -143,37 +129,35 @@ export const useValidatorActions = (validator?: CombinedStakingInfo) => {
     }
   };
 
+  // TODO: non-positional parameters are better
   const runTransaction = async (
     action: 'stake' | 'unstake' | 'claim',
-    amount: string = '0',
+    amount?: string,
     toRestake: boolean = false,
-    delegations?: any,
-    rewards: any[] = [],
+    validatorInfoArray: FullValidatorInfo[] = [],
   ): Promise<TransactionResult | null> => {
     return handleTransaction({
       action,
       isSimulation: false,
       amount,
       toRestake,
-      delegations,
-      rewards,
+      validatorInfoArray,
     });
   };
 
+  // TODO: non-positional parameters are better
   const runSimulation = async (
     action: 'stake' | 'unstake' | 'claim',
-    amount: string = '0',
+    amount?: string,
     toRestake: boolean = false,
-    delegations?: any,
-    rewards: any[] = [],
+    validatorInfoArray: FullValidatorInfo[] = [],
   ): Promise<TransactionResult | null> => {
     return handleTransaction({
       action,
       isSimulation: true,
       amount,
       toRestake,
-      delegations,
-      rewards,
+      validatorInfoArray,
     });
   };
 

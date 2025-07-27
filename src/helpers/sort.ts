@@ -1,4 +1,4 @@
-import { Asset, CombinedStakingInfo, SimplifiedChainInfo } from '@/types';
+import { Asset, FullValidatorInfo, SimplifiedChainInfo } from '@/types';
 import { safeTrimLowerCase, stripNonAlphanumerics } from './formatString';
 import {
   AssetSortType,
@@ -112,7 +112,7 @@ export function filterAndSortAssets(
   return sortAssets(filteredAssets, searchTerm, sortType, sortOrder);
 }
 
-const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStatusFilter) => {
+const statusMatch = (validator: FullValidatorInfo, statusFilter: ValidatorStatusFilter) => {
   if (statusFilter === ValidatorStatusFilter.STATUS_ACTIVE) {
     return validator.validator.status === BondStatus.BONDED;
   } else if (statusFilter === ValidatorStatusFilter.STATUS_NON_JAILED) {
@@ -122,7 +122,7 @@ const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStat
   }
 };
 
-const hasUserActivity = (validator: CombinedStakingInfo) => {
+const hasUserActivity = (validator: FullValidatorInfo) => {
   const isDelegatedTo = parseFloat(validator.balance.amount) > 0;
   const isUnbondingFrom =
     validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
@@ -132,7 +132,7 @@ const hasUserActivity = (validator: CombinedStakingInfo) => {
 };
 
 export function filterAndSortValidators(
-  validators: CombinedStakingInfo[],
+  validators: FullValidatorInfo[],
   searchTerm: string,
   sortType: ValidatorSortType,
   sortOrder: SortOrder,
@@ -204,6 +204,39 @@ export function filterAndSortValidators(
   });
 
   return sorted;
+}
+
+export function filterAndSortDialogValidators(
+  validators: FullValidatorInfo[],
+  searchTerm: string,
+  sortType: ValidatorSortType,
+  sortOrder: SortOrder,
+  statusFilter: ValidatorStatusFilter,
+  isClaimDialog: boolean,
+): FullValidatorInfo[] {
+  // First apply the base filtering (status and search)
+  const baseFiltered = filterAndSortValidators(
+    validators,
+    searchTerm,
+    sortType,
+    sortOrder,
+    true, // showCurrentValidators
+    statusFilter,
+  );
+
+  // Then apply dialog-specific filtering
+  return baseFiltered.filter(validator => {
+    if (isClaimDialog) {
+      // For claim dialog: only show validators with rewards to claim
+      return validator.rewards.some(reward => parseFloat(reward.amount) > 0);
+    } else {
+      // For unstake dialog: only show validators with balance and not unstaking
+      const hasBalance = parseFloat(validator.balance.amount) > 0;
+      const isUnstaking =
+        validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
+      return hasBalance && !isUnstaking;
+    }
+  });
 }
 
 export function filterAndSortChains(

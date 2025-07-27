@@ -6,6 +6,7 @@ import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { chainWalletAtom } from './walletAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 
+// TODO: may not need this pass-through file
 // Core transaction execution atoms
 export const executeSendAtom = atom(
   null,

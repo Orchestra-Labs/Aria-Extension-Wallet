@@ -1,237 +1,55 @@
-import {
-  COSMOS_CHAIN_ENDPOINTS,
-  DEFAULT_MAINNET_ASSET,
-  GREATER_EXPONENT_DEFAULT,
-} from '@/constants';
+import { COSMOS_CHAIN_ENDPOINTS, GREATER_EXPONENT_DEFAULT } from '@/constants';
 import { queryRpcNode } from './queryNodes';
-import { DelegationResponse, FeeToken, SimplifiedChainInfo, TransactionResult } from '@/types';
-import { fetchRewards } from './fetchStakingInfo';
+import {
+  FeeToken,
+  FullValidatorInfo,
+  RPCResponse,
+  SimplifiedChainInfo,
+  TransactionResult,
+} from '@/types';
+import { delay } from './timer';
 
 const MAX_MESSAGES_PER_BATCH = 15;
 
-// TODO: verify multiple messages add fees from queryNodes properly.  shouldn't need magic number below
-export const buildStakingMessage = ({
+export const buildMessageBundle = ({
   endpoint,
-  delegatorAddress,
-  validatorAddress,
-  amount,
+  validatorInfoArray,
+  amount = undefined,
   denom,
-  delegations,
 }: {
   endpoint: string;
   delegatorAddress?: string;
-  validatorAddress?: string | string[];
+  validatorInfoArray?: FullValidatorInfo[];
   amount?: string;
   denom?: string;
-  delegations?: DelegationResponse[];
-}): any => {
-  if (delegations) {
-    // Handle multiple delegations
-    return delegations.map(delegation => ({
-      typeUrl: endpoint,
-      value: {
-        delegatorAddress: delegation.delegation.delegator_address,
-        validatorAddress: delegation.delegation.validator_address,
-        amount: {
-          denom: delegation.balance.denom,
-          amount: delegation.balance.amount,
-        },
-      },
-    }));
-  }
+}): any[] => {
+  const messages = [];
 
-  // Single validator address or multiple
-  const validatorAddressesArray = Array.isArray(validatorAddress)
-    ? validatorAddress
-    : [validatorAddress];
-
-  // Create messages for each validator in the array
-  return validatorAddressesArray.map(validator => ({
-    typeUrl: endpoint,
-    value: {
-      delegatorAddress: delegatorAddress,
-      validatorAddress: validator,
-      ...(amount && denom ? { amount: { denom, amount } } : {}),
-    },
-  }));
-};
-
-export const claimRewards = async (
-  delegatorAddress: string,
-  validatorAddress: string | string[],
-  chain: SimplifiedChainInfo,
-  feeToken?: FeeToken,
-  simulateOnly = false,
-): Promise<TransactionResult> => {
-  const endpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
-  const validatorAddressesArray = Array.isArray(validatorAddress)
-    ? validatorAddress
-    : [validatorAddress];
-  const messages = buildStakingMessage({
-    endpoint,
-    delegatorAddress,
-    validatorAddress: validatorAddressesArray,
-  });
-
-  try {
-    const response = await queryRpcNode({
-      endpoint,
-      prefix: chain.bech32_prefix,
-      rpcUris: chain.rpc_uris,
-      messages,
-      feeToken,
-      simulateOnly,
-    });
-
-    if (!response) {
-      return {
-        success: false,
-        message: 'No response received from transaction',
-        data: { code: 1 },
+  if (validatorInfoArray) {
+    for (const validatorInfo of validatorInfoArray) {
+      const messageValue: any = {
+        delegatorAddress: validatorInfo.delegation.delegator_address,
+        validatorAddress: validatorInfo.delegation.validator_address,
       };
-    }
 
-    if (simulateOnly) {
-      return { success: true, message: 'Simulation successful', data: response };
-    }
-
-    return { success: true, message: 'Transaction successful', data: response };
-  } catch (error) {
-    console.error('Error claiming rewards:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      data: { code: 1 },
-    };
-  }
-};
-
-// TOOD: this properly handles mass messages.  expand the solution to the others
-// TODO: ensure this sends back a sum of all batches when simulating
-export const claimAndRestake = async (
-  chain: SimplifiedChainInfo,
-  delegations: DelegationResponse | DelegationResponse[],
-  rewards?: { validator: string; rewards: { denom: string; amount: string }[] }[],
-  feeToken?: FeeToken,
-  simulateOnly = false,
-): Promise<TransactionResult> => {
-  const delegateEndpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
-  const delegationsArray = Array.isArray(delegations) ? delegations : [delegations];
-  const delegatorAddress = delegationsArray[0].delegation.delegator_address;
-  const validatorAddresses = delegationsArray.map(d => d.delegation.validator_address);
-  const prefix = chain.bech32_prefix;
-  const restUris = chain.rest_uris;
-  const rpcUris = chain.rpc_uris;
-
-  try {
-    const validatorRewards =
-      rewards ||
-      (await fetchRewards(
-        prefix,
-        restUris,
-        delegatorAddress,
-        validatorAddresses.map(addr => ({ validator_address: addr })),
-      ));
-
-    const claimMessages = buildStakingMessage({
-      endpoint: COSMOS_CHAIN_ENDPOINTS.claimRewards,
-      delegatorAddress,
-      validatorAddress: validatorAddresses,
-    });
-
-    const delegateMessages = validatorRewards.flatMap(reward => {
-      const [firstReward] = reward.rewards || [];
-      if (!firstReward || !firstReward.amount || !firstReward.denom) return [];
-
-      return buildStakingMessage({
-        endpoint: delegateEndpoint,
-        delegatorAddress,
-        validatorAddress: reward.validator,
-        amount: firstReward.amount.split('.')[0],
-        denom: firstReward.denom,
-      });
-    });
-
-    const batchedMessages = [...claimMessages, ...delegateMessages];
-
-    const messageChunks = [];
-    for (let i = 0; i < batchedMessages.length; i += MAX_MESSAGES_PER_BATCH) {
-      messageChunks.push(batchedMessages.slice(i, i + MAX_MESSAGES_PER_BATCH));
-    }
-
-    if (simulateOnly) {
-      const simulation = await queryRpcNode({
-        endpoint: delegateEndpoint,
-        prefix,
-        rpcUris,
-        messages: messageChunks[0],
-        feeToken,
-        simulateOnly: true,
-      });
-
-      return {
-        success: !!simulation && simulation.code === 0,
-        message: simulation?.code === 0 ? 'Simulation successful' : 'Simulation failed',
-        data: simulation,
-      };
-    }
-
-    for (const messages of messageChunks) {
-      const simulation = await queryRpcNode({
-        endpoint: delegateEndpoint,
-        prefix,
-        rpcUris,
-        messages,
-        feeToken,
-        simulateOnly: true,
-      });
-
-      if (!simulation || simulation.code !== 0) {
-        return {
-          success: false,
-          message: 'Simulation failed or insufficient gas estimation',
-          data: simulation,
+      if (endpoint === COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator) {
+        // NOTE: If no amount is provided, Cosmos will unstake all
+        messageValue.amount = {
+          denom: validatorInfo.balance.denom,
+          amount: amount || validatorInfo.balance.amount,
         };
+      } else if (amount && denom) {
+        messageValue.amount = { denom, amount };
       }
 
-      const estimatedGas = parseFloat(simulation.gasWanted || '0') * 1.1;
-      const feeAmount = Math.ceil(estimatedGas * 0.025);
-
-      const result = await queryRpcNode({
-        endpoint: delegateEndpoint,
-        prefix,
-        rpcUris,
-        messages,
-        feeToken,
-        simulateOnly: false,
-        fee: {
-          amount: [{ denom: DEFAULT_MAINNET_ASSET.denom, amount: feeAmount.toFixed(0) }],
-          gas: estimatedGas.toFixed(0),
-        },
+      messages.push({
+        typeUrl: endpoint,
+        value: messageValue,
       });
-
-      if (!result || result.code !== 0) {
-        return {
-          success: false,
-          message: 'Transaction failed',
-          data: result,
-        };
-      }
     }
-
-    return {
-      success: true,
-      message: 'Transaction successful',
-      data: { code: 0 },
-    };
-  } catch (error) {
-    console.error('Error during claim and restake:', error);
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      data: { code: 1 },
-    };
   }
+
+  return messages;
 };
 
 export const stakeToValidator = async (
@@ -243,27 +61,25 @@ export const stakeToValidator = async (
   feeToken: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
-  console.log('[stakeToValidator] Starting stake operation', {
-    amount,
-    denom,
-    walletAddress: walletAddress,
-    validatorAddress: validatorAddress,
-    simulateOnly,
-  });
-
   const endpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
 
   const formattedAmount = (
     parseFloat(amount) * Math.pow(10, chain.assets?.[denom]?.exponent || GREATER_EXPONENT_DEFAULT)
   ).toFixed(0);
 
-  const messages = buildStakingMessage({
-    endpoint,
-    delegatorAddress: walletAddress,
-    validatorAddress,
-    amount: formattedAmount,
-    denom,
-  });
+  const messages = [
+    {
+      typeUrl: endpoint,
+      value: {
+        delegatorAddress: walletAddress,
+        validatorAddress,
+        amount: {
+          denom,
+          amount: formattedAmount,
+        },
+      },
+    },
+  ];
 
   try {
     const response = await queryRpcNode({
@@ -297,127 +113,71 @@ export const stakeToValidator = async (
   }
 };
 
-// NOTE: Cosmos unstaking automatically claims rewards
-export const claimAndUnstake = async ({
-  chain,
-  delegations,
-  amount,
-  feeToken,
+// TODO: get feeToken from chain information?
+export const claimRewards = async (
+  chain: SimplifiedChainInfo,
+  validatorInfoArray: FullValidatorInfo[],
+  feeToken: FeeToken,
   simulateOnly = false,
-}: {
-  chain: SimplifiedChainInfo;
-  delegations: DelegationResponse[];
-  amount?: string;
-  feeToken: FeeToken;
-  simulateOnly?: boolean;
-}): Promise<TransactionResult> => {
-  const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
+): Promise<TransactionResult> => {
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
   const prefix = chain.bech32_prefix;
   const rpcUris = chain.rpc_uris;
 
-  // Validate inputs
-  if (!delegations || delegations.length === 0) {
-    return {
-      success: false,
-      message: 'No delegations provided',
-      data: { code: 1 },
-    };
-  }
-
-  // Get chain parameters
-  const denom = delegations[0].balance.denom;
-  const exponent = chain.assets?.[denom]?.exponent || GREATER_EXPONENT_DEFAULT;
-
-  // Build messages for each validator
-  const buildMessages = (): any[] => {
-    if (amount) {
-      // Partial unstaking from first validator
-      const amountNum = parseFloat(amount);
-      if (isNaN(amountNum)) {
-        throw new Error('Invalid unstaking amount');
-      }
-      const formattedAmount = (amountNum * Math.pow(10, exponent)).toFixed(0);
-
-      return [
-        {
-          typeUrl: endpoint,
-          value: {
-            delegatorAddress: delegations[0].delegation.delegator_address,
-            validatorAddress: delegations[0].delegation.validator_address,
-            amount: {
-              denom,
-              amount: formattedAmount,
-            },
-          },
-        },
-      ];
-    }
-
-    // Full unstaking from all validators
-    return delegations.map(delegation => ({
-      typeUrl: endpoint,
-      value: {
-        delegatorAddress: delegation.delegation.delegator_address,
-        validatorAddress: delegation.delegation.validator_address,
-        amount: {
-          denom: delegation.balance.denom,
-          amount: delegation.balance.amount,
-        },
-      },
-    }));
-  };
-
-  const allMessages = buildMessages();
-  const messageChunks: any[][] = [];
+  // Build messages from validator info array
+  const messages = buildMessageBundle({
+    endpoint,
+    validatorInfoArray,
+  });
 
   // Split into batches
-  for (let i = 0; i < allMessages.length; i += MAX_MESSAGES_PER_BATCH) {
-    messageChunks.push(allMessages.slice(i, i + MAX_MESSAGES_PER_BATCH));
+  const messageChunks = [];
+  for (let i = 0; i < messages.length; i += MAX_MESSAGES_PER_BATCH) {
+    messageChunks.push(messages.slice(i, i + MAX_MESSAGES_PER_BATCH));
   }
 
-  let lastSuccessfulResponse: any = null;
-
   try {
-    for (const messages of messageChunks) {
-      // First get gas estimate using minimal amounts
-      const gasEstimation = await queryRpcNode({
+    let totalGasWanted = 0;
+    let lastSuccessfulResult: RPCResponse | undefined = undefined;
+    let allSimulationsSuccessful = true;
+    let firstFailedSimulation: RPCResponse | undefined = undefined;
+
+    // Single loop for both simulation and execution
+    for (const [index, messages] of messageChunks.entries()) {
+      // Always simulate first
+      const simulation = await queryRpcNode({
         endpoint,
         prefix,
         rpcUris,
-        messages: messages.map(msg => ({
-          ...msg,
-          value: {
-            ...msg.value,
-            amount: {
-              denom: msg.value.amount.denom,
-              amount: '1',
-            },
-          },
-        })),
+        messages,
         feeToken,
         simulateOnly: true,
       });
 
-      if (!gasEstimation || gasEstimation.code !== 0) {
+      if (!simulation || simulation.code !== 0) {
+        allSimulationsSuccessful = false;
+        firstFailedSimulation = simulation;
+        if (simulateOnly) continue;
+
         return {
           success: false,
-          message: 'Gas estimation failed',
-          data: gasEstimation,
+          message: `Batch ${index + 1} simulation failed`,
+          data: simulation,
         };
       }
 
-      const estimatedGas = parseFloat(gasEstimation.gasWanted || '0');
-      const feeAmount = Math.ceil(estimatedGas * feeToken.gasPriceStep.average);
+      totalGasWanted += parseFloat(simulation.gasWanted || '0');
 
       if (simulateOnly) {
-        return {
-          success: true,
-          message: 'Simulation successful',
-          data: gasEstimation,
-        };
+        continue; // Just accumulate gas in simulation mode
       }
 
-      // Execute actual transaction with full amounts
+      // Execution mode
+      console.log(`Processing claim rewards batch ${index + 1}/${messageChunks.length}`);
+
+      const estimatedGas = Math.ceil(parseFloat(simulation.gasWanted || '0') * 1.1);
+      const feeAmount = Math.ceil(estimatedGas * (feeToken.gasPriceStep?.average || 0.025));
+
       const result = await queryRpcNode({
         endpoint,
         prefix,
@@ -431,50 +191,370 @@ export const claimAndUnstake = async ({
         },
       });
 
-      // Store the last successful response
-      if (result) {
-        lastSuccessfulResponse = result;
-      }
-
-      // Handle indexer disabled case
-      if (result?.code === 1 && result?.message?.includes('indexer disabled')) {
-        return {
-          success: true,
-          message: 'Transaction submitted (indexer disabled)',
-          data: result,
-        };
-      }
-
       if (!result || result.code !== 0) {
         return {
           success: false,
-          message: result?.message || 'Transaction failed',
+          message: `Batch ${index + 1} transaction failed`,
           data: result,
         };
       }
+
+      lastSuccessfulResult = result;
+
+      if (index < messageChunks.length - 1) {
+        await delay(500);
+      }
     }
 
-    return {
-      success: true,
-      message: 'Transaction successful',
-      data: lastSuccessfulResponse || { code: 0 },
-    };
-  } catch (error) {
-    console.error('[claimAndUnstake] Error:', error);
+    if (simulateOnly) {
+      if (!allSimulationsSuccessful && firstFailedSimulation) {
+        return {
+          success: false,
+          message: 'Some batches failed simulation',
+          data: firstFailedSimulation,
+        };
+      }
 
-    // Handle indexer errors thrown as exceptions
-    if (error instanceof Error && error.message.includes('indexing is disabled')) {
+      const estimatedGas = Math.ceil(totalGasWanted * 1.1);
       return {
         success: true,
-        message: 'Transaction submitted (indexer disabled)',
-        data: { code: 0, message: 'Indexer disabled' },
+        message: 'Simulation successful',
+        data: {
+          code: 0,
+          gasWanted: estimatedGas.toString(),
+        },
+      };
+    }
+
+    if (!lastSuccessfulResult) {
+      return {
+        success: false,
+        message: 'No batches were processed',
       };
     }
 
     return {
+      success: true,
+      message: `All ${messageChunks.length} batches processed successfully`,
+      data: lastSuccessfulResult,
+    };
+  } catch (error) {
+    console.error('[claimRewards] Error:', error);
+    return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error',
-      data: { code: 1, message: error instanceof Error ? error.message : 'Unknown error' },
+    };
+  }
+};
+
+// TODO: get feeToken from chain information?
+export const claimAndRestake = async (
+  chain: SimplifiedChainInfo,
+  validatorInfoArray: FullValidatorInfo[],
+  feeToken?: FeeToken,
+  simulateOnly = false,
+): Promise<TransactionResult> => {
+  const delegateEndpoint = COSMOS_CHAIN_ENDPOINTS.delegateToValidator;
+  const claimEndpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
+  const prefix = chain.bech32_prefix;
+  const rpcUris = chain.rpc_uris;
+
+  // Build claim messages from validator info array
+  const claimMessages = buildMessageBundle({
+    endpoint: claimEndpoint,
+    validatorInfoArray,
+  });
+
+  // TODO: pass this to buildMessageBundle
+  // Build delegate messages from rewards
+  const delegateMessages = validatorInfoArray.flatMap(validatorInfo => {
+    return (validatorInfo.rewards || [])
+      .map(rewardItem => {
+        if (!rewardItem.denom || !rewardItem.amount) return null;
+
+        // Remove decimal portion if present
+        const amount = rewardItem.amount.includes('.')
+          ? rewardItem.amount.split('.')[0]
+          : rewardItem.amount;
+
+        if (parseInt(amount) === 0) return null;
+
+        return {
+          typeUrl: delegateEndpoint,
+          value: {
+            delegatorAddress: validatorInfo.delegation.delegator_address,
+            validatorAddress: validatorInfo.delegation.validator_address,
+            amount: {
+              denom: rewardItem.denom,
+              amount,
+            },
+          },
+        };
+      })
+      .filter(Boolean);
+  });
+
+  const batchedMessages = [...claimMessages, ...delegateMessages];
+  const messageChunks = [];
+  for (let i = 0; i < batchedMessages.length; i += MAX_MESSAGES_PER_BATCH) {
+    messageChunks.push(batchedMessages.slice(i, i + MAX_MESSAGES_PER_BATCH));
+  }
+
+  let totalGasWanted = 0;
+  let lastSuccessfulResult: RPCResponse | undefined = undefined;
+  let allSimulationsSuccessful = true;
+  let firstFailedSimulation: RPCResponse | undefined = undefined;
+
+  // Process batches
+  for (const [index, messages] of messageChunks.entries()) {
+    // Always simulate first
+    const simulation = await queryRpcNode({
+      endpoint: delegateEndpoint,
+      prefix,
+      rpcUris,
+      messages,
+      feeToken,
+      simulateOnly: true,
+    });
+
+    if (!simulation || simulation.code !== 0) {
+      allSimulationsSuccessful = false;
+      firstFailedSimulation = simulation;
+      if (simulateOnly) continue;
+
+      return {
+        success: false,
+        message: `Batch ${index + 1} simulation failed`,
+        data: simulation,
+      };
+    }
+
+    totalGasWanted += parseFloat(simulation.gasWanted || '0');
+
+    if (simulateOnly) {
+      continue;
+    }
+
+    // Execution mode
+    console.log(`Processing claim+restake batch ${index + 1}/${messageChunks.length}`);
+
+    const estimatedGas = Math.ceil(parseFloat(simulation.gasWanted || '0') * 1.1);
+    const feeAmount = Math.ceil(estimatedGas * (feeToken?.gasPriceStep?.average || 0.025));
+
+    const result = await queryRpcNode({
+      endpoint: delegateEndpoint,
+      prefix,
+      rpcUris,
+      messages,
+      feeToken,
+      simulateOnly: false,
+      fee: {
+        amount: [{ denom: feeToken?.denom || 'uatom', amount: feeAmount.toString() }],
+        gas: estimatedGas.toString(),
+      },
+    });
+
+    if (!result || result.code !== 0) {
+      return {
+        success: false,
+        message: `Batch ${index + 1} transaction failed`,
+        data: result,
+      };
+    }
+
+    lastSuccessfulResult = result;
+
+    if (index < messageChunks.length - 1) {
+      await delay(500);
+    }
+  }
+
+  if (simulateOnly) {
+    if (!allSimulationsSuccessful && firstFailedSimulation) {
+      return {
+        success: false,
+        message: 'Some batches failed simulation',
+        data: firstFailedSimulation,
+      };
+    }
+
+    const estimatedGas = Math.ceil(totalGasWanted * 1.1);
+    return {
+      success: true,
+      message: 'Simulation successful',
+      data: {
+        code: 0,
+        gasWanted: estimatedGas.toString(),
+      },
+    };
+  }
+
+  if (!lastSuccessfulResult) {
+    return {
+      success: false,
+      message: 'No batches were processed',
+    };
+  }
+
+  return {
+    success: true,
+    message: `All ${messageChunks.length} batches processed successfully`,
+    data: lastSuccessfulResult,
+  };
+};
+
+// NOTE: Cosmos unstaking automatically claims rewards
+export const claimAndUnstake = async ({
+  chain,
+  amount = undefined,
+  validatorInfoArray,
+  feeToken,
+  simulateOnly = false,
+}: {
+  chain: SimplifiedChainInfo;
+  amount?: string;
+  validatorInfoArray: FullValidatorInfo[];
+  feeToken: FeeToken;
+  simulateOnly?: boolean;
+}): Promise<TransactionResult> => {
+  const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
+  const prefix = chain.bech32_prefix;
+  const rpcUris = chain.rpc_uris;
+  const denom = validatorInfoArray[0].balance.denom;
+
+  // For partial unstaking, format the amount
+  let formattedAmount: string | undefined = undefined;
+  if (amount) {
+    if (parseFloat(amount) === 0) {
+      return {
+        success: false,
+        message: 'Cannot unstake amount of zero',
+        data: { code: 6 },
+      };
+    }
+
+    const exponent = chain.assets?.[denom]?.exponent || GREATER_EXPONENT_DEFAULT;
+    formattedAmount = (parseFloat(amount) * Math.pow(10, exponent)).toFixed(0);
+  }
+
+  // Build messages from validator info array
+  const messages = buildMessageBundle({
+    endpoint,
+    validatorInfoArray,
+    amount: amount ? formattedAmount : undefined,
+    denom: amount ? denom : undefined,
+  });
+
+  // Split into batches
+  const messageChunks = [];
+  for (let i = 0; i < messages.length; i += MAX_MESSAGES_PER_BATCH) {
+    messageChunks.push(messages.slice(i, i + MAX_MESSAGES_PER_BATCH));
+  }
+
+  try {
+    let totalGasWanted = 0;
+    let lastSuccessfulResult: RPCResponse | undefined = undefined;
+    let allSimulationsSuccessful = true;
+
+    // Single loop that handles both simulation and execution
+    for (const [index, messages] of messageChunks.entries()) {
+      // Always simulate first to get gas estimate
+      const simulation = await queryRpcNode({
+        endpoint,
+        prefix,
+        rpcUris,
+        messages,
+        feeToken,
+        simulateOnly: true,
+      });
+
+      if (!simulation || simulation.code !== 0) {
+        allSimulationsSuccessful = false;
+        lastSuccessfulResult = simulation;
+        if (simulateOnly) break; // In simulation mode, we can exit early on failure
+
+        return {
+          success: false,
+          message: `Batch ${index + 1} simulation failed`,
+          data: simulation,
+        };
+      }
+
+      totalGasWanted += parseFloat(simulation.gasWanted || '0');
+
+      // NOTE: For simulations continue to next batch to accumulate totals
+      if (simulateOnly) {
+        continue;
+      }
+
+      // NOTE: For executions proceed with actual transaction
+      console.log(`Processing unstake batch ${index + 1}/${messageChunks.length}`);
+
+      // Add buffer to gas estimate
+      const estimatedGas = Math.ceil(parseFloat(simulation.gasWanted || '0') * 1.1);
+      const feeAmount = Math.ceil(estimatedGas * (feeToken.gasPriceStep?.average || 0.025));
+
+      const result = await queryRpcNode({
+        endpoint,
+        prefix,
+        rpcUris,
+        messages,
+        feeToken,
+        simulateOnly: false,
+        fee: {
+          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }],
+          gas: estimatedGas.toString(),
+        },
+      });
+
+      if (!result || result.code !== 0) {
+        return {
+          success: false,
+          message: `Batch ${index + 1} transaction failed`,
+          data: result,
+        };
+      }
+
+      lastSuccessfulResult = result;
+
+      // Add small delay between batches to prevent sequence mismatch
+      if (index < messageChunks.length - 1) {
+        await delay(500);
+      }
+    }
+
+    if (simulateOnly) {
+      if (!allSimulationsSuccessful) {
+        return {
+          success: false,
+          message: 'Some batches failed simulation',
+          data: lastSuccessfulResult,
+        };
+      }
+
+      // Calculate total fee with buffer
+      const estimatedGas = Math.ceil(totalGasWanted * 1.1);
+      return {
+        success: true,
+        message: 'Simulation successful',
+        data: {
+          code: 0,
+          gasWanted: estimatedGas.toString(),
+        },
+      };
+    }
+
+    return {
+      success: true,
+      message: `All ${messageChunks.length} batches processed successfully`,
+      data: lastSuccessfulResult,
+    };
+  } catch (error) {
+    console.error('[claimAndUnstake] Error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      data: { code: 1 },
     };
   }
 };

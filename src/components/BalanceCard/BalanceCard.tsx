@@ -150,7 +150,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
       stakedValue,
       convertToGreaterUnit(totalStakedMLD, currentExponent),
       symbol,
-      val => `Balance: ${formatUSD(val)}`,
+      val => `Staked Balance: ${formatUSD(val)}`,
     );
   }
 
