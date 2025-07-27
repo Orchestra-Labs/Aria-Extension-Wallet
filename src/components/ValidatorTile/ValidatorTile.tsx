@@ -21,6 +21,7 @@ import {
   DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
   TextFieldStatus,
+  ValidatorAction,
 } from '@/constants';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -91,7 +92,7 @@ const ValidatorTileComponent = ({
 
   const [amount, setAmount] = useState(0);
   const [isClaimToRestake, setIsClaimToRestake] = useState(true);
-  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake' | 'claim' | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ValidatorAction>(ValidatorAction.NONE);
   const [validatorLogoInfo, setValidatorLogoInfo] = useState<ValidatorLogoInfo>({
     url: null,
     isFallback: false,
@@ -211,14 +212,26 @@ const ValidatorTileComponent = ({
 
     try {
       switch (selectedAction) {
-        case 'stake':
-          await actionFn('stake', amount.toString(), false, [combinedStakingInfo]);
+        case ValidatorAction.STAKE:
+          await actionFn({
+            action: ValidatorAction.STAKE,
+            amount: amount.toString(),
+            validatorInfoArray: [combinedStakingInfo],
+          });
           break;
-        case 'unstake':
-          await actionFn('unstake', amount.toString(), false, [combinedStakingInfo]);
+        case ValidatorAction.UNSTAKE:
+          await actionFn({
+            action: ValidatorAction.UNSTAKE,
+            amount: amount.toString(),
+            validatorInfoArray: [combinedStakingInfo],
+          });
           break;
-        case 'claim':
-          await actionFn('claim', undefined, isClaimToRestake, [combinedStakingInfo]);
+        case ValidatorAction.CLAIM:
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: [combinedStakingInfo],
+            toRestake: isClaimToRestake,
+          });
           break;
       }
 
@@ -235,11 +248,12 @@ const ValidatorTileComponent = ({
     // NOTE: reset local states
     setAmount(0);
     setIsClaimToRestake(false);
-    setSelectedAction(null);
+    setSelectedAction(ValidatorAction.NONE);
   };
 
+  // TODO: consider using local state for !isTransactionInProgress like on validatorselectdialog
   const canRunSimulation = () => {
-    if (selectedAction === 'claim') return true;
+    if (selectedAction === ValidatorAction.CLAIM) return true;
     return amount > 0 && !isLoading && selectedAction;
   };
 
@@ -257,7 +271,7 @@ const ValidatorTileComponent = ({
       }, 5000);
     };
 
-    if (selectedAction === 'claim') {
+    if (selectedAction === ValidatorAction.CLAIM) {
       handleAction({ isSimulation: true });
       setLastUpdateTime(Date.now());
       setupInterval();
@@ -425,8 +439,8 @@ const ValidatorTileComponent = ({
                 <Button
                   size="medium"
                   className="w-full"
-                  onClick={() => setSelectedAction('stake')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.STAKE)}
+                  disabled={isLoading || selectedAction === ValidatorAction.STAKE}
                 >
                   Stake
                 </Button>
@@ -434,16 +448,16 @@ const ValidatorTileComponent = ({
                   size="medium"
                   variant="secondary"
                   className="w-full mx-2"
-                  onClick={() => setSelectedAction('unstake')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.UNSTAKE)}
+                  disabled={isLoading || selectedAction === ValidatorAction.UNSTAKE}
                 >
                   Unstake
                 </Button>
                 <Button
                   size="medium"
                   className="w-full"
-                  onClick={() => setSelectedAction('claim')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.CLAIM)}
+                  disabled={isLoading || selectedAction === ValidatorAction.CLAIM}
                 >
                   Claim
                 </Button>
@@ -451,7 +465,7 @@ const ValidatorTileComponent = ({
             )}
 
             <div
-              className={`flex flex-grow flex-col items-center justify-center ${selectedAction === 'claim' ? '' : 'px-[1.5rem]'}`}
+              className={`flex flex-grow flex-col items-center justify-center ${selectedAction === ValidatorAction.CLAIM ? '' : 'px-[1.5rem]'}`}
             >
               {isSuccess && (
                 <div className="flex-grow">
@@ -475,7 +489,8 @@ const ValidatorTileComponent = ({
 
               {!isLoading &&
                 !isSuccess &&
-                (selectedAction === 'stake' || selectedAction === 'unstake') && (
+                (selectedAction === ValidatorAction.STAKE ||
+                  selectedAction === ValidatorAction.UNSTAKE) && (
                   <div className="flex flex-col items-center w-full">
                     <AssetInput
                       placeholder={`Enter ${selectedAction} amount`}
@@ -489,13 +504,15 @@ const ValidatorTileComponent = ({
                       disableButtons={isLoading}
                       onClear={() => setAmount(0)}
                       onMax={() => {
-                        if (selectedAction === 'stake') {
+                        if (selectedAction === ValidatorAction.STAKE) {
                           setAmount(maxAvailable);
                         } else {
                           setAmount(delegatedAmount);
                         }
                       }}
-                      endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+                      endButtonTitle={
+                        selectedAction === ValidatorAction.STAKE ? 'Stake' : 'Unstake'
+                      }
                       onEndButtonClick={handleAction}
                     />
                   </div>

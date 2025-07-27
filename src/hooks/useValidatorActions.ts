@@ -1,20 +1,32 @@
 import { useAtom, useSetAtom } from 'jotai';
 import { FullValidatorInfo, TransactionResult } from '@/types';
-import { validatorFeeStateAtom, validatorTransactionStateAtom } from '@/atoms/validatorStateAtom';
 import {
+  validatorFeeStateAtom,
+  validatorTransactionStateAtom,
   executeClaimAtom,
   executeStakeAtom,
   executeUnstakeAtom,
-} from '@/atoms/validatorActionsAtom';
-import { DEFAULT_EXTERNAL_GAS_PRICES, TransactionStatus, TransactionType } from '@/constants';
-import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
+  selectedValidatorsAtom,
+} from '@/atoms';
+import {
+  DEFAULT_EXTERNAL_GAS_PRICES,
+  TransactionStatus,
+  TransactionType,
+  ValidatorAction,
+} from '@/constants';
+import { handleTransactionError, handleTransactionSuccess } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
-import { selectedValidatorsAtom } from '@/atoms';
 
 interface HandleTransactionParams {
-  // TODO: use enum
-  action: 'stake' | 'unstake' | 'claim';
+  action: Exclude<ValidatorAction, ValidatorAction.NONE>;
   isSimulation: boolean;
+  amount?: string;
+  toRestake?: boolean;
+  validatorInfoArray?: FullValidatorInfo[];
+}
+
+interface RunParams {
+  action: Exclude<ValidatorAction, ValidatorAction.NONE>;
   amount?: string;
   toRestake?: boolean;
   validatorInfoArray?: FullValidatorInfo[];
@@ -129,13 +141,12 @@ export const useValidatorActions = () => {
     }
   };
 
-  // TODO: non-positional parameters are better
-  const runTransaction = async (
-    action: 'stake' | 'unstake' | 'claim',
-    amount?: string,
-    toRestake: boolean = false,
-    validatorInfoArray: FullValidatorInfo[] = [],
-  ): Promise<TransactionResult | null> => {
+  const runTransaction = async ({
+    action,
+    amount,
+    toRestake = false,
+    validatorInfoArray = [],
+  }: RunParams): Promise<TransactionResult | null> => {
     return handleTransaction({
       action,
       isSimulation: false,
@@ -145,13 +156,12 @@ export const useValidatorActions = () => {
     });
   };
 
-  // TODO: non-positional parameters are better
-  const runSimulation = async (
-    action: 'stake' | 'unstake' | 'claim',
-    amount?: string,
-    toRestake: boolean = false,
-    validatorInfoArray: FullValidatorInfo[] = [],
-  ): Promise<TransactionResult | null> => {
+  const runSimulation = async ({
+    action,
+    amount,
+    toRestake = false,
+    validatorInfoArray = [],
+  }: RunParams): Promise<TransactionResult | null> => {
     return handleTransaction({
       action,
       isSimulation: true,

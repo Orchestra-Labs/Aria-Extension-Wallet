@@ -21,7 +21,7 @@ import { SearchBar } from '../SearchBar';
 import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
 import { FullValidatorInfo } from '@/types';
 import { useRefreshData, useValidatorActions } from '@/hooks';
-import { ValidatorSortType, SortOrder, SearchType } from '@/constants';
+import { ValidatorSortType, SortOrder, SearchType, ValidatorAction } from '@/constants';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { Loader } from '../Loader';
 import { ValidatorScroller } from '../ValidatorScroller';
@@ -108,14 +108,24 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
       if (isClaimDialog) {
         if (isClaimToRestake) {
           // Claim to restake
-          await actionFn('claim', undefined, true, selectedValidators);
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: selectedValidators,
+            toRestake: true,
+          });
         } else {
           // Claim to wallet
-          await actionFn('claim', undefined, false, selectedValidators);
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: selectedValidators,
+          });
         }
       } else {
         // Unstake
-        await actionFn('unstake', undefined, false, selectedValidators);
+        await actionFn({
+          action: ValidatorAction.UNSTAKE,
+          validatorInfoArray: selectedValidators,
+        });
       }
 
       setLastUpdateTime(Date.now());
