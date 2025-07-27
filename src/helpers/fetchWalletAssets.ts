@@ -1,4 +1,4 @@
-import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS } from '@/constants';
+import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS, NetworkLevel } from '@/constants';
 import { Uri, Asset, SubscriptionRecord, LocalChainRegistry } from '@/types';
 import { queryRestNode } from './queryNodes';
 import { safeTrimLowerCase } from './formatString';
@@ -139,6 +139,7 @@ export async function fetchWalletAssets(
         console.warn(`[FetchWalletAssets] No metadata for subscribed denom ${denom}`);
         return null;
       }
+
       return {
         ...metadata,
         amount: '0',
@@ -178,6 +179,16 @@ export async function fetchWalletAssets(
             }
           });
         });
+
+        if (networkLevel === NetworkLevel.TESTNET) {
+          return Array.from(coinGeckoIds).reduce(
+            (acc, id) => {
+              acc[id] = 0;
+              return acc;
+            },
+            {} as Record<string, number>,
+          );
+        }
 
         return fetchCoinGeckoPrices(Array.from(coinGeckoIds));
       })(),
