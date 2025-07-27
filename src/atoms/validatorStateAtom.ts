@@ -1,27 +1,36 @@
 import { atom } from 'jotai';
-import { DEFAULT_FEE_STATE, DEFAULT_FEE_TOKEN, TransactionStatus } from '@/constants';
+import {
+  DEFAULT_FEE_STATE,
+  DEFAULT_FEE_TOKEN,
+  TransactionStatus,
+  ValidatorAction,
+} from '@/constants';
 import { CalculatedFeeDisplay, FeeState } from '@/types';
 import { chainInfoAtom, selectedValidatorChainAtom } from './chainRegistryAtom';
 import { getFeeTextClass } from '@/helpers';
 
-export const validatorTransactionStateAtom = atom<{
+// TODO: tie to Toast
+export interface ValidatorTransactionState {
   status: TransactionStatus;
   error?: string;
   txHash?: string;
-  type?: 'stake' | 'unstake' | 'claim';
+  type?: Exclude<ValidatorAction, ValidatorAction.NONE>;
   claimToRestake?: boolean;
-}>({
+  validatorAddress?: string; // NOTE: to track which validator this state belongs to
+}
+
+export const validatorTransactionStateAtom = atom<ValidatorTransactionState>({
   status: TransactionStatus.IDLE,
 });
 
 export const validatorAmountAtom = atom(0);
 
 // Derived atoms
-export const isValidatorLoadingAtom = atom(
+export const isValidatorTxLoadingAtom = atom(
   get => get(validatorTransactionStateAtom).status === TransactionStatus.LOADING,
 );
 
-export const isValidatorSuccessAtom = atom(
+export const isValidatorTxSuccessAtom = atom(
   get => get(validatorTransactionStateAtom).status === TransactionStatus.SUCCESS,
 );
 
@@ -137,6 +146,7 @@ export const resetValidatorTransactionAtom = atom(null, (get, set) => {
 
   set(validatorTransactionStateAtom, {
     status: TransactionStatus.IDLE,
+    validatorAddress: undefined,
   });
   set(validatorAmountAtom, 0);
   set(_validatorFeeStateAtom, {

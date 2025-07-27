@@ -35,7 +35,6 @@ interface RunParams {
 export const useValidatorActions = () => {
   const { refreshData } = useRefreshData();
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
-
   const setTransactionState = useSetAtom(validatorTransactionStateAtom);
   const [feeState, setFeeState] = useAtom(validatorFeeStateAtom);
   const stake = useSetAtom(executeStakeAtom);
@@ -51,12 +50,17 @@ export const useValidatorActions = () => {
   }: HandleTransactionParams): Promise<TransactionResult | null> => {
     try {
       let result: TransactionResult;
-      const startTime = performance.now();
+
+      const singleTargetValidatorAddress =
+        validatorInfoArray.length > 0
+          ? validatorInfoArray[0].validator.operator_address
+          : selectedValidators[0].validator.operator_address;
 
       if (!isSimulation) {
         setTransactionState(prev => ({
           ...prev,
           status: TransactionStatus.LOADING,
+          validatorAddress: singleTargetValidatorAddress,
         }));
       }
 
@@ -93,12 +97,6 @@ export const useValidatorActions = () => {
         default:
           throw new Error('Invalid validator action');
       }
-
-      const duration = performance.now() - startTime;
-      console.log(`[useValidatorActions] ${action} completed in ${duration.toFixed(2)}ms`, {
-        success: result?.success,
-        code: result?.data?.code,
-      });
 
       if (result?.success && result.data?.code === 0) {
         if (isSimulation) {

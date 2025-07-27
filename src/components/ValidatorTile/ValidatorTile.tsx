@@ -21,26 +21,24 @@ import {
   DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
   TextFieldStatus,
+  TransactionStatus,
   ValidatorAction,
 } from '@/constants';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   subscribedChainRegistryAtom,
   filteredValidatorsAtom,
   networkLevelAtom,
   showCurrentValidatorsAtom,
   selectedValidatorChainAtom,
-  isValidatorLoadingAtom,
-  isValidatorSuccessAtom,
   resetValidatorTransactionAtom,
   validatorErrorAtom,
-  validatorTxFailedAtom,
   maxAvailableAtom,
   validatorTxHash,
-  lastSimulationUpdateAtom,
   validatorCalculatedFeeAtom,
   chainInfoAtom,
   selectedValidatorsAtom,
+  validatorTransactionStateAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -56,10 +54,9 @@ interface ValidatorTileProps {
   forceCurrentViewStyle?: boolean;
 }
 
-// TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 // TODO: if no staking denom, disable staking features
 const ValidatorTileComponent = ({
-  fullValidatorInfo: combinedStakingInfo,
+  fullValidatorInfo,
   isSelectable = false,
   onClick,
   forceCurrentViewStyle = false,
@@ -75,15 +72,12 @@ const ValidatorTileComponent = ({
   );
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
-  const isLoading = useAtomValue(isValidatorLoadingAtom);
+  const txStatus = useAtomValue(validatorTransactionStateAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
-  const transactionFailed = useAtomValue(validatorTxFailedAtom);
-  const isSuccess = useAtomValue(isValidatorSuccessAtom);
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const transactionHash = useAtomValue(validatorTxHash);
   const chainInfo = useAtomValue(chainInfoAtom);
-  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
 
@@ -100,12 +94,19 @@ const ValidatorTileComponent = ({
   });
 
   const { validator, delegation, rewards, unbondingBalance, theoreticalApr, uptime, votingPower } =
-    combinedStakingInfo;
+    fullValidatorInfo;
   // Asset info
   const stakingDenom = chain.staking_denoms[0];
   const asset = chain.assets?.[stakingDenom] || DEFAULT_MAINNET_ASSET;
   const symbol = asset.symbol;
   const exponent = asset.exponent || GREATER_EXPONENT_DEFAULT;
+
+  const txIsForCurrentValidator =
+    txStatus.validatorAddress === validator.operator_address &&
+    txStatus.status !== TransactionStatus.IDLE;
+  const isLoading = txIsForCurrentValidator && txStatus.status === TransactionStatus.LOADING;
+  const isSuccess = txIsForCurrentValidator && txStatus.status === TransactionStatus.SUCCESS;
+  const transactionFailed = txIsForCurrentValidator && txStatus.status === TransactionStatus.ERROR;
 
   // Calculations
   const rewardAmount = rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
@@ -131,8 +132,8 @@ const ValidatorTileComponent = ({
     v => v.delegation.validator_address === delegation.validator_address,
   );
 
-  const unbondingDays = `${combinedStakingInfo.stakingParams?.unbonding_time} days`;
-  const unstakingTime = `${calculateRemainingTime(combinedStakingInfo.unbondingBalance?.completion_time || '')}`;
+  const unbondingDays = `${fullValidatorInfo.stakingParams?.unbonding_time} days`;
+  const unstakingTime = `${calculateRemainingTime(fullValidatorInfo.unbondingBalance?.completion_time || '')}`;
   let amountUnstaking = formatBalanceDisplay(
     convertToGreaterUnit(parseFloat(unbondingBalance?.balance || '0'), exponent).toFixed(exponent),
     symbol,
@@ -201,7 +202,7 @@ const ValidatorTileComponent = ({
 
   const handleClick = () => {
     if (onClick) {
-      onClick(combinedStakingInfo);
+      onClick(fullValidatorInfo);
     }
   };
 
@@ -216,26 +217,24 @@ const ValidatorTileComponent = ({
           await actionFn({
             action: ValidatorAction.STAKE,
             amount: amount.toString(),
-            validatorInfoArray: [combinedStakingInfo],
+            validatorInfoArray: [fullValidatorInfo],
           });
           break;
         case ValidatorAction.UNSTAKE:
           await actionFn({
             action: ValidatorAction.UNSTAKE,
             amount: amount.toString(),
-            validatorInfoArray: [combinedStakingInfo],
+            validatorInfoArray: [fullValidatorInfo],
           });
           break;
         case ValidatorAction.CLAIM:
           await actionFn({
             action: ValidatorAction.CLAIM,
-            validatorInfoArray: [combinedStakingInfo],
+            validatorInfoArray: [fullValidatorInfo],
             toRestake: isClaimToRestake,
           });
           break;
       }
-
-      setLastUpdateTime(Date.now());
     } catch (error) {
       console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, error);
     }
@@ -251,42 +250,42 @@ const ValidatorTileComponent = ({
     setSelectedAction(ValidatorAction.NONE);
   };
 
-  // TODO: consider using local state for !isTransactionInProgress like on validatorselectdialog
   const canRunSimulation = () => {
     if (selectedAction === ValidatorAction.CLAIM) return true;
     return amount > 0 && !isLoading && selectedAction;
   };
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    // Use a ref to track the timeout
+    const timeoutRef = { current: null as NodeJS.Timeout | null };
 
-    const setupInterval = () => {
-      intervalId = setInterval(() => {
-        if (canRunSimulation()) {
-          handleAction({ isSimulation: true });
-          setLastUpdateTime(Date.now());
-        } else {
-          clearInterval(intervalId);
-        }
-      }, 5000);
+    const runSimulation = () => {
+      if (canRunSimulation()) {
+        handleAction({ isSimulation: true });
+        // Schedule next run
+        timeoutRef.current = setTimeout(runSimulation, 5000);
+      }
     };
 
-    if (selectedAction === ValidatorAction.CLAIM) {
-      handleAction({ isSimulation: true });
-      setLastUpdateTime(Date.now());
-      setupInterval();
-    } else if (canRunSimulation()) {
-      if (Date.now() - lastUpdateTime > 5000) {
-        handleAction({ isSimulation: true });
-        setLastUpdateTime(Date.now());
+    // Run immediately if conditions are met and it's been more than 5 seconds
+    if (canRunSimulation()) {
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
 
-      setupInterval();
+      handleAction({ isSimulation: true });
+    }
+
+    // Setup the recurring simulation
+    if (canRunSimulation()) {
+      timeoutRef.current = setTimeout(runSimulation, 5000);
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      // Cleanup on unmount or dependency change
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [amount, isLoading, selectedAction]);

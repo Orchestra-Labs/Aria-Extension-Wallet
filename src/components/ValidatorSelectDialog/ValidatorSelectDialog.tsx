@@ -8,13 +8,12 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
   resetValidatorTransactionAtom,
-  isValidatorLoadingAtom,
-  isValidatorSuccessAtom,
+  isValidatorTxLoadingAtom,
+  isValidatorTxSuccessAtom,
   validatorErrorAtom,
   validatorTxFailedAtom,
   validatorTxHash,
   validatorCalculatedFeeAtom,
-  lastSimulationUpdateAtom,
   dialogValidatorsAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
@@ -47,13 +46,12 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const getDialogValidators = useAtomValue(dialogValidatorsAtom);
-  const isLoading = useAtomValue(isValidatorLoadingAtom);
-  const isSuccess = useAtomValue(isValidatorSuccessAtom);
+  const isLoading = useAtomValue(isValidatorTxLoadingAtom);
+  const isSuccess = useAtomValue(isValidatorTxSuccessAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
   const transactionFailed = useAtomValue(validatorTxFailedAtom);
   const transactionHash = useAtomValue(validatorTxHash);
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
-  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
   const filteredValidators = getDialogValidators(isClaimDialog);
 
@@ -127,8 +125,6 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
           validatorInfoArray: selectedValidators,
         });
       }
-
-      setLastUpdateTime(Date.now());
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
       console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, errorMessage);
@@ -142,36 +138,32 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     slideTrayRef.current?.isOpen() && !noValidatorsSelected && !isTransactionInProgress;
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    // Use a ref to track the timeout ID
+    const timeoutRef = { current: null as NodeJS.Timeout | null };
 
-    const runSimulationIfNeeded = () => {
-      if (canRunSimulation() && Date.now() - lastUpdateTime > 5000) {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-
+    const runSimulation = () => {
+      if (canRunSimulation()) {
         handleAction({ isSimulation: true });
-        setLastUpdateTime(Date.now());
+        // Schedule next run
+        timeoutRef.current = setTimeout(runSimulation, 5000);
       }
     };
 
-    runSimulationIfNeeded();
-
-    // Set up interval for periodic checks
-    intervalId = setInterval(runSimulationIfNeeded, 5000);
+    // Run immediately if conditions are met
+    if (canRunSimulation()) {
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      runSimulation();
+    }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      // Cleanup on unmount or dependency change
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-  }, [selectedValidators]);
-
-  useEffect(() => {
-    if (canRunSimulation()) {
-      handleAction({ isSimulation: true });
-      setLastUpdateTime(Date.now());
-    }
   }, [selectedValidators]);
 
   useEffect(() => {
