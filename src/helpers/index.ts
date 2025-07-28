@@ -10,6 +10,7 @@ export * from './ibcTransactions';
 export * from './openExtensionWindow';
 export * from './openMediaOnboardingTab';
 export * from './openPageInNewTab';
+export * from './priceCache';
 export * from './queryNodes';
 export * from './sendTransactions';
 export * from './sleep';
