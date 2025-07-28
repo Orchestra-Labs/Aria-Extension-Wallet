@@ -1,4 +1,4 @@
-import { Asset, CombinedStakingInfo, SimplifiedChainInfo } from '@/types';
+import { Asset, FullValidatorInfo, SimplifiedChainInfo } from '@/types';
 import { safeTrimLowerCase, stripNonAlphanumerics } from './formatString';
 import {
   AssetSortType,
@@ -112,7 +112,7 @@ export function filterAndSortAssets(
   return sortAssets(filteredAssets, searchTerm, sortType, sortOrder);
 }
 
-const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStatusFilter) => {
+const statusMatch = (validator: FullValidatorInfo, statusFilter: ValidatorStatusFilter) => {
   if (statusFilter === ValidatorStatusFilter.STATUS_ACTIVE) {
     return validator.validator.status === BondStatus.BONDED;
   } else if (statusFilter === ValidatorStatusFilter.STATUS_NON_JAILED) {
@@ -122,7 +122,7 @@ const statusMatch = (validator: CombinedStakingInfo, statusFilter: ValidatorStat
   }
 };
 
-const hasUserActivity = (validator: CombinedStakingInfo) => {
+const hasUserActivity = (validator: FullValidatorInfo) => {
   const isDelegatedTo = parseFloat(validator.balance.amount) > 0;
   const isUnbondingFrom =
     validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
@@ -132,7 +132,7 @@ const hasUserActivity = (validator: CombinedStakingInfo) => {
 };
 
 export function filterAndSortValidators(
-  validators: CombinedStakingInfo[],
+  validators: FullValidatorInfo[],
   searchTerm: string,
   sortType: ValidatorSortType,
   sortOrder: SortOrder,
@@ -157,53 +157,97 @@ export function filterAndSortValidators(
     : filteredValidators;
 
   const sorted = finalValidators.sort((a, b) => {
-    let valueA: any;
-    let valueB: any;
-
     switch (sortType) {
-      case ValidatorSortType.NAME:
-        const monikerA = safeTrimLowerCase(a.validator.description.moniker);
-        const monikerB = safeTrimLowerCase(b.validator.description.moniker);
-        valueA = stripNonAlphanumerics(monikerA);
-        valueB = stripNonAlphanumerics(monikerB);
-        const result =
-          sortOrder === SortOrder.ASC
-            ? valueA.localeCompare(valueB, undefined, { sensitivity: 'base' })
-            : valueB.localeCompare(valueA, undefined, { sensitivity: 'base' });
-        return result;
+      case ValidatorSortType.NAME: {
+        const monikerA = stripNonAlphanumerics(safeTrimLowerCase(a.validator.description.moniker));
+        const monikerB = stripNonAlphanumerics(safeTrimLowerCase(b.validator.description.moniker));
+        return sortOrder === SortOrder.ASC
+          ? monikerA.localeCompare(monikerB, undefined, { sensitivity: 'base' })
+          : monikerB.localeCompare(monikerA, undefined, { sensitivity: 'base' });
+      }
 
-      case ValidatorSortType.DELEGATION:
-        valueA = parseFloat(a.delegation.shares);
-        valueB = parseFloat(b.delegation.shares);
-        break;
+      case ValidatorSortType.DELEGATION: {
+        const valueA = parseFloat(a.delegation.shares) || 0;
+        const valueB = parseFloat(b.delegation.shares) || 0;
 
-      case ValidatorSortType.REWARDS:
-        valueA = a.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
-        valueB = b.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
-        break;
+        if (sortOrder === SortOrder.ASC) {
+          if (valueA === 0 && valueB !== 0) return -1;
+          if (valueB === 0 && valueA !== 0) return 1;
+          return valueA - valueB;
+        } else {
+          if (valueA === 0 && valueB !== 0) return 1;
+          if (valueB === 0 && valueA !== 0) return -1;
+          return valueB - valueA;
+        }
+      }
 
-      case ValidatorSortType.APR:
-        valueA = parseFloat(a.theoreticalApr ?? '0');
-        valueB = parseFloat(b.theoreticalApr ?? '0');
-        break;
+      case ValidatorSortType.REWARDS: {
+        const valueA = a.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
+        const valueB = b.rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
 
-      case ValidatorSortType.VOTING_POWER:
-        valueA = parseFloat(a.votingPower ?? '0');
-        valueB = parseFloat(b.votingPower ?? '0');
-        break;
+      case ValidatorSortType.APR: {
+        const valueA = parseFloat(a.theoreticalApr ?? '0');
+        const valueB = parseFloat(b.theoreticalApr ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
 
-      case ValidatorSortType.UPTIME:
-        valueA = parseFloat(a.uptime ?? '0');
-        valueB = parseFloat(b.uptime ?? '0');
-        break;
+      case ValidatorSortType.VOTING_POWER: {
+        const valueA = parseFloat(a.votingPower ?? '0');
+        const valueB = parseFloat(b.votingPower ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
+
+      case ValidatorSortType.UPTIME: {
+        const valueA = parseFloat(a.uptime ?? '0');
+        const valueB = parseFloat(b.uptime ?? '0');
+        return sortOrder === SortOrder.ASC ? valueA - valueB : valueB - valueA;
+      }
+
+      default: {
+        // Fallback to name sorting if unknown sort type
+        const monikerA = stripNonAlphanumerics(safeTrimLowerCase(a.validator.description.moniker));
+        const monikerB = stripNonAlphanumerics(safeTrimLowerCase(b.validator.description.moniker));
+        return monikerA.localeCompare(monikerB, undefined, { sensitivity: 'base' });
+      }
     }
-
-    const result =
-      sortOrder === SortOrder.ASC ? (valueA > valueB ? 1 : -1) : valueA < valueB ? 1 : -1;
-    return result;
   });
 
   return sorted;
+}
+
+export function filterAndSortDialogValidators(
+  validators: FullValidatorInfo[],
+  searchTerm: string,
+  sortType: ValidatorSortType,
+  sortOrder: SortOrder,
+  statusFilter: ValidatorStatusFilter,
+  isClaimDialog: boolean,
+): FullValidatorInfo[] {
+  // First apply the base filtering (status and search)
+  const baseFiltered = filterAndSortValidators(
+    validators,
+    searchTerm,
+    sortType,
+    sortOrder,
+    true, // showCurrentValidators
+    statusFilter,
+  );
+
+  // Then apply dialog-specific filtering
+  return baseFiltered.filter(validator => {
+    if (isClaimDialog) {
+      // For claim dialog: only show validators with rewards to claim
+      return validator.rewards.some(reward => parseFloat(reward.amount) > 0);
+    } else {
+      // For unstake dialog: only show validators with balance and not unstaking
+      const hasBalance = parseFloat(validator.balance.amount) > 0;
+      const isUnstaking =
+        validator.unbondingBalance && parseFloat(validator.unbondingBalance.balance) > 0;
+      return hasBalance && !isUnstaking;
+    }
+  });
 }
 
 export function filterAndSortChains(

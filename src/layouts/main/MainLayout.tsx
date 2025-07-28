@@ -1,19 +1,29 @@
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import React, { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { LogoIcon } from '@/assets/icons';
 import { OptionsDialog } from '@/components';
 import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
-import { networkLevelAtom, sessionWalletAtom, userAccountAtom } from '@/atoms';
+import {
+  networkLevelAtom,
+  resetSelectedValidatorChainAtom,
+  sessionWalletAtom,
+  userAccountAtom,
+  validatorDataAtom,
+} from '@/atoms';
 import { Button } from '@/ui-kit';
 
 const MainLayout: React.FC = () => {
   const [networkLevel, setNetworkLevel] = useAtom(networkLevelAtom);
   const userWallet = useAtomValue(sessionWalletAtom);
   const userAccount = useAtomValue(userAccountAtom);
+  const setValidatorState = useSetAtom(validatorDataAtom);
+  const resetSelectedValidatorChain = useSetAtom(resetSelectedValidatorChainAtom);
 
   const toggleNetworkLevel = () => {
+    setValidatorState([]);
+    resetSelectedValidatorChain();
     setNetworkLevel(prev =>
       prev === NetworkLevel.MAINNET ? NetworkLevel.TESTNET : NetworkLevel.MAINNET,
     );

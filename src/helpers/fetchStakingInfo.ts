@@ -1,5 +1,5 @@
 import {
-  CombinedStakingInfo,
+  FullValidatorInfo,
   DelegationResponse,
   MintParams,
   SigningInfo,
@@ -217,24 +217,37 @@ export const fetchRewards = async (
       const rewardsPromises = delegations.map(async delegation => {
         const specificEndpoint = `${COSMOS_CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
         const response = await queryRestNode({ endpoint: specificEndpoint, prefix, restUris });
+
+        const rewards = Array.isArray(response.rewards)
+          ? response.rewards
+          : response.rewards?.rewards || [];
+
         return {
           validator: delegation.validator_address,
-          rewards: response.rewards || [],
+          rewards,
         };
       });
 
-      const rewardsData = await Promise.all(rewardsPromises);
-      return rewardsData;
+      return await Promise.all(rewardsPromises);
     }
 
     // Fetch all rewards for the delegator
     const response = await queryRestNode({ endpoint, prefix, restUris });
 
     // Process the response and map rewards for each validator
-    return (response.rewards ?? []).map((reward: any) => ({
-      validator: reward.validator_address,
-      rewards: reward.reward || [],
-    }));
+    if (Array.isArray(response.rewards)) {
+      return response.rewards.map((reward: any) => ({
+        validator: reward.validator_address,
+        rewards: reward.reward || [],
+      }));
+    } else if (response.rewards?.rewards) {
+      return response.rewards.rewards.map((reward: any) => ({
+        validator: reward.validator_address,
+        rewards: reward.reward || [],
+      }));
+    }
+
+    return [];
   } catch (error) {
     console.error(`Error fetching rewards for ${delegatorAddress}:`, error);
     throw error;
@@ -577,7 +590,7 @@ const fetchUptimeData = async (
 export const fetchValidatorData = async (
   chain: SimplifiedChainInfo,
   delegatorAddress: string,
-): Promise<CombinedStakingInfo[]> => {
+): Promise<FullValidatorInfo[]> => {
   try {
     const { bech32_prefix: prefix, rest_uris: restUris } = chain;
 

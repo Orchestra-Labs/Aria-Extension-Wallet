@@ -186,15 +186,16 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
 
     const userAccount = get(userAccountAtom);
     const subscribedChains = get(subscribedChainsAtom);
+    const networkLevel = get(networkLevelAtom);
+
     const subscribedChainIds = subscribedChains.map(chain => chain.chain_id);
 
     // Priority 1: User's default chain ID (if subscribed)
-    const userDefaultChain = userAccount?.settings.defaultChainID;
+    const userDefaultChain = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
     if (userDefaultChain && subscribedChainIds.includes(userDefaultChain)) {
       return userDefaultChain;
     }
 
-    const networkLevel = get(networkLevelAtom);
     const symphonyChainId = getSymphonyChainId(networkLevel);
 
     // Priority 2: symphony id (if subscribed)
@@ -210,6 +211,10 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
     set(_selectedValidatorChainAtom, newChainId);
   },
 );
+
+export const resetSelectedValidatorChainAtom = atom(null, (_, set) => {
+  set(_selectedValidatorChainAtom, null);
+});
 
 export const selectedValidatorChainInfoAtom = atom(get => {
   const chainId = get(selectedValidatorChainAtom);

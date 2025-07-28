@@ -15,6 +15,7 @@ export * from './swiperIndexAtom';
 export * from './transactionAtom';
 export * from './transactionStateAtom';
 export * from './transactionTypeAtom';
+export * from './validatorActionsAtom';
 export * from './validatorsAtom';
 export * from './validatorStateAtom';
 export * from './walletAtom';

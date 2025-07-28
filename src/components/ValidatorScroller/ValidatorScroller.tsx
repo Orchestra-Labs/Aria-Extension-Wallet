@@ -2,13 +2,13 @@ import React, { useCallback, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { ValidatorTile } from '../ValidatorTile';
 import { isFetchingValidatorDataAtom } from '@/atoms';
-import { CombinedStakingInfo } from '@/types';
+import { FullValidatorInfo } from '@/types';
 import { TileScroller, TileScrollerHandle } from '../TileScroller';
 import { useRefreshData } from '@/hooks';
 
 interface ValidatorScrollerProps {
-  validators: CombinedStakingInfo[];
-  onClick?: (asset: CombinedStakingInfo) => void;
+  validators: FullValidatorInfo[];
+  onClick?: (asset: FullValidatorInfo) => void;
   isSelectable?: boolean;
   lazyLoad?: boolean;
   forceCurrentViewStyle?: boolean;
@@ -30,7 +30,7 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
     refreshData({ validator: true, wallet: false });
   }, [refreshData]);
 
-  const handleClick = (combinedStakingInfo: CombinedStakingInfo) => {
+  const handleClick = (combinedStakingInfo: FullValidatorInfo) => {
     // Check if we should prevent the click
     if (tileScrollerRef.current?.shouldPreventClick()) {
       return;
@@ -54,7 +54,7 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
             className="tile-item" // NOTE: Important for lazy loading
           >
             <ValidatorTile
-              combinedStakingInfo={combinedStakingInfo}
+              fullValidatorInfo={combinedStakingInfo}
               isSelectable={isSelectable}
               onClick={handleClick}
               forceCurrentViewStyle={forceCurrentViewStyle}

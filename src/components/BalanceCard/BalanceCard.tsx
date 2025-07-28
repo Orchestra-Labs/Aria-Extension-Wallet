@@ -11,10 +11,10 @@ import {
   validatorDataAtom,
   subscribedChainRegistryAtom,
   hasNonZeroAssetsAtom,
-  chainInfoAtom,
   selectedValidatorChainAtom,
   userAccountAtom,
   isFetchingWalletDataAtom,
+  chainInfoAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -25,7 +25,6 @@ import {
   ValidatorSelectDialog,
 } from '@/components';
 import {
-  convertToGreaterUnit,
   formatUSD,
   formatValueWithFallback,
   getPrimaryFeeToken,
@@ -55,11 +54,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
 
-  const chain = getChainInfo(
-    currentStep === 0
-      ? userAccount?.settings.defaultChainID || getSymphonyChainId(networkLevel)
-      : chainId,
-  );
+  const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
+  const accountViewChainId = defaultChainId || getSymphonyChainId(networkLevel);
+  const validatorViewChainId = chainId;
+  const viewDefinedChainId = currentStep === 0 ? accountViewChainId : validatorViewChainId;
+  const chain = getChainInfo(viewDefinedChainId);
 
   console.log('[BalanceCard] Non-zero assets check:', {
     hasNonZeroAssets,
@@ -69,7 +68,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
 
-  // TODO: change this from default constant to default from account
   const balanceDisplayUnit = getPrimaryFeeToken(chain) || getSymphonyDefaultAsset(networkLevel);
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;
@@ -140,17 +138,22 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     // Calculate staked balance (secondary text)
     const totalStakedMLD = validatorData
       .filter(item => item.balance?.denom === balanceDisplayUnit?.denom)
-      .reduce((sum, item) => sum + parseFloat(item.balance?.amount || '0'), 0);
+      .reduce((sum, item) => {
+        const amount = new BigNumber(item.balance?.amount || '0');
+        // Convert from base units to human-readable units using the exponent
+        const humanReadableAmount = amount.dividedBy(10 ** currentExponent);
+        return sum.plus(humanReadableAmount);
+      }, new BigNumber(0));
 
     // Find the primary asset to get its price
     const primaryAsset = networkWalletAssets.find(a => a.denom === balanceDisplayUnit?.denom);
-    const stakedValue = new BigNumber(totalStakedMLD).multipliedBy(primaryAsset?.price || 0);
+    const stakedValue = totalStakedMLD.multipliedBy(primaryAsset?.price || 0);
 
     secondaryText = formatValueWithFallback(
       stakedValue,
-      convertToGreaterUnit(totalStakedMLD, currentExponent),
+      totalStakedMLD,
       symbol,
-      val => `Balance: ${formatUSD(val)}`,
+      val => `Staked Balance: ${formatUSD(val)}`,
     );
   }
 

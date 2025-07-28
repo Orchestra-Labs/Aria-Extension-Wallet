@@ -4,7 +4,7 @@ import {
   claimAndUnstake,
   stakeToValidator,
 } from '@/helpers/stakingTransactions';
-import { Intent, CombinedStakingInfo, Asset } from '@/types';
+import { Intent, FullValidatorInfo, Asset } from '@/types';
 import {
   DEFAULT_FEE_TOKEN,
   GREATER_EXPONENT_DEFAULT,
@@ -30,7 +30,7 @@ export const handleIntent = async (
   }: {
     address: string;
     walletAssets: Asset[];
-    validators: CombinedStakingInfo[];
+    validators: FullValidatorInfo[];
     symphonyAssets: Asset[];
   },
 ) => {
@@ -73,7 +73,7 @@ export const handleIntent = async (
   const chain = LOCAL_CHAIN_REGISTRY.mainnet[SYMPHONY_MAINNET_ID];
   const feeToken = DEFAULT_FEE_TOKEN;
 
-  const resolveValidator = (input: ValidatorTarget): CombinedStakingInfo | undefined => {
+  const resolveValidator = (input: ValidatorTarget): FullValidatorInfo | undefined => {
     if (typeof input === 'object') {
       return (
         validators.find(v => v.validator.operator_address === input.operator_address) ||
@@ -104,50 +104,56 @@ export const handleIntent = async (
   switch (action) {
     case 'claim': {
       const targets = (target ? [resolveValidator(target)] : userDelegations).filter(
-        (v): v is CombinedStakingInfo => !!v,
+        (v): v is FullValidatorInfo => !!v,
       );
 
-      const ops = targets.map(v => v.validator.operator_address);
-      const fee = await simulateFee(() => claimRewards(address, ops, chain, feeToken, true));
+      if (targets.length === 0) {
+        console.error('[handleIntent] No valid validators found for claim');
+        return;
+      }
+
+      const fee = await simulateFee(() => claimRewards(chain, targets, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claim fee');
         return;
       }
 
-      return await claimRewards(address, ops, chain);
+      return await claimRewards(chain, targets, feeToken);
     }
 
     case 'claimAndRestake': {
       const targets = (target ? [resolveValidator(target)] : userDelegations).filter(
-        (v): v is CombinedStakingInfo => !!v,
+        (v): v is FullValidatorInfo => !!v,
       );
 
-      const rewards = targets.map(v => ({
-        validator: v.validator.operator_address,
-        rewards: v.rewards,
-      }));
+      if (targets.length === 0) {
+        console.error('[handleIntent] No valid validators found for claimAndRestake');
+        return;
+      }
 
-      const fee = await simulateFee(() => claimAndRestake(chain, targets, rewards, feeToken, true));
+      const fee = await simulateFee(() => claimAndRestake(chain, targets, feeToken, true));
       if (fee === null || fee > available) {
         console.error('[handleIntent] Insufficient balance for claimAndRestake fee');
         return;
       }
 
-      return await claimAndRestake(chain, targets, rewards);
+      return await claimAndRestake(chain, targets, feeToken);
     }
 
     case 'unstake': {
-      const targets = (target ? [resolveValidator(target)] : userDelegations)
-        .filter((v): v is CombinedStakingInfo => !!v)
-        .map(v => ({
-          delegation: v.delegation,
-          balance: v.balance,
-        }));
+      const targets = (target ? [resolveValidator(target)] : userDelegations).filter(
+        (v): v is FullValidatorInfo => !!v,
+      );
+
+      if (targets.length === 0) {
+        console.error('[handleIntent] No valid validators found for unstake');
+        return;
+      }
 
       const fee = await simulateFee(() =>
         claimAndUnstake({
           chain,
-          delegations: targets,
+          validatorInfoArray: targets,
           amount: amount?.toString(),
           feeToken,
           simulateOnly: true,
@@ -160,7 +166,7 @@ export const handleIntent = async (
 
       return await claimAndUnstake({
         chain,
-        delegations: targets,
+        validatorInfoArray: targets,
         amount: amount?.toString(),
         feeToken,
       });

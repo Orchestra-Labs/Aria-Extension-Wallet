@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { CombinedStakingInfo, ValidatorLogoInfo } from '@/types';
+import { FullValidatorInfo, ValidatorLogoInfo } from '@/types';
 import { SlideTray, Button } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
@@ -21,25 +21,24 @@ import {
   DEFAULT_MAINNET_ASSET,
   GREATER_EXPONENT_DEFAULT,
   TextFieldStatus,
+  TransactionStatus,
+  ValidatorAction,
 } from '@/constants';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   subscribedChainRegistryAtom,
   filteredValidatorsAtom,
   networkLevelAtom,
   showCurrentValidatorsAtom,
   selectedValidatorChainAtom,
-  isValidatorLoadingAtom,
-  isValidatorSuccessAtom,
   resetValidatorTransactionAtom,
   validatorErrorAtom,
-  validatorTxFailedAtom,
   maxAvailableAtom,
   validatorTxHash,
-  lastSimulationUpdateAtom,
   validatorCalculatedFeeAtom,
   chainInfoAtom,
   selectedValidatorsAtom,
+  validatorTransactionStateAtom,
 } from '@/atoms';
 import { AssetInput } from '../AssetInput';
 import { Loader } from '../Loader';
@@ -49,23 +48,22 @@ import { useValidatorActions } from '@/hooks';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
 
 interface ValidatorTileProps {
-  combinedStakingInfo: CombinedStakingInfo;
+  fullValidatorInfo: FullValidatorInfo;
   isSelectable?: boolean;
-  onClick?: (validator: CombinedStakingInfo) => void;
+  onClick?: (validator: FullValidatorInfo) => void;
   forceCurrentViewStyle?: boolean;
 }
 
-// TODO: for the case where the user is unstaking all and the filtered validators would not include this tray, if this causes graphical errors, swipe away the tray and show toast
 // TODO: if no staking denom, disable staking features
 const ValidatorTileComponent = ({
-  combinedStakingInfo,
+  fullValidatorInfo,
   isSelectable = false,
   onClick,
   forceCurrentViewStyle = false,
 }: ValidatorTileProps) => {
   // Refs and state
   const slideTrayRef = useRef<{ isOpen: () => void }>(null);
-  const { runTransaction, runSimulation } = useValidatorActions(combinedStakingInfo);
+  const { runTransaction, runSimulation } = useValidatorActions();
 
   // Atoms
   const networkLevel = useAtomValue(networkLevelAtom);
@@ -74,15 +72,12 @@ const ValidatorTileComponent = ({
   );
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
-  const isLoading = useAtomValue(isValidatorLoadingAtom);
+  const txStatus = useAtomValue(validatorTransactionStateAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
-  const transactionFailed = useAtomValue(validatorTxFailedAtom);
-  const isSuccess = useAtomValue(isValidatorSuccessAtom);
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const transactionHash = useAtomValue(validatorTxHash);
   const chainInfo = useAtomValue(chainInfoAtom);
-  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
 
@@ -91,30 +86,27 @@ const ValidatorTileComponent = ({
 
   const [amount, setAmount] = useState(0);
   const [isClaimToRestake, setIsClaimToRestake] = useState(true);
-  const [selectedAction, setSelectedAction] = useState<'stake' | 'unstake' | 'claim' | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ValidatorAction>(ValidatorAction.NONE);
   const [validatorLogoInfo, setValidatorLogoInfo] = useState<ValidatorLogoInfo>({
     url: null,
     isFallback: false,
     error: false,
   });
 
-  const {
-    validator,
-    delegation,
-    balance,
-    rewards,
-    unbondingBalance,
-    theoreticalApr,
-    uptime,
-    votingPower,
-  } = combinedStakingInfo;
-  const delegationResponse = { delegation, balance };
-
+  const { validator, delegation, rewards, unbondingBalance, theoreticalApr, uptime, votingPower } =
+    fullValidatorInfo;
   // Asset info
   const stakingDenom = chain.staking_denoms[0];
   const asset = chain.assets?.[stakingDenom] || DEFAULT_MAINNET_ASSET;
   const symbol = asset.symbol;
   const exponent = asset.exponent || GREATER_EXPONENT_DEFAULT;
+
+  const txIsForCurrentValidator =
+    txStatus.validatorAddress === validator.operator_address &&
+    txStatus.status !== TransactionStatus.IDLE;
+  const isLoading = txIsForCurrentValidator && txStatus.status === TransactionStatus.LOADING;
+  const isSuccess = txIsForCurrentValidator && txStatus.status === TransactionStatus.SUCCESS;
+  const transactionFailed = txIsForCurrentValidator && txStatus.status === TransactionStatus.ERROR;
 
   // Calculations
   const rewardAmount = rewards.reduce((sum, reward) => sum + parseFloat(reward.amount), 0);
@@ -140,8 +132,8 @@ const ValidatorTileComponent = ({
     v => v.delegation.validator_address === delegation.validator_address,
   );
 
-  const unbondingDays = `${combinedStakingInfo.stakingParams?.unbonding_time} days`;
-  const unstakingTime = `${calculateRemainingTime(combinedStakingInfo.unbondingBalance?.completion_time || '')}`;
+  const unbondingDays = `${fullValidatorInfo.stakingParams?.unbonding_time} days`;
+  const unstakingTime = `${calculateRemainingTime(fullValidatorInfo.unbondingBalance?.completion_time || '')}`;
   let amountUnstaking = formatBalanceDisplay(
     convertToGreaterUnit(parseFloat(unbondingBalance?.balance || '0'), exponent).toFixed(exponent),
     symbol,
@@ -210,7 +202,7 @@ const ValidatorTileComponent = ({
 
   const handleClick = () => {
     if (onClick) {
-      onClick(combinedStakingInfo);
+      onClick(fullValidatorInfo);
     }
   };
 
@@ -221,24 +213,28 @@ const ValidatorTileComponent = ({
 
     try {
       switch (selectedAction) {
-        case 'stake':
-          await actionFn('stake', amount.toString());
+        case ValidatorAction.STAKE:
+          await actionFn({
+            action: ValidatorAction.STAKE,
+            amount: amount.toString(),
+            validatorInfoArray: [fullValidatorInfo],
+          });
           break;
-        case 'unstake':
-          await actionFn('unstake', amount.toString(), false, [delegationResponse]);
+        case ValidatorAction.UNSTAKE:
+          await actionFn({
+            action: ValidatorAction.UNSTAKE,
+            amount: amount.toString(),
+            validatorInfoArray: [fullValidatorInfo],
+          });
           break;
-        case 'claim':
-          await actionFn(
-            'claim',
-            '0',
-            isClaimToRestake,
-            [delegationResponse],
-            [{ validator: validator.operator_address, rewards }],
-          );
+        case ValidatorAction.CLAIM:
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: [fullValidatorInfo],
+            toRestake: isClaimToRestake,
+          });
           break;
       }
-
-      setLastUpdateTime(Date.now());
     } catch (error) {
       console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, error);
     }
@@ -251,44 +247,45 @@ const ValidatorTileComponent = ({
     // NOTE: reset local states
     setAmount(0);
     setIsClaimToRestake(false);
-    setSelectedAction(null);
+    setSelectedAction(ValidatorAction.NONE);
   };
 
   const canRunSimulation = () => {
-    if (selectedAction === 'claim') return true;
+    if (selectedAction === ValidatorAction.CLAIM) return true;
     return amount > 0 && !isLoading && selectedAction;
   };
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    // Use a ref to track the timeout
+    const timeoutRef = { current: null as NodeJS.Timeout | null };
 
-    const setupInterval = () => {
-      intervalId = setInterval(() => {
-        if (canRunSimulation()) {
-          handleAction({ isSimulation: true });
-          setLastUpdateTime(Date.now());
-        } else {
-          clearInterval(intervalId);
-        }
-      }, 5000);
+    const runSimulation = () => {
+      if (canRunSimulation()) {
+        handleAction({ isSimulation: true });
+        // Schedule next run
+        timeoutRef.current = setTimeout(runSimulation, 5000);
+      }
     };
 
-    if (selectedAction === 'claim') {
-      handleAction({ isSimulation: true });
-      setLastUpdateTime(Date.now());
-      setupInterval();
-    } else if (canRunSimulation()) {
-      if (Date.now() - lastUpdateTime > 5000) {
-        handleAction({ isSimulation: true });
-        setLastUpdateTime(Date.now());
+    // Run immediately if conditions are met and it's been more than 5 seconds
+    if (canRunSimulation()) {
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
 
-      setupInterval();
+      handleAction({ isSimulation: true });
+    }
+
+    // Setup the recurring simulation
+    if (canRunSimulation()) {
+      timeoutRef.current = setTimeout(runSimulation, 5000);
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      // Cleanup on unmount or dependency change
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [amount, isLoading, selectedAction]);
@@ -441,8 +438,8 @@ const ValidatorTileComponent = ({
                 <Button
                   size="medium"
                   className="w-full"
-                  onClick={() => setSelectedAction('stake')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.STAKE)}
+                  disabled={isLoading || selectedAction === ValidatorAction.STAKE}
                 >
                   Stake
                 </Button>
@@ -450,16 +447,16 @@ const ValidatorTileComponent = ({
                   size="medium"
                   variant="secondary"
                   className="w-full mx-2"
-                  onClick={() => setSelectedAction('unstake')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.UNSTAKE)}
+                  disabled={isLoading || selectedAction === ValidatorAction.UNSTAKE}
                 >
                   Unstake
                 </Button>
                 <Button
                   size="medium"
                   className="w-full"
-                  onClick={() => setSelectedAction('claim')}
-                  disabled={isLoading}
+                  onClick={() => setSelectedAction(ValidatorAction.CLAIM)}
+                  disabled={isLoading || selectedAction === ValidatorAction.CLAIM}
                 >
                   Claim
                 </Button>
@@ -467,7 +464,7 @@ const ValidatorTileComponent = ({
             )}
 
             <div
-              className={`flex flex-grow flex-col items-center justify-center ${selectedAction === 'claim' ? '' : 'px-[1.5rem]'}`}
+              className={`flex flex-grow flex-col items-center justify-center ${selectedAction === ValidatorAction.CLAIM ? '' : 'px-[1.5rem]'}`}
             >
               {isSuccess && (
                 <div className="flex-grow">
@@ -491,7 +488,8 @@ const ValidatorTileComponent = ({
 
               {!isLoading &&
                 !isSuccess &&
-                (selectedAction === 'stake' || selectedAction === 'unstake') && (
+                (selectedAction === ValidatorAction.STAKE ||
+                  selectedAction === ValidatorAction.UNSTAKE) && (
                   <div className="flex flex-col items-center w-full">
                     <AssetInput
                       placeholder={`Enter ${selectedAction} amount`}
@@ -505,13 +503,15 @@ const ValidatorTileComponent = ({
                       disableButtons={isLoading}
                       onClear={() => setAmount(0)}
                       onMax={() => {
-                        if (selectedAction === 'stake') {
+                        if (selectedAction === ValidatorAction.STAKE) {
                           setAmount(maxAvailable);
                         } else {
                           setAmount(delegatedAmount);
                         }
                       }}
-                      endButtonTitle={selectedAction === 'stake' ? 'Stake' : 'Unstake'}
+                      endButtonTitle={
+                        selectedAction === ValidatorAction.STAKE ? 'Stake' : 'Unstake'
+                      }
                       onEndButtonClick={handleAction}
                     />
                   </div>

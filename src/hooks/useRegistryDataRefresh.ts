@@ -13,6 +13,7 @@ import {
   filterChainRegistryToSubscriptions,
 } from '@/helpers';
 import { LOCAL_CHAIN_REGISTRY, NetworkLevel } from '@/constants';
+import { ChainRegistryData } from '@/types';
 
 export function useRegistryDataRefresh() {
   const [chainRegistry, setChainRegistry] = useAtom(subscribedChainRegistryAtom);
@@ -82,7 +83,7 @@ export function useRegistryDataRefresh() {
   };
 
   // Helper function to filter registry data
-  const filterRegistryData = (registryData: typeof LOCAL_CHAIN_REGISTRY, userAccount: any) => {
+  const filterRegistryData = (registryData: ChainRegistryData, userAccount: any) => {
     return {
       mainnet: userAccount
         ? filterChainRegistryToSubscriptions(

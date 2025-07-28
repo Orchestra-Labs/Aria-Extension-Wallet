@@ -4,24 +4,23 @@ import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   dialogSearchTermAtom,
-  filteredDialogValidatorsAtom,
   selectedValidatorsAtom,
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
   resetValidatorTransactionAtom,
-  isValidatorLoadingAtom,
-  isValidatorSuccessAtom,
+  isValidatorTxLoadingAtom,
+  isValidatorTxSuccessAtom,
   validatorErrorAtom,
   validatorTxFailedAtom,
   validatorTxHash,
   validatorCalculatedFeeAtom,
-  lastSimulationUpdateAtom,
+  dialogValidatorsAtom,
 } from '@/atoms';
 import { SearchBar } from '../SearchBar';
 import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
-import { CombinedStakingInfo } from '@/types';
+import { FullValidatorInfo } from '@/types';
 import { useRefreshData, useValidatorActions } from '@/hooks';
-import { ValidatorSortType, SortOrder, SearchType } from '@/constants';
+import { ValidatorSortType, SortOrder, SearchType, ValidatorAction } from '@/constants';
 import { TransactionResultsTile } from '../TransactionResultsTile';
 import { Loader } from '../Loader';
 import { ValidatorScroller } from '../ValidatorScroller';
@@ -46,18 +45,18 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortOrder = useSetAtom(validatorDialogSortOrderAtom);
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
-  const filteredValidators = useAtomValue(filteredDialogValidatorsAtom);
-
-  const isLoading = useAtomValue(isValidatorLoadingAtom);
-  const isSuccess = useAtomValue(isValidatorSuccessAtom);
+  const getDialogValidators = useAtomValue(dialogValidatorsAtom);
+  const isLoading = useAtomValue(isValidatorTxLoadingAtom);
+  const isSuccess = useAtomValue(isValidatorTxSuccessAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
   const transactionFailed = useAtomValue(validatorTxFailedAtom);
   const transactionHash = useAtomValue(validatorTxHash);
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
-  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
+  const filteredValidators = getDialogValidators(isClaimDialog);
 
   const [isClaimToRestake, setIsClaimToRestake] = useState<boolean>(true);
+  const [isTransactionInProgress, setIsTransactionInProgress] = useState(false);
 
   const searchType = SearchType.VALIDATOR;
 
@@ -65,13 +64,6 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const noValidatorsSelected = selectedValidators.length === 0;
 
   const unbondingDays = `${filteredValidators[0]?.stakingParams?.unbonding_time || 0} days`;
-
-  const calculateTotalDelegations = () => {
-    return selectedValidators.reduce(
-      (sum, validator) => sum + parseFloat(validator.delegation.shares || '0'),
-      0,
-    );
-  };
 
   const resetDefaults = () => {
     // NOTE: reset atom states
@@ -93,7 +85,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     setSelectedValidators([]);
   };
 
-  const handleValidatorSelect = (validator: CombinedStakingInfo) => {
+  const handleValidatorSelect = (validator: FullValidatorInfo) => {
     setSelectedValidators(prev =>
       prev.some(v => v.delegation.validator_address === validator.delegation.validator_address)
         ? prev.filter(
@@ -106,68 +98,70 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const handleAction = async ({ isSimulation = false }: { isSimulation?: boolean } = {}) => {
     if (noValidatorsSelected) return;
 
-    const delegations = selectedValidators.map(validator => ({
-      delegation: validator.delegation,
-      balance: validator.balance,
-    }));
-
-    const rewards = selectedValidators.map(v => ({
-      validator: v.delegation.validator_address,
-      rewards: v.rewards,
-    }));
-
     const actionFn = isSimulation ? runSimulation : runTransaction;
 
     try {
+      setIsTransactionInProgress(true);
+
       if (isClaimDialog) {
         if (isClaimToRestake) {
           // Claim to restake
-          await actionFn('claim', '0', true, delegations, rewards);
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: selectedValidators,
+            toRestake: true,
+          });
         } else {
           // Claim to wallet
-          await actionFn('claim', '0', false, delegations, rewards);
+          await actionFn({
+            action: ValidatorAction.CLAIM,
+            validatorInfoArray: selectedValidators,
+          });
         }
       } else {
         // Unstake
-        await actionFn('unstake', calculateTotalDelegations().toString(), false, delegations);
+        await actionFn({
+          action: ValidatorAction.UNSTAKE,
+          validatorInfoArray: selectedValidators,
+        });
       }
-
-      setLastUpdateTime(Date.now());
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
       console.error(`Error during ${isSimulation ? 'simulation' : 'transaction'}:`, errorMessage);
       throw error;
+    } finally {
+      setIsTransactionInProgress(false);
     }
   };
 
-  const canRunSimulation = () => !noValidatorsSelected;
+  const canRunSimulation = () =>
+    slideTrayRef.current?.isOpen() && !noValidatorsSelected && !isTransactionInProgress;
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    // Use a ref to track the timeout ID
+    const timeoutRef = { current: null as NodeJS.Timeout | null };
 
-    const setupInterval = () => {
-      intervalId = setInterval(() => {
-        if (canRunSimulation()) {
-          handleAction({ isSimulation: true });
-          setLastUpdateTime(Date.now());
-        } else {
-          clearInterval(intervalId);
-        }
-      }, 5000);
+    const runSimulation = () => {
+      if (canRunSimulation()) {
+        handleAction({ isSimulation: true });
+        // Schedule next run
+        timeoutRef.current = setTimeout(runSimulation, 5000);
+      }
     };
 
+    // Run immediately if conditions are met
     if (canRunSimulation()) {
-      if (Date.now() - lastUpdateTime > 5000) {
-        handleAction({ isSimulation: true });
-        setLastUpdateTime(Date.now());
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-
-      setupInterval();
+      runSimulation();
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      // Cleanup on unmount or dependency change
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [selectedValidators]);

@@ -1,7 +1,8 @@
-import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS } from '@/constants';
+import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS, NetworkLevel } from '@/constants';
 import { Uri, Asset, SubscriptionRecord, LocalChainRegistry } from '@/types';
 import { queryRestNode } from './queryNodes';
 import { safeTrimLowerCase } from './formatString';
+import { getCachedPrices } from './priceCache';
 
 const adjustAmountByExponent = (amount: string, exponent: number): string => {
   const divisor = Math.pow(10, exponent);
@@ -11,9 +12,19 @@ const adjustAmountByExponent = (amount: string, exponent: number): string => {
 const fetchCoinGeckoPrices = async (coinGeckoIds: string[]): Promise<Record<string, number>> => {
   if (!coinGeckoIds.length) return {};
 
+  // First check cache for any valid prices
+  const cachedPrices = getCachedPrices(coinGeckoIds);
+
+  // Filter out IDs we already have cached
+  const idsToFetch = coinGeckoIds.filter(id => !(id in cachedPrices));
+
+  if (!idsToFetch.length) {
+    return cachedPrices;
+  }
+
   try {
     const batchSize = 50;
-    const priceData: Record<string, number> = {};
+    const priceData: Record<string, number> = { ...cachedPrices };
 
     for (let i = 0; i < coinGeckoIds.length; i += batchSize) {
       const batch = coinGeckoIds.slice(i, i + batchSize);
@@ -139,6 +150,7 @@ export async function fetchWalletAssets(
         console.warn(`[FetchWalletAssets] No metadata for subscribed denom ${denom}`);
         return null;
       }
+
       return {
         ...metadata,
         amount: '0',
@@ -178,6 +190,16 @@ export async function fetchWalletAssets(
             }
           });
         });
+
+        if (networkLevel === NetworkLevel.TESTNET) {
+          return Array.from(coinGeckoIds).reduce(
+            (acc, id) => {
+              acc[id] = 0;
+              return acc;
+            },
+            {} as Record<string, number>,
+          );
+        }
 
         return fetchCoinGeckoPrices(Array.from(coinGeckoIds));
       })(),

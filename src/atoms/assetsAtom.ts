@@ -47,14 +47,14 @@ export const defaultAssetAtom = atom(get => {
   const chainRegistry = get(subscribedChainRegistryAtom);
 
   // If user has a default coin denom
-  if (userAccount?.settings.defaultCoinDenom) {
+  if (userAccount?.settings.defaultSelections[networkLevel].defaultCoinDenom) {
+    const defaultCoinDenom = userAccount?.settings.defaultSelections[networkLevel].defaultCoinDenom;
     // Try to find in chain registry
-    if (userAccount.settings.defaultChainID) {
-      const chain = chainRegistry[networkLevel][userAccount.settings.defaultChainID];
+    if (userAccount?.settings.defaultSelections[networkLevel].defaultChainId) {
+      const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
+      const chain = chainRegistry[networkLevel][defaultChainId];
       if (chain?.assets) {
-        const registryAsset = Object.values(chain.assets).find(
-          a => a.denom === userAccount.settings.defaultCoinDenom,
-        );
+        const registryAsset = Object.values(chain.assets).find(a => a.denom === defaultCoinDenom);
         if (registryAsset) {
           return {
             ...registryAsset,
