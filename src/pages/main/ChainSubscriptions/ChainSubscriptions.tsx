@@ -21,6 +21,7 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import {
   AssetSortType,
+  DEFAULT_SELECTIONS,
   DEFAULT_SUBSCRIPTION,
   NetworkLevel,
   ROUTES,
@@ -30,7 +31,7 @@ import {
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { Asset, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
-import { saveAccountByID, getPrimaryFeeToken } from '@/helpers';
+import { saveAccountByID, getPrimaryFeeToken, getSymphonyChainId } from '@/helpers';
 import { useDataProviderControls } from '@/data';
 import { useRefreshData } from '@/hooks';
 
@@ -77,8 +78,9 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const [initialChainIds, setInitialChainIds] = useState<string[]>([]);
 
   const initialSettings = {
+    defaultSelections: userAccount && userAccount.settings.defaultSelections,
     hasSetCoinList: true,
-    subscriptions:
+    chainSubscriptions:
       userAccount?.settings.chainSubscriptions &&
       Object.keys(userAccount.settings.chainSubscriptions.mainnet).length +
         Object.keys(userAccount.settings.chainSubscriptions.testnet).length >
@@ -280,16 +282,68 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     });
   };
 
-  // TODO: if default coin and chain are not included in the set of chains and coins here, update those to first in the list
-  // TODO: add method to select default coin and chain
   const saveToLocalStorage = () => {
     if (userAccount) {
+      // Helper function to get the best chain ID for a network level
+      const getBestChainId = (networkLevel: NetworkLevel): string => {
+        const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
+
+        // Priority 1: Symphony ID (if subscribed)
+        const symphonyChainId = getSymphonyChainId(networkLevel);
+        if (subscribedChainIds.includes(symphonyChainId)) {
+          return symphonyChainId;
+        }
+
+        // Priority 2: First available subscribed chain (fallback to Symphony)
+        return subscribedChainIds[0] || symphonyChainId;
+      };
+
+      // Helper function to get the best coin denom for a chain
+      const getBestCoinDenom = (networkLevel: NetworkLevel, chainId: string): string => {
+        const subscribedCoins = subscriptionSelections[networkLevel][chainId] || [];
+        const chain = chainRegistry[networkLevel][chainId];
+
+        // Priority 1: Primary fee token (if subscribed)
+        if (chain) {
+          const feeToken = getPrimaryFeeToken(chain);
+          if (feeToken && subscribedCoins.includes(feeToken.denom)) {
+            return feeToken.denom;
+          }
+        }
+
+        // Priority 2: First subscribed coin
+        if (subscribedCoins.length > 0) {
+          return subscribedCoins[0];
+        }
+
+        // Fallback to network default
+        return DEFAULT_SELECTIONS[networkLevel].defaultCoinDenom;
+      };
+
+      // Helper function to update default selections for a network level
+      const updateDefaultSelections = (networkLevel: NetworkLevel) => {
+        const bestChainId = getBestChainId(networkLevel);
+        const bestCoinDenom = getBestCoinDenom(networkLevel, bestChainId);
+
+        return {
+          defaultChainId: bestChainId,
+          defaultCoinDenom: bestCoinDenom,
+        };
+      };
+
+      // Update default selections for both network levels
+      const updatedDefaultSelections = {
+        mainnet: updateDefaultSelections(NetworkLevel.MAINNET),
+        testnet: updateDefaultSelections(NetworkLevel.TESTNET),
+      };
+
       const updatedUserAccount = {
         ...userAccount,
         settings: {
           ...userAccount.settings,
           hasSetCoinList: true,
           chainSubscriptions: subscriptionSelections,
+          defaultSelections: updatedDefaultSelections,
         },
       };
 
@@ -344,7 +398,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const cancel = () => {
     if (userAccount) {
       userAccount.settings.hasSetCoinList = initialSettings.hasSetCoinList;
-      userAccount.settings.chainSubscriptions = initialSettings.subscriptions;
+      userAccount.settings.chainSubscriptions = initialSettings.chainSubscriptions;
       saveAccountByID(userAccount);
     }
 

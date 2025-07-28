@@ -11,10 +11,10 @@ import {
   validatorDataAtom,
   subscribedChainRegistryAtom,
   hasNonZeroAssetsAtom,
-  chainInfoAtom,
   selectedValidatorChainAtom,
   userAccountAtom,
   isFetchingWalletDataAtom,
+  chainInfoAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -54,11 +54,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
 
-  const chain = getChainInfo(
-    currentStep === 0
-      ? userAccount?.settings.defaultChainID || getSymphonyChainId(networkLevel)
-      : chainId,
-  );
+  const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
+  const accountViewChainId = defaultChainId || getSymphonyChainId(networkLevel);
+  const validatorViewChainId = chainId;
+  const viewDefinedChainId = currentStep === 0 ? accountViewChainId : validatorViewChainId;
+  const chain = getChainInfo(viewDefinedChainId);
 
   console.log('[BalanceCard] Non-zero assets check:', {
     hasNonZeroAssets,
@@ -68,7 +68,6 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const [showReserveStatus, setShowReserveStatus] = useState(false);
 
-  // TODO: change this from default constant to default from account
   const balanceDisplayUnit = getPrimaryFeeToken(chain) || getSymphonyDefaultAsset(networkLevel);
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;

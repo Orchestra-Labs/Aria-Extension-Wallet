@@ -55,11 +55,13 @@ export interface SimplifiedChainInfo {
 
 export interface LocalChainRegistry extends Record<string, SimplifiedChainInfo> {}
 
+export interface ChainRegistryData {
+  mainnet: LocalChainRegistry;
+  testnet: LocalChainRegistry;
+}
+
 export interface ChainRegistryRecord {
   sha: string;
   lastUpdated: string;
-  data: {
-    mainnet: LocalChainRegistry;
-    testnet: LocalChainRegistry;
-  };
+  data: ChainRegistryData;
 }

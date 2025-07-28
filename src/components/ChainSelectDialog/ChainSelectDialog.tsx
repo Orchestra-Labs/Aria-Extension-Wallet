@@ -69,6 +69,17 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
       '[ChainSelectDialog] triggerComponent updated with chainInfo:',
       chainInfo?.pretty_name,
     );
+
+    // Format the button text to max 9 characters
+    const formatButtonText = (text: string | undefined) => {
+      if (!text) return 'Chain';
+      return text.length > 9 ? `${text.substring(0, 6)}...` : text;
+    };
+
+    const displayText = buttonText
+      ? formatButtonText(buttonText)
+      : formatButtonText(chainInfo?.pretty_name) || 'Chain';
+
     return (
       <Button
         variant="selectedEnabled"
@@ -76,7 +87,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
         className={`px-1 rounded text-xs ${buttonClassName || ''}`}
         disabled={disabled}
       >
-        {buttonText || chainInfo?.pretty_name || 'Unknown Chain'}
+        {displayText}
       </Button>
     );
   }, [chainInfo]);

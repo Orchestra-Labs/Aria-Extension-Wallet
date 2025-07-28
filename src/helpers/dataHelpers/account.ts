@@ -4,12 +4,7 @@ import { getPasswordRecords, hashPassword, savePasswordHash, updatePassword } fr
 import { createWallet } from './wallet';
 import { saveSessionData } from './session';
 import { generateUUID } from '../uuid';
-import {
-  DEFAULT_DENOM,
-  DEFAULT_SUBSCRIPTION,
-  SettingsOption,
-  SYMPHONY_MAINNET_ID,
-} from '@/constants';
+import { DEFAULT_SELECTIONS, DEFAULT_SUBSCRIPTION, SettingsOption } from '@/constants';
 import { decryptMnemonic, encryptMnemonic } from './crypto';
 
 const ACCOUNTS_KEY = 'accountsToken';
@@ -92,10 +87,9 @@ export const createAccount = async (
 
   const newAccount: AccountRecord = {
     id: accountID,
-    // TODO: move settings to defaul.  s.grab from there and add wallet id
+    // TODO: move settings to defaults.  grab from there and add wallet id
     settings: {
-      defaultChainID: SYMPHONY_MAINNET_ID,
-      defaultCoinDenom: DEFAULT_DENOM,
+      defaultSelections: DEFAULT_SELECTIONS,
       chainSubscriptions: DEFAULT_SUBSCRIPTION,
       activeWalletID: walletRecord.id,
 

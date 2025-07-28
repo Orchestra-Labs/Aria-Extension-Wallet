@@ -28,6 +28,17 @@ export const DEFAULT_FEE_TOKEN = {
   gasPriceStep: DEFAULT_GAS_PRICES,
 };
 
+export const DEFAULT_SELECTIONS = {
+  mainnet: {
+    defaultChainId: SYMPHONY_MAINNET_ID,
+    defaultCoinDenom: DEFAULT_DENOM,
+  },
+  testnet: {
+    defaultChainId: SYMPHONY_TESTNET_ID,
+    defaultCoinDenom: DEFAULT_DENOM,
+  },
+};
+
 export const MAX_RETRIES_PER_QUERY = 3;
 
 export const KNOWN_EPOCH_BASED_CHAINS = [

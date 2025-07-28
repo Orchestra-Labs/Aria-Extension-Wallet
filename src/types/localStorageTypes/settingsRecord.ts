@@ -9,9 +9,19 @@ export interface SubscriptionRecord {
   testnet: NetworkSubscriptionRecord;
 }
 
+interface SelectionSettings {
+  mainnet: {
+    defaultChainId: string;
+    defaultCoinDenom: string;
+  };
+  testnet: {
+    defaultChainId: string;
+    defaultCoinDenom: string;
+  };
+}
+
 export interface SettingsRecord {
-  defaultChainID: string;
-  defaultCoinDenom: string;
+  defaultSelections: SelectionSettings;
   chainSubscriptions: SubscriptionRecord;
   activeWalletID: string;
 

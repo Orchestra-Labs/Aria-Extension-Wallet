@@ -5,7 +5,13 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { LogoIcon } from '@/assets/icons';
 import { OptionsDialog } from '@/components';
 import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
-import { networkLevelAtom, sessionWalletAtom, userAccountAtom, validatorDataAtom } from '@/atoms';
+import {
+  networkLevelAtom,
+  resetSelectedValidatorChainAtom,
+  sessionWalletAtom,
+  userAccountAtom,
+  validatorDataAtom,
+} from '@/atoms';
 import { Button } from '@/ui-kit';
 
 const MainLayout: React.FC = () => {
@@ -13,9 +19,11 @@ const MainLayout: React.FC = () => {
   const userWallet = useAtomValue(sessionWalletAtom);
   const userAccount = useAtomValue(userAccountAtom);
   const setValidatorState = useSetAtom(validatorDataAtom);
+  const resetSelectedValidatorChain = useSetAtom(resetSelectedValidatorChainAtom);
 
   const toggleNetworkLevel = () => {
     setValidatorState([]);
+    resetSelectedValidatorChain();
     setNetworkLevel(prev =>
       prev === NetworkLevel.MAINNET ? NetworkLevel.TESTNET : NetworkLevel.MAINNET,
     );
