@@ -13,26 +13,33 @@ import {
   getSessionToken,
   walletkit,
 } from '@/helpers';
-import { SYMPHONY_PREFIX } from '@/constants';
+import { useAtomValue } from 'jotai';
+import { chainInfoAtom } from '@/atoms';
 
 const bufferFromBase64 = (base64: string) => Buffer.from(base64, 'base64');
 const base64FromUint8Array = (array: Uint8Array) => Buffer.from(array).toString('base64');
 
 type Params = {
   requestEvent: SignClientTypes.EventArguments['session_request'];
-  prefix?: string;
 };
 
-const approveWCTransaction = async ({ requestEvent, prefix }: Params) => {
+const approveWCTransaction = async ({ requestEvent }: Params) => {
+  const getChainInfo = useAtomValue(chainInfoAtom);
+
   const { id, params, topic } = requestEvent;
-  const { request } = params;
+  const { request, chainId } = params;
 
   const sessionToken = getSessionToken();
   if (!sessionToken) {
     throw new Error(getSdkError('USER_DISCONNECTED').message);
   }
 
-  const signerPrefix = prefix || SYMPHONY_PREFIX;
+  const chain = getChainInfo(chainId);
+  if (!chain) {
+    throw getSdkError('UNSUPPORTED_CHAINS', `Chain ${chainId} not supported`);
+  }
+
+  const signerPrefix = chain.bech32_prefix;
   const directSigner = await createOfflineSignerByPrefix(sessionToken.mnemonic, signerPrefix);
   const aminoSigner = await createAminoSignerByPrefix(sessionToken.mnemonic, signerPrefix);
 
@@ -46,6 +53,7 @@ const approveWCTransaction = async ({ requestEvent, prefix }: Params) => {
         pubkey: pubkeyBuffer,
       };
     });
+
     switch (request.method) {
       case COSMOS_SIGNING_METHODS.COSMOS_SIGN_DIRECT:
         const signDoc = request.params.signDoc;
@@ -98,6 +106,7 @@ export const useApproveWCTransactionMutation = (
     mutationFn: approveWCTransaction,
     ...options,
     onError: e => {
+      // TODO: alerts are blockers.  handle more gracefully
       alert(e.message);
     },
   });

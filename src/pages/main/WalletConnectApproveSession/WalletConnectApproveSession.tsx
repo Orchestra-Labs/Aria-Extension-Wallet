@@ -4,48 +4,43 @@ import { SignClientTypes } from '@walletconnect/types';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Header, WCProposalButtons } from '@/components';
-import { WCProposalMetadata } from '@/components';
+import { Header, WCProposalButtons, WCProposalMetadata } from '@/components';
 import { ROUTES } from '@/constants';
-import { COSMOS_CHAINS } from '@/constants/wc';
 import { closeAllExtensionPopups } from '@/helpers';
 import { useSupportedWCNamespaces, useToast } from '@/hooks';
-import { useApproveWCSessionMutation } from '@/queries/useApproveWCSession.mutation';
-import { useRejectWCSessionMutation } from '@/queries/useRejectWCSession.mutation';
+import { useApproveWCSessionMutation, useRejectWCSessionMutation } from '@/queries';
+import { useAtomValue } from 'jotai';
+import { chainInfoAtom } from '@/atoms';
 
 const PAGE_TITLE = 'Requesting Connection';
 
 export const WalletConnectApproveSession: React.FC = () => {
   const searchParams = new URLSearchParams(window.location.search);
-
   const proposal: SignClientTypes.EventArguments['session_proposal'] = JSON.parse(
     searchParams.get('proposal') ?? '',
   );
 
   const { metadata } = proposal.params.proposer;
-
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { supportedNamespaces } = useSupportedWCNamespaces();
+  const { mutate: approveWCSession, isPending: approvingWCSession } = useApproveWCSessionMutation();
+
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   const chainIds: string[] =
     Object.values(proposal.params.requiredNamespaces).flatMap(
-      ({ chains }) => chains?.map(chain => chain) ?? [],
+      ({ chains }) => chains?.map(chain => chain.replace('cosmos:', '')) ?? [],
     ) ?? [];
 
-  const chains = new Intl.ListFormat('en', {
-    style: 'long',
-    type: 'conjunction',
-  }).format(
-    chainIds.map(
-      chainId => COSMOS_CHAINS?.[chainId as keyof typeof COSMOS_CHAINS]?.name ?? chainId,
-    ) ?? [],
-  );
+  const chains = chainIds
+    .map(chainId => {
+      const info = getChainInfo(chainId);
+      return info?.pretty_name ?? chainId;
+    })
+    .join(', ');
 
   const { verifyContext } = proposal;
-
-  const { toast } = useToast();
-
-  const { supportedNamespaces } = useSupportedWCNamespaces();
-  const { mutate: approveWCSession, isPending: approvingWCSession } = useApproveWCSessionMutation();
 
   const closeScreen = () => {
     navigate({ pathname: ROUTES.APP.ROOT, search: '' });
@@ -99,7 +94,6 @@ export const WalletConnectApproveSession: React.FC = () => {
   };
 
   const { name } = metadata;
-
   const disabled = approvingWCSession || rejectingWCSession;
 
   return (

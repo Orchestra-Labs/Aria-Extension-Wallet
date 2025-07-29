@@ -9,6 +9,8 @@ import { useApproveWCTransactionMutation } from '@/queries';
 
 import { useSupportedWCNamespaces } from './useSupportedWCNamespaces';
 import { useToast } from './useToast';
+import { useAtomValue } from 'jotai';
+import { chainInfoAtom } from '@/atoms';
 
 type Params = { initialized: boolean };
 
@@ -16,14 +18,14 @@ export const useWalletConnectEventsManager = ({ initialized }: Params) => {
   const { mutate: approveWCTransaction } = useApproveWCTransactionMutation({
     retry: 3,
   });
-
   const { supportedNamespaces } = useSupportedWCNamespaces();
   const { toast } = useToast();
-
   const location = useLocation();
-  const { pathname } = location;
-
   const navigate = useNavigate();
+
+  const getChainInfo = useAtomValue(chainInfoAtom);
+
+  const { pathname } = location;
 
   /******************************************************************************
    * 1. Open session proposal modal
@@ -59,7 +61,17 @@ export const useWalletConnectEventsManager = ({ initialized }: Params) => {
       if (pathname === ROUTES.APP.WALLET_CONNECT.SIGN_TRANSACTION) return;
 
       const { params } = requestEvent;
-      const { request } = params;
+      const { request, chainId } = params;
+
+      const chainInfo = getChainInfo(chainId);
+      if (!chainInfo) {
+        toast({
+          title: 'Unsupported Chain',
+          description: `Chain ${chainId} is not supported`,
+          duration: 5000,
+        });
+        return;
+      }
 
       switch (request.method) {
         case COSMOS_SIGNING_METHODS.COSMOS_SIGN_DIRECT:
