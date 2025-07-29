@@ -6,6 +6,7 @@ import { ToastActionElement, ToastProps } from '@/components/Toast/toast';
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
 
+// TODO: add status (such as error/success)
 type ToasterToast = ToastProps & {
   id: string;
   title?: React.ReactNode;
