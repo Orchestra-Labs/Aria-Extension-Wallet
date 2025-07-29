@@ -4,44 +4,34 @@ import { SignClientTypes } from '@walletconnect/types';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Header, WCProposalButtons } from '@/components';
-import { WCProposalMetadata } from '@/components';
+import { Header, WCProposalButtons, WCProposalMetadata } from '@/components';
 import { ROUTES } from '@/constants';
-import { COSMOS_CHAINS } from '@/constants/wc';
 import { closeAllExtensionPopups, sleep } from '@/helpers';
-import { walletkit } from '@/helpers/walletConnect';
+import { walletkit } from '@/helpers';
 import { useToast } from '@/hooks';
 import { useApproveWCTransactionMutation, useRejectWCTransactionMutation } from '@/queries';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/ui-kit';
+import { useAtomValue } from 'jotai';
+import { chainInfoAtom } from '@/atoms';
 
 const PAGE_TITLE = 'Approve Transaction';
 
 export const WalletConnectSignTransaction: React.FC = () => {
+  const getChainInfo = useAtomValue(chainInfoAtom);
+
   const searchParams = new URLSearchParams(window.location.search);
   const requestEvent: SignClientTypes.EventArguments['session_request'] = JSON.parse(
     searchParams.get('requestEvent') ?? '',
   );
 
   const { verifyContext } = requestEvent;
-
   const signDoc: object | undefined = requestEvent.params.request.params?.signDoc;
-
   const { topic, params } = requestEvent;
   const { chainId } = params;
 
-  const chainIds = [chainId];
-
-  const chains = new Intl.ListFormat('en', {
-    style: 'long',
-    type: 'conjunction',
-  }).format(
-    chainIds.map(
-      chainId => COSMOS_CHAINS?.[chainId as keyof typeof COSMOS_CHAINS]?.name ?? chainId,
-    ) ?? [],
-  );
+  const chain = getChainInfo(chainId);
 
   const requestSession = walletkit.engine.signClient.session.get(topic);
-
   const metadata = requestSession.peer.metadata;
 
   const { toast } = useToast();
@@ -103,8 +93,22 @@ export const WalletConnectSignTransaction: React.FC = () => {
     await closeScreen();
   };
 
-  const { name } = metadata;
+  if (!chain) {
+    // Show error toast
+    toast({
+      title: 'Unsupported Chain',
+      description: `${chainId} is not supported by this wallet`,
+      duration: 5000,
+    });
 
+    // Automatically reject the request
+    onReject();
+
+    // Return empty fragment to prevent rendering
+    return null;
+  }
+
+  const { name } = metadata;
   const disabled = approvingTransaction || rejectingTransaction;
 
   return (
@@ -114,7 +118,7 @@ export const WalletConnectSignTransaction: React.FC = () => {
       <div className="p-8 mt-4 h-full overflow-y-auto flex flex-grow flex-col justify-center">
         <WCProposalMetadata metadata={metadata} verifyContext={verifyContext}>
           <div className="text-xl my-5 font-medium">
-            {name} wants you to sign transaction on {chains}
+            {name} wants you to sign transaction on {chain?.pretty_name ?? chainId}
           </div>
         </WCProposalMetadata>
         {signDoc && (

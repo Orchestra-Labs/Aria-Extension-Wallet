@@ -77,12 +77,12 @@ const ValidatorTileComponent = ({
   const calculatedFee = useAtomValue(validatorCalculatedFeeAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const transactionHash = useAtomValue(validatorTxHash);
-  const chainInfo = useAtomValue(chainInfoAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
   const resetTransactionStates = useSetAtom(resetValidatorTransactionAtom);
   const showCurrentValidators = useAtomValue(showCurrentValidatorsAtom);
 
   // Derived data
-  const chain = chainInfo(chainId);
+  const chain = getChainInfo(chainId);
 
   const [amount, setAmount] = useState(0);
   const [isClaimToRestake, setIsClaimToRestake] = useState(true);

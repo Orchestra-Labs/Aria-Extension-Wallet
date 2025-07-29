@@ -60,9 +60,9 @@ export const validatorFeeStateAtom = atom<
     // Otherwise compute default state
     const selectedChainId = get(selectedValidatorChainAtom);
     const chainId = get(selectedValidatorChainAtom);
-    const chainInfo = get(chainInfoAtom);
+    const getChainInfo = get(chainInfoAtom);
 
-    const chain = chainInfo(chainId);
+    const chain = getChainInfo(chainId);
 
     // Always reset when chain changes
     if (currentState.chainID !== selectedChainId) {
@@ -90,10 +90,10 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
   const feeState = get(validatorFeeStateAtom);
   console.log('[validatorCalculatedFeeAtom] Current fee state:', feeState);
   const chainId = get(selectedValidatorChainAtom);
-  const chainInfo = get(chainInfoAtom);
+  const getChainInfo = get(chainInfoAtom);
 
   // Try to find asset by fee token denom first
-  const chain = chainInfo(chainId);
+  const chain = getChainInfo(chainId);
   let asset = chain.assets?.[feeState.feeToken.denom];
   console.log('[validatorCalculatedFeeAtom] Found asset:', asset);
 
@@ -137,8 +137,8 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
 
 export const resetValidatorTransactionAtom = atom(null, (get, set) => {
   const chainId = get(selectedValidatorChainAtom);
-  const chainInfo = get(chainInfoAtom);
-  const chain = chainInfo(chainId);
+  const getChainInfo = get(chainInfoAtom);
+  const chain = getChainInfo(chainId);
 
   // Get the default fee token for current chain
   const feeToken = chain?.fees?.[0] || DEFAULT_FEE_TOKEN;

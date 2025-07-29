@@ -219,9 +219,9 @@ export const resetSelectedValidatorChainAtom = atom(null, (_, set) => {
 export const selectedValidatorChainInfoAtom = atom(get => {
   const chainId = get(selectedValidatorChainAtom);
   const networkLevel = get(networkLevelAtom);
-  const chainInfo = get(chainInfoAtom);
+  const getChainInfo = get(chainInfoAtom);
 
-  const chain = chainInfo(chainId);
+  const chain = getChainInfo(chainId);
   console.log('[selectedValidatorChainInfoAtom]', {
     chainId,
     networkLevel,
