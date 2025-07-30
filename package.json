@@ -1,7 +1,7 @@
 {
   "name": "aria-wallet",
   "private": true,
-  "version": "1.3.2",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc",
-    "prepare-zip": "yarn build && zip -r aria-wallet.zip dist/",
+    "prepare-zip": "yarn build && rm -f aria-wallet.zip && zip -r aria-wallet.zip dist/",
     "reinstall": "rm -rf node_modules yarn.lock && yarn install",
     "set-version": "NODE_OPTIONS='--loader ts-node/esm' ts-node src/scripts/set-version.ts"
   },
