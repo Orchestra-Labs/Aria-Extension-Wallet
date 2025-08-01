@@ -3,7 +3,6 @@ import {
   executeSendAtom,
   executeIBCAtom,
   executeSwapAtom,
-  // transactionLogAtom,
   transactionStatusAtom,
   transactionTypeAtom,
   sendStateAtom,
@@ -11,9 +10,12 @@ import {
   chainWalletAtom,
   recipientAddressAtom,
   feeStateAtom,
+  transactionLogAtom,
+  addTransactionLogEntryAtom,
+  updateTransactionLogEntryAtom,
 } from '@/atoms';
 import { TransactionStatus } from '@/constants';
-import { TransactionResult } from '@/types';
+import { TransactionResult, TransactionState } from '@/types';
 import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
 
 // TODO: set toast for if not on original page
@@ -27,6 +29,10 @@ export const useSendActions = () => {
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const transactionType = useAtomValue(transactionTypeAtom);
   const [feeState, setFeeState] = useAtom(feeStateAtom);
+  const setTransactionStatus = useSetAtom(transactionStatusAtom);
+  const addLogEntry = useSetAtom(addTransactionLogEntryAtom);
+  const updateLogEntry = useSetAtom(updateTransactionLogEntryAtom);
+  const transactionLog = useAtomValue(transactionLogAtom);
 
   console.log('[useTransactionHandler] Current state:', {
     sendState,
@@ -41,17 +47,53 @@ export const useSendActions = () => {
   const executeIBC = useSetAtom(executeIBCAtom);
   const executeSwap = useSetAtom(executeSwapAtom);
 
-  // State atoms
-  // const [
-  //   transactionLog,
-  //   setTransactionLog
-  // ] = useAtom(transactionLogAtom);
-  const setTransactionStatus = useSetAtom(transactionStatusAtom);
+  const formatTransactionDescription = (
+    sendState: TransactionState,
+    recipientAddress: string,
+    isIBC: boolean,
+  ) => {
+    const amount = `${sendState.amount} ${sendState.asset.symbol}`;
+    const toAddress = recipientAddress
+      ? `to ${recipientAddress.substring(0, 10)}...${recipientAddress.substring(recipientAddress.length - 5)}`
+      : '';
+    const chainInfo = isIBC ? ` on ${sendState.chainID}` : '';
+
+    return `Send ${amount} ${toAddress}${chainInfo}`;
+  };
 
   const handleTransaction = async ({
     isSimulation = false,
   } = {}): Promise<TransactionResult | null> => {
     console.group('[useTransactionHandler] Starting transaction');
+
+    const description = formatTransactionDescription(
+      sendState,
+      recipientAddress,
+      transactionType.isIBC,
+    );
+
+    const hasExistingEntries = transactionLog.entries.length > 0;
+
+    // Add or update log entry based on existing entries
+    let logIndex = 0;
+    if (!hasExistingEntries) {
+      // Add new entry if no existing logs
+      addLogEntry({
+        description,
+        status: TransactionStatus.LOADING,
+      });
+    } else {
+      // Update entry if logs exist
+      // TODO: update to handle multi-step transactions
+      logIndex = 0;
+      updateLogEntry({
+        index: logIndex,
+        updates: {
+          description,
+          status: TransactionStatus.LOADING,
+        },
+      });
+    }
 
     if (!isSimulation) {
       console.log('[useTransactionHandler] Setting loading state');
@@ -75,8 +117,6 @@ export const useSendActions = () => {
       console.log('[useTransactionHandler] Prepared send object:', sendObject);
 
       let result: TransactionResult;
-      const startTime = performance.now();
-
       if (transactionType.isIBC) {
         console.log('[useTransactionHandler] Executing IBC transfer');
         result = await executeIBC({ sendObject, simulateTransaction: isSimulation });
@@ -92,22 +132,21 @@ export const useSendActions = () => {
         result = await executeSend({ sendObject, simulateTransaction: isSimulation });
       }
 
-      const duration = performance.now() - startTime;
-      console.log(`[useTransactionHandler] Transaction completed in ${duration.toFixed(2)}ms`);
       console.log('[useTransactionHandler] Result:', result);
 
       // Update transaction log
-      const logEntry = {
-        isSimulation: isSimulation,
-        entries: [
-          {
-            sendObject,
-            isSuccess: result?.data?.code === 0,
-          },
-        ],
-      };
-      console.log('[useTransactionHandler] Updating transaction log:', logEntry);
-      // setTransactionLog(logEntry);
+      const success = result?.data?.code === 0;
+
+      // Update log entry with result
+      updateLogEntry({
+        // TODO: update with index for multi-step transactions
+        index: 0,
+        updates: {
+          status: success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
+          description,
+          ...(!success && { error: result.message }),
+        },
+      });
 
       if (result.success && result.data?.code === 0) {
         console.log('[useTransactionHandler] Transaction successful');
@@ -178,6 +217,5 @@ export const useSendActions = () => {
   return {
     runTransaction,
     runSimulation,
-    // transactionLog,
   };
 };

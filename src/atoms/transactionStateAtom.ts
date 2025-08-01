@@ -12,6 +12,7 @@ import {
   CalculatedFeeDisplay,
   FeeState,
   TransactionLog,
+  TransactionLogEntry,
   TransactionState,
   TransactionStatusState,
 } from '@/types';
@@ -190,6 +191,12 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
   set(transactionStatusAtom, {
     status: TransactionStatus.IDLE,
   });
+
+  // Reset transaction log
+  set(transactionLogAtom, {
+    isSimulation: false,
+    entries: [],
+  });
 });
 
 export const maxAvailableAtom = atom(get => {
@@ -211,6 +218,37 @@ export const maxAvailableAtom = atom(get => {
 export const transactionLogAtom = atom<TransactionLog>({
   isSimulation: false,
   entries: [],
+});
+
+// Add derived atoms for log operations
+export const addTransactionLogEntryAtom = atom(null, (get, set, entry: TransactionLogEntry) => {
+  const current = get(transactionLogAtom);
+  set(transactionLogAtom, {
+    ...current,
+    entries: [...current.entries, entry],
+  });
+});
+
+export const updateTransactionLogEntryAtom = atom(
+  null,
+  (get, set, { index, updates }: { index: number; updates: Partial<TransactionLogEntry> }) => {
+    const current = get(transactionLogAtom);
+    const newEntries = [...current.entries];
+    if (index >= 0 && index < newEntries.length) {
+      newEntries[index] = { ...newEntries[index], ...updates };
+    }
+    set(transactionLogAtom, {
+      ...current,
+      entries: newEntries,
+    });
+  },
+);
+
+export const resetTransactionLogAtom = atom(null, (_, set) => {
+  set(transactionLogAtom, {
+    isSimulation: false,
+    entries: [],
+  });
 });
 
 export const transactionStatusAtom = atom<TransactionStatusState>({

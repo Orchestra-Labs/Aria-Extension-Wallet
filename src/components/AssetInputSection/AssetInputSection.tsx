@@ -17,6 +17,7 @@ import {
   updateTransactionTypeAtom,
   lastSimulationUpdateAtom,
   simulationBlockedAtom,
+  resetTransactionLogAtom,
 } from '@/atoms';
 import { useEffect } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -42,6 +43,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   const [sendError, setSendError] = useAtom(sendErrorAtom);
   const receiveError = useAtomValue(receiveErrorAtom);
   const hasSendError = useAtomValue(hasSendErrorAtom);
+  const resetLogs = useSetAtom(resetTransactionLogAtom);
 
   // New atoms for simulation state
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
@@ -242,6 +244,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   const clearAmount = () => {
     handleStateUpdate({ sendAmount: 0, receiveAmount: 0 });
     setSendError({ message: '', status: InputStatus.NEUTRAL });
+    resetLogs();
   };
 
   // Effects
@@ -260,6 +263,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
       intervalId = setInterval(() => {
         if (canRunSimulation()) {
           console.log('[Periodic Check] Running simulation');
+          resetLogs();
           runSimulation();
           setLastUpdateTime(Date.now());
         } else {

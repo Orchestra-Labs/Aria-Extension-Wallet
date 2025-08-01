@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Spinner } from '@/assets/icons';
 import { ROUTES } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
@@ -10,33 +9,20 @@ import {
   sendStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
-  // symphonyAssetsAtom,
-  // subscribedChainRegistryAtom,
   chainWalletAtom,
   defaultAssetAtom,
   resetTransactionStatesAtom,
   transactionTypeAtom,
-  // transactionLogAtom,
   transactionErrorAtom,
   transactionStatusAtom,
   isLoadingAtom,
   isTransactionSuccessAtom,
-  transactionFailedAtom,
   unloadFullRegistryAtom,
   loadFullRegistryAtom,
   calculatedFeeAtom,
+  resetTransactionLogAtom,
 } from '@/atoms';
-import {
-  WalletSuccessScreen,
-  TransactionResultsTile,
-  Header,
-  AssetInputSection,
-} from '@/components';
-import {
-  // convertToGreaterUnit,
-  formatLowBalanceDisplay,
-  // truncateWalletAddress
-} from '@/helpers';
+import { WalletSuccessScreen, Header, AssetInputSection, TransactionInfoPanel } from '@/components';
 import { useSendActions } from '@/hooks/';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
@@ -57,15 +43,14 @@ export const Send = () => {
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.networkID));
   console.log('[Send] initial wallet state', walletState);
   const transactionType = useAtomValue(transactionTypeAtom);
-  // const [transactionLog, setTransactionLog] = useAtom(transactionLogAtom);
   const [transactionStatus, setTransactionStatus] = useAtom(transactionStatusAtom);
   const isLoading = useAtomValue(isLoadingAtom);
   const isSuccess = useAtomValue(isTransactionSuccessAtom);
-  const transactionFailed = useAtomValue(transactionFailedAtom);
   const transactionError = useAtomValue(transactionErrorAtom);
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const calculatedFee = useAtomValue(calculatedFeeAtom);
+  const resetLogs = useSetAtom(resetTransactionLogAtom);
 
   const resetStates = () => {
     console.log('Resetting transaction states');
@@ -79,12 +64,6 @@ export const Send = () => {
       setRecipientAddress(stableAddress);
       setSelectedAsset(defaultAsset);
     }
-
-    // Reset transaction log
-    // setTransactionLog({
-    //   isSimulation: false,
-    //   entries: [],
-    // });
   };
 
   const handleBackClick = () => {
@@ -122,6 +101,7 @@ export const Send = () => {
     console.log("[Send] walletstate's address on init", walletState.address);
     setRecipientAddress(walletState.address);
     loadFullRegistry();
+    resetLogs();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)
@@ -134,7 +114,6 @@ export const Send = () => {
     return <WalletSuccessScreen caption="Transaction success!" txHash={transactionStatus.txHash} />;
   }
 
-  //  TODO: move fee section to own component
   console.log('[Send] Current calculated fee display:', calculatedFee);
   return (
     <div className="h-screen flex flex-col bg-black text-white">
@@ -147,90 +126,8 @@ export const Send = () => {
           <AssetInputSection />
         </>
 
-        {/* 
-          TODO: add labels above text in fee block
-          TODO: view error then resolve to list
-        */}
-
         {/* Info Section */}
-        <div
-          className={`flex flex-grow mx-2 my-4 border rounded-md border-neutral-4 justify-center ${
-            isLoading || transactionError
-              ? 'items-center '
-              : 'flex-col items-start overflow-y-auto p-4'
-          }`}
-        >
-          {isLoading && <Spinner className="h-16 w-16 animate-spin fill-blue" />}
-          {transactionFailed && (
-            <TransactionResultsTile isSuccess={false} size="sm" message={transactionError} />
-          )}
-          {/* {!isLoading &&
-            !transactionFailed &&
-            transactionLog.entries.map((entry, index) => {
-              const { sendObject } = entry;
-
-              const sendChain = chainRegistry.mainnet[sendState.chainID];
-              const receiveChain = chainRegistry.mainnet[receiveState.chainID];
-              const sendChainName = sendChain.chain_name;
-              const receiveChainName = receiveChain.chain_name;
-
-              const isIBC = sendChainName !== receiveChainName;
-              const isSwap = sendState.asset?.denom !== receiveState.asset?.denom;
-
-              const sendAssetSymbol = sendState.asset.symbol;
-              const exponent = sendState.asset.exponent;
-              const sendReadableAmount = formatBalanceDisplay(
-                convertToGreaterUnit(sendObject.amount, exponent).toFixed(exponent),
-                sendAssetSymbol,
-              );
-              const receiveChainPrefix = receiveChain.bech32_prefix;
-
-              let description = `Send ${sendReadableAmount}`;
-              if (isIBC) {
-                description += ` to ${truncateWalletAddress(receiveChainPrefix, sendObject.recipientAddress)}`;
-              } else if (isSwap) {
-                const receiveAsset = symphonyAssets.find(
-                  asset => asset.denom === receiveState.asset?.denom,
-                );
-
-                description += ` → ${receiveAsset?.symbol} to ${truncateWalletAddress(
-                  receiveChainPrefix,
-                  sendObject.recipientAddress,
-                )}`;
-              } else {
-                description += ` to ${truncateWalletAddress(receiveChainPrefix, sendObject.recipientAddress)}`;
-              }
-              description += ` on ${receiveChainName.charAt(0).toUpperCase()}${receiveChainName.slice(1)}`;
-
-              return (
-                <div
-                  key={index}
-                  className="flex justify-between items-center w-full text-sm text-white mb-1"
-                >
-                  <span className="text-left truncate">{description}</span>
-                  <span className="text-right min-w-[2rem]">
-                    {entry.isSuccess === true && transactionLog.isSimulation && (
-                      <span className="text-success">✔</span>
-                    )}
-                    {entry.isSuccess === true && !transactionLog.isSimulation && (
-                      <span className="text-success">✔✔</span>
-                    )}
-                    {entry.isSuccess !== true && <span className="text-gray-500">—</span>}
-                  </span>
-                </div>
-              );
-            })} */}
-        </div>
-
-        {/* Fee Section */}
-        <div className="flex justify-between items-center text-blue text-sm font-bold mx-2">
-          <p>Estimated Fee</p>
-          <p className={calculatedFee.textClass}>
-            {calculatedFee && calculatedFee.feeAmount > 0 && sendState.amount !== 0
-              ? formatLowBalanceDisplay(`${calculatedFee.calculatedFee}`, calculatedFee.feeUnit)
-              : '-'}
-          </p>
-        </div>
+        <TransactionInfoPanel />
 
         {/* Separator */}
         <div className="mt-2">

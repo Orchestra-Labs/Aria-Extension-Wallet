@@ -7,6 +7,7 @@ import {
   networkLevelAtom,
   receiveStateAtom,
   recipientAddressAtom,
+  resetTransactionLogAtom,
   selectedAssetAtom,
   updateTransactionTypeAtom,
 } from '@/atoms';
@@ -30,10 +31,11 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.networkID));
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const [addressValidation, setAddressValidation] = useAtom(addressValidationAtom);
-  const setReceiveState = useSetAtom(receiveStateAtom);
+  const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
   const fullRegistry = useAtomValue(fullChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const resetLogs = useSetAtom(resetTransactionLogAtom);
 
   const [allowValidateAddress, setAllowValidatePassword] = useState(false);
 
@@ -75,6 +77,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
       }
 
       setStatus(InputStatus.SUCCESS);
+      if (receiveState.chainID !== matchedChain.chain_id) resetLogs();
       setReceiveState(prevState => ({
         ...prevState,
         chainID: matchedChain.chain_id,
@@ -98,6 +101,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
       setAllowValidatePassword(false);
       setStatus();
       updateTransactionType({});
+      resetLogs();
     }
 
     if (allowValidateAddress) {

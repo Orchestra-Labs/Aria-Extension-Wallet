@@ -1,9 +1,9 @@
 import { TransactionType } from '@/constants';
-import { getTransactionDetails, TransactionDetails, TransactionState } from '@/types';
+import { TransactionDetails, TransactionState } from '@/types';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { chainWalletAtom } from './walletAtom';
 import { recipientAddressAtom } from './addressAtom';
-import { isIBC, isValidSwap, isValidTransaction } from '@/helpers';
+import { getTransactionDetails, isIBC, isValidSwap, isValidTransaction } from '@/helpers';
 import { atom } from 'jotai';
 import { receiveStateAtom, sendStateAtom } from './transactionStateAtom';
 
