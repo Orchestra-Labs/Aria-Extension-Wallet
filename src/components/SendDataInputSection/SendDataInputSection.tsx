@@ -145,6 +145,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     setUpdateBlocked(false);
   };
 
+  // TODO: fix.  this is not stopping simulations on transaction error
   const canRunSimulation = () => {
     const canRun =
       recipientAddress &&
