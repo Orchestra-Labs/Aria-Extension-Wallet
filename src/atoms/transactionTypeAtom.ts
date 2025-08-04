@@ -1,9 +1,9 @@
 import { TransactionType } from '@/constants';
 import { TransactionDetails, TransactionState } from '@/types';
-import { subscribedChainRegistryAtom } from './chainRegistryAtom';
+import { chainInfoAtom } from './chainRegistryAtom';
 import { chainWalletAtom } from './walletAtom';
 import { recipientAddressAtom } from './addressAtom';
-import { getTransactionDetails, isIBC, isValidSwap, isValidTransaction } from '@/helpers';
+import { getTransactionType, getValidIBCChannel, isValidSwap, isValidTransaction } from '@/helpers';
 import { atom } from 'jotai';
 import { receiveStateAtom, sendStateAtom } from './transactionStateAtom';
 
@@ -20,57 +20,64 @@ export const updateTransactionTypeAtom = atom(
     get,
     set,
     params: {
-      sendStateOverride?: TransactionState;
-      receiveStateOverride?: TransactionState;
+      sendState?: TransactionState;
+      receiveState?: TransactionState;
       walletAddress?: string;
       recipientAddress?: string;
-      chainRegistry?: any;
     },
   ) => {
-    const sendState = params.sendStateOverride || get(sendStateAtom);
-    const receiveState = params.receiveStateOverride || get(receiveStateAtom);
+    const getChainInfo = get(chainInfoAtom);
+    const sendState = params.sendState || get(sendStateAtom);
+    const receiveState = params.receiveState || get(receiveStateAtom);
     const walletAddress = params.walletAddress || get(chainWalletAtom(sendState.chainID))?.address;
     const recipientAddress = params.recipientAddress || get(recipientAddressAtom);
-    const chainRegistry = params.chainRegistry || get(subscribedChainRegistryAtom);
 
     if (!sendState.asset || !receiveState.asset) {
       console.error('Missing assets for transaction type update');
       return;
     }
 
-    const sendChain = chainRegistry.mainnet[sendState.chainID];
-    const sendChainLevel = sendChain.network_level;
+    console.log('[TransactionType] Chain IDs', sendState.chainID, receiveState.chainID);
+    const sendChain = getChainInfo(sendState.chainID);
     const restUris = sendChain.rest_uris;
 
     try {
-      const isIBCEnabled = await isIBC({
-        sendAddress: walletAddress,
-        recipientAddress,
-        network: sendChainLevel,
+      const isValidIbcTx = await getValidIBCChannel({
+        sendChain,
+        receiveChainId: receiveState.chainID,
+        networkLevel: sendChain.network_level,
         prefix: sendChain.bech32_prefix,
         restUris,
       });
+      console.log('[TransactionTypeAtom] Is IBC enabled?:', isValidIbcTx);
 
-      const isSwapEnabled = isValidSwap({
+      const isValidSwapTx = isValidSwap({
         sendAsset: sendState.asset,
         receiveAsset: receiveState.asset,
       });
 
-      const isValidTransactionEnabled = await isValidTransaction({
+      const isValidTx = await isValidTransaction({
         sendAddress: walletAddress,
         recipientAddress,
         sendState,
         receiveState,
       });
 
-      const newTransactionDetails = getTransactionDetails(
-        isIBCEnabled,
-        isSwapEnabled,
-        isValidTransactionEnabled,
+      const newTransactionType = getTransactionType(
+        isValidIbcTx ? true : false,
+        isValidSwapTx,
+        isValidTx,
       );
+      const newTransactionDetails = {
+        type: newTransactionType,
+        isValid: isValidTx,
+        isIBC: isValidIbcTx ? true : false,
+        isSwap: isValidSwapTx,
+      };
+
+      console.log('[TransactionTypeAtom] Setting transaction details to:', newTransactionDetails);
 
       set(transactionTypeAtom, newTransactionDetails);
-      return newTransactionDetails;
     } catch (error) {
       console.error('Error updating transaction type:', error);
       set(transactionTypeAtom, {
@@ -79,12 +86,6 @@ export const updateTransactionTypeAtom = atom(
         isIBC: false,
         isSwap: false,
       });
-      return {
-        type: TransactionType.INVALID,
-        isValid: false,
-        isIBC: false,
-        isSwap: false,
-      };
     }
   },
 );

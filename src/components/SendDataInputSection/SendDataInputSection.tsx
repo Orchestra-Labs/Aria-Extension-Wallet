@@ -14,10 +14,11 @@ import {
   sendErrorAtom,
   sendStateAtom,
   transactionLogAtom,
-  updateTransactionTypeAtom,
   lastSimulationUpdateAtom,
   simulationBlockedAtom,
   resetTransactionLogAtom,
+  transactionTypeAtom,
+  transactionErrorAtom,
 } from '@/atoms';
 import { useEffect } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -25,9 +26,9 @@ import { AddressInput } from '../AddressInput';
 import { InputStatus } from '@/constants';
 import { formatBalanceDisplay } from '@/helpers';
 
-interface AssetInputSectionProps {}
+interface SendDataInputSectionProps {}
 
-export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
+export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const { exchangeRate = 1 } = useExchangeRate();
   const { runSimulation } = useSendActions();
 
@@ -35,8 +36,8 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
+  const transactionType = useAtomValue(transactionTypeAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
-  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
   const addressVerified = useAtomValue(addressVerifiedAtom);
   const setTransactionLog = useSetAtom(transactionLogAtom);
   const isLoading = useAtomValue(isLoadingAtom);
@@ -44,6 +45,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
   const receiveError = useAtomValue(receiveErrorAtom);
   const hasSendError = useAtomValue(hasSendErrorAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
+  const transactionError = useAtomValue(transactionErrorAtom);
 
   // New atoms for simulation state
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
@@ -124,6 +126,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
         ...prev,
         amount: newState.sendAmount,
         asset: newState.sendAsset,
+        chainID: newState.sendAsset.networkID,
       }));
     }
 
@@ -139,46 +142,26 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
       }));
     }
 
-    // Update transaction type
-    console.log('[AssetInputSection] Updating transaction type');
-    updateTransactionType({
-      sendStateOverride: {
-        ...sendState,
-        amount: newState.sendAmount,
-        asset: newState.sendAsset,
-      },
-      receiveStateOverride: {
-        ...receiveState,
-        amount: newState.receiveAmount,
-        asset: newState.receiveAsset,
-      },
-    });
-
-    // Check simulation conditions
-    // console.log('[AssetInputSection] Checking simulation conditions');
-    // console.log('Recipient address exists:', !!recipientAddress);
-    // console.log('Address verified:', addressVerified);
-    // console.log('Send amount > 0:', newState.sendAmount > 0);
-    // console.log('Not loading:', !isLoading);
-
-    // if (canRunSimulation()) {
-    //   console.log('[AssetInputSection] Conditions met, running simulation');
-    //   await runSimulation();
-    // } else {
-    //   console.log('[AssetInputSection] Conditions not met for simulation');
-    // }
     setUpdateBlocked(false);
   };
 
   const canRunSimulation = () => {
-    const canRun = recipientAddress && addressVerified && sendState.amount > 0 && !isLoading;
+    const canRun =
+      recipientAddress &&
+      addressVerified &&
+      sendState.amount > 0 &&
+      transactionType.isValid &&
+      !isLoading &&
+      !transactionError;
 
     console.log('[canRunSimulation] Evaluation:', {
       recipientAddress: !!recipientAddress,
       addressVerified,
       sendAmount: sendState.amount,
       isLoading,
+      transactionType,
       result: canRun,
+      transactionError,
     });
 
     return canRun;
@@ -254,7 +237,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
       setLastUpdateTime(Date.now());
     }
     // NOTE: no sendstate dependency needed here.  sendstate calls for simulation elsewhere
-  }, [sendState, recipientAddress, addressVerified, isLoading]);
+  }, [transactionType, isLoading]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -289,7 +272,7 @@ export const AssetInputSection: React.FC<AssetInputSectionProps> = () => {
         clearInterval(intervalId);
       }
     };
-  }, [sendState, recipientAddress, addressVerified, isLoading]);
+  }, [transactionType, isLoading]);
 
   useEffect(() => {
     if (hasSendError) {

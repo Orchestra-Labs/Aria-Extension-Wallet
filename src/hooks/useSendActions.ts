@@ -1,8 +1,5 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
-  executeSendAtom,
-  executeIBCAtom,
-  executeSwapAtom,
   transactionStatusAtom,
   transactionTypeAtom,
   sendStateAtom,
@@ -13,10 +10,18 @@ import {
   transactionLogAtom,
   addTransactionLogEntryAtom,
   updateTransactionLogEntryAtom,
+  networkLevelAtom,
+  chainInfoAtom,
 } from '@/atoms';
 import { TransactionStatus } from '@/constants';
-import { TransactionResult, TransactionState } from '@/types';
+import { Asset, IBCObject, SendObject, TransactionResult, TransactionState } from '@/types';
 import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
+import {
+  getValidIBCChannel,
+  sendIBCTransaction,
+  sendTransaction,
+  swapTransaction,
+} from '@/helpers';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
@@ -33,19 +38,111 @@ export const useSendActions = () => {
   const addLogEntry = useSetAtom(addTransactionLogEntryAtom);
   const updateLogEntry = useSetAtom(updateTransactionLogEntryAtom);
   const transactionLog = useAtomValue(transactionLogAtom);
+  const networkLevel = useAtomValue(networkLevelAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   console.log('[useTransactionHandler] Current state:', {
     sendState,
     receiveState,
-    walletState: walletState ? { ...walletState, privateKey: '***' } : null,
+    walletState: walletState ? walletState : null,
     recipientAddress,
     transactionType,
   });
 
-  // Action atoms
-  const executeSend = useSetAtom(executeSendAtom);
-  const executeIBC = useSetAtom(executeIBCAtom);
-  const executeSwap = useSetAtom(executeSwapAtom);
+  const executeSend = async ({
+    sendObject,
+    simulateTransaction,
+  }: {
+    sendObject: SendObject;
+    simulateTransaction: boolean;
+  }): Promise<TransactionResult> => {
+    console.group('[executeSend] Starting standard send transaction');
+    try {
+      const sendChain = getChainInfo(sendState.chainID);
+      const prefix = sendChain.bech32_prefix;
+      const rpcUris = sendChain.rpc_uris;
+
+      return await sendTransaction(
+        walletState.address,
+        sendObject,
+        simulateTransaction,
+        prefix,
+        rpcUris,
+      );
+    } finally {
+      console.groupEnd();
+    }
+  };
+
+  const executeIBC = async ({
+    sendObject,
+    simulateTransaction,
+  }: {
+    sendObject: SendObject;
+    simulateTransaction: boolean;
+  }): Promise<TransactionResult> => {
+    console.group('[executeIBC] Starting IBC transaction');
+    try {
+      const sendChain = getChainInfo(sendState.chainID);
+
+      const validChannel = await getValidIBCChannel({
+        sendChain,
+        receiveChainId: receiveState.chainID,
+        networkLevel,
+        prefix: sendChain.bech32_prefix,
+        restUris: sendChain.rest_uris,
+      });
+
+      if (!validChannel) {
+        return {
+          success: false,
+          message: 'No valid IBC channel found for this connection',
+        };
+      }
+
+      const ibcObject: IBCObject = {
+        fromAddress: walletState.address,
+        sendObject,
+        ibcChannel: {
+          channel_id: validChannel.channel_id,
+          port_id: validChannel.port_id,
+        },
+      };
+
+      return await sendIBCTransaction({
+        ibcObject,
+        prefix: sendChain.bech32_prefix,
+        rpcUris: sendChain.rpc_uris,
+        simulateOnly: simulateTransaction,
+      });
+    } finally {
+      console.groupEnd();
+    }
+  };
+
+  const executeSwap = async ({
+    sendObject,
+    receiveAsset,
+    simulateTransaction,
+  }: {
+    sendObject: SendObject;
+    receiveAsset: Asset;
+    simulateTransaction: boolean;
+  }): Promise<TransactionResult> => {
+    console.group('[executeSwap] Starting swap transaction');
+    try {
+      const swapParams = {
+        sendObject,
+        resultDenom: receiveAsset.denom,
+      };
+      const sendChain = getChainInfo(sendState.chainID);
+      const restUris = sendChain.rest_uris;
+
+      return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
+    } finally {
+      console.groupEnd();
+    }
+  };
 
   const formatTransactionDescription = (
     sendState: TransactionState,
@@ -64,7 +161,7 @@ export const useSendActions = () => {
   const handleTransaction = async ({
     isSimulation = false,
   } = {}): Promise<TransactionResult | null> => {
-    console.group('[useTransactionHandler] Starting transaction');
+    console.log('[useTransactionHandler] Starting transaction');
 
     const description = formatTransactionDescription(
       sendState,
@@ -115,6 +212,7 @@ export const useSendActions = () => {
       };
 
       console.log('[useTransactionHandler] Prepared send object:', sendObject);
+      console.log('[useTransactionHandler] Current transactiontype:', transactionType);
 
       let result: TransactionResult;
       if (transactionType.isIBC) {
@@ -184,13 +282,11 @@ export const useSendActions = () => {
           });
         }
 
-        console.groupEnd();
         return result;
       } else {
         const errorMessage = `Transaction failed: ${result.message || 'Unknown error'}`;
         console.error('[useTransactionHandler]', errorMessage);
         handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
-        console.groupEnd();
         return null;
       }
     } catch (error) {
@@ -199,7 +295,6 @@ export const useSendActions = () => {
       }`;
       console.error('[useTransactionHandler] Caught error:', error);
       handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
-      console.groupEnd();
       return null;
     }
   };

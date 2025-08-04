@@ -1,4 +1,4 @@
-import { Asset, SimplifiedChainInfo, TransactionDetails, TransactionState } from '@/types';
+import { Asset, SimplifiedChainInfo, TransactionState } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { isValidSwap } from './swapTransactions';
@@ -140,51 +140,18 @@ export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
 
-export const getTransactionDetails = (
+export const getTransactionType = (
   isIBC: boolean,
   isSwap: boolean,
   isValid: boolean,
-): TransactionDetails => {
-  if (!isValid) {
-    return {
-      type: TransactionType.INVALID,
-      isValid: false,
-      isIBC: false,
-      isSwap: false,
-    };
-  }
+): TransactionType => {
+  if (!isValid) return TransactionType.INVALID;
 
-  if (isIBC && isSwap) {
-    return {
-      type: TransactionType.IBC_SWAP,
-      isValid: true,
-      isIBC: true,
-      isSwap: true,
-    };
-  }
+  if (isIBC && isSwap) return TransactionType.IBC_SWAP;
 
-  if (isIBC) {
-    return {
-      type: TransactionType.IBC_SEND,
-      isValid: true,
-      isIBC: true,
-      isSwap: false,
-    };
-  }
+  if (isIBC) return TransactionType.IBC_SEND;
 
-  if (isSwap) {
-    return {
-      type: TransactionType.SWAP,
-      isValid: true,
-      isIBC: false,
-      isSwap: true,
-    };
-  }
+  if (isSwap) return TransactionType.SWAP;
 
-  return {
-    type: TransactionType.SEND,
-    isValid: true,
-    isIBC: false,
-    isSwap: false,
-  };
+  return TransactionType.SEND;
 };

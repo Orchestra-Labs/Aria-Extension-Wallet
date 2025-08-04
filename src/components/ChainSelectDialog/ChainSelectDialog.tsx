@@ -97,7 +97,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
   }, [subscribedChains, searchTerm, sortOrder]);
 
   useEffect(() => {
-    refreshData({ wallet: false, validator: true });
+    refreshData({ validator: true });
   }, [selectedChainId]);
 
   return (

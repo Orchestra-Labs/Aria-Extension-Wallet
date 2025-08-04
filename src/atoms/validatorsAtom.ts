@@ -43,11 +43,6 @@ export const filteredValidatorsAtom = atom(get => {
   const statusFilter = get(validatorStatusFilterAtom);
   const showCurrentValidators = get(showCurrentValidatorsAtom);
 
-  console.group('[filteredValidatorsAtom]');
-  console.log('validatorData length:', validatorData.length);
-  console.log('showCurrentValidators:', showCurrentValidators);
-  console.groupEnd();
-
   return filterAndSortValidators(
     validatorData,
     searchTerm,

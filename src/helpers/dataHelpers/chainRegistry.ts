@@ -16,7 +16,6 @@ import {
   FeeToken,
 } from '@/types';
 
-// TODO: also pull IBC information
 // TODO: show status of download to user in topbar.  "checking for update", "querying for new chains", "updating chain information"
 // TODO: change to use regularly updated json file for single file download (faster, lighter, less wasteful)
 const REGISTRY_KEY = 'localChainRegistry';

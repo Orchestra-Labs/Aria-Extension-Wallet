@@ -10,7 +10,12 @@ import {
   isGeneratingAddressesAtom,
 } from '@/atoms';
 
-import { useRefreshData, useRegistryDataRefresh, useAddressGeneration } from '@/hooks';
+import {
+  useRefreshData,
+  useRegistryDataRefresh,
+  useAddressGeneration,
+  useIbcRegistryRefresh,
+} from '@/hooks';
 import { useAtom, useAtomValue } from 'jotai';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
@@ -29,6 +34,7 @@ interface DataProviderProps {
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const { refreshData } = useRefreshData();
   const { refreshRegistry, subscribedChainRegistry } = useRegistryDataRefresh();
+  const { refreshIbcData } = useIbcRegistryRefresh();
   const { generateAddresses } = useAddressGeneration();
 
   const [isInitialDataLoad, setIsInitialDataLoad] = useAtom(isInitialDataLoadAtom);
@@ -37,7 +43,6 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const networkLevel = useAtomValue(networkLevelAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
   const walletAddresses = useAtomValue(walletAddressesAtom);
-
   const isGeneratingAddresses = useAtomValue(isGeneratingAddressesAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
   const isFetchingValidators = useAtomValue(isFetchingValidatorDataAtom);
@@ -100,7 +105,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         return;
 
       try {
-        await refreshData();
+        await refreshData({ wallet: true, validator: true });
+        if (isInitialDataLoad) refreshIbcData();
         setPhase3LoadComplete(true);
       } catch (error) {
         console.error('[DataProvider] Phase 3 load failed:', error);
@@ -132,11 +138,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     validatorData,
   ]);
 
+  // TODO: test removal of this since prepAddressDataReload may be getting this via stage 3
   // Refresh data when network level changes
   useEffect(() => {
     if (!userAccount || !phase3LoadComplete) return;
 
-    refreshData();
+    refreshData({ wallet: true, validator: true });
   }, [networkLevel]);
 
   return (

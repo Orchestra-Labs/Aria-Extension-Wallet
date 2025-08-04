@@ -6,6 +6,7 @@ export * from './useExchangeRate';
 export * from './useExchangeRequirements';
 export * from './useGetModuleAccountsQuery';
 export * from './useGetTobinTaxRateQuery';
+export * from './useIbcRegistryRefresh';
 export * from './useInactivityCheck';
 export * from './useInitializeWalletConnect';
 export * from './useIntersectionObserver';

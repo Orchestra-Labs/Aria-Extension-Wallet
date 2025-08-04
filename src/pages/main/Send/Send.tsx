@@ -21,8 +21,14 @@ import {
   loadFullRegistryAtom,
   calculatedFeeAtom,
   resetTransactionLogAtom,
+  updateTransactionTypeAtom,
 } from '@/atoms';
-import { WalletSuccessScreen, Header, AssetInputSection, TransactionInfoPanel } from '@/components';
+import {
+  WalletSuccessScreen,
+  Header,
+  SendDataInputSection,
+  TransactionInfoPanel,
+} from '@/components';
 import { useSendActions } from '@/hooks/';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
@@ -31,8 +37,8 @@ export const Send = () => {
   const { runTransaction } = useSendActions();
 
   // const symphonyAssets = useAtomValue(symphonyAssetsAtom);
-  const [sendState, setSendState] = useAtom(sendStateAtom);
-  const setReceiveState = useSetAtom(receiveStateAtom);
+  const sendState = useAtomValue(sendStateAtom);
+  const receiveState = useAtomValue(receiveStateAtom);
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const addressVerified = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
@@ -51,9 +57,10 @@ export const Send = () => {
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const calculatedFee = useAtomValue(calculatedFeeAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
+  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
 
   const resetStates = () => {
-    console.log('Resetting transaction states');
+    console.log('[Send] Resetting transaction states');
 
     // Reset all transaction-related atoms
     resetTransactionStates();
@@ -71,6 +78,95 @@ export const Send = () => {
     unloadFullRegistry();
   };
 
+  // const updateTransactionType = async ({
+  //   sendState,
+  //   receiveState,
+  //   walletAddress,
+  //   recipientAddress,
+  // }: {
+  //   sendState: TransactionState;
+  //   receiveState: TransactionState;
+  //   walletAddress: string;
+  //   recipientAddress: string;
+  // }) => {
+  //   if (!sendState.asset || !receiveState.asset) {
+  //     console.error('Missing assets for transaction type update');
+  //     return;
+  //   }
+
+  //   console.log('[TransactionType] Chain IDs', sendState.chainID, receiveState.chainID);
+
+  //   try {
+  //     console.log('[TransactionType] Chain IDs', sendState.chainID, receiveState.chainID);
+  //     const sendChain = getChainInfo(sendState.chainID);
+  //     const restUris = sendChain.rest_uris;
+
+  //     const isValidIbcTx = await getValidIBCChannel({
+  //       sendChain,
+  //       receiveChainId: receiveState.chainID,
+  //       networkLevel: sendChain.network_level,
+  //       prefix: sendChain.bech32_prefix,
+  //       restUris,
+  //     });
+  //     console.log('[TransactionTypeAtom] Is IBC enabled?:', isValidIbcTx);
+
+  //     const isValidSwapTx = isValidSwap({
+  //       sendAsset: sendState.asset,
+  //       receiveAsset: receiveState.asset,
+  //     });
+
+  //     const isValidTx = await isValidTransaction({
+  //       sendAddress: walletAddress,
+  //       recipientAddress,
+  //       sendState,
+  //       receiveState,
+  //     });
+
+  //     const newTransactionType = getTransactionType(
+  //       isValidIbcTx ? true : false,
+  //       isValidSwapTx,
+  //       isValidTx,
+  //     );
+  //     const newTransactionDetails = {
+  //       type: newTransactionType,
+  //       isValid: isValidTx,
+  //       isIBC: isValidIbcTx ? true : false,
+  //       isSwap: isValidSwapTx,
+  //     };
+
+  //     console.log('[TransactionTypeAtom] Setting transaction details to:', newTransactionDetails);
+
+  //     setTransactionType(newTransactionDetails);
+  //   } catch (error) {
+  //     console.error('Error updating transaction type:', error);
+  //     setTransactionType({
+  //       type: TransactionType.INVALID,
+  //       isValid: false,
+  //       isIBC: false,
+  //       isSwap: false,
+  //     });
+  //   }
+  // };
+
+  useEffect(() => {
+    const updateTxType = async () => {
+      if (!walletState.address) return;
+
+      try {
+        await updateTransactionType({
+          sendState,
+          receiveState,
+          walletAddress: walletState.address,
+          recipientAddress: recipientAddress,
+        });
+      } catch (error) {
+        console.error('Error updating transaction type:', error);
+      }
+    };
+
+    updateTxType();
+  }, [sendState, receiveState, recipientAddress, walletState]);
+
   useEffect(() => {
     if (!transactionError) return;
 
@@ -84,18 +180,6 @@ export const Send = () => {
 
     return () => clearTimeout(timeout);
   }, [transactionError]);
-
-  useEffect(() => {
-    // When selected asset changes, update send state chain ID
-    setSendState(prev => ({
-      ...prev,
-      chainID: selectedAsset.networkID,
-    }));
-    setReceiveState(prev => ({
-      ...prev,
-      chainID: selectedAsset.networkID,
-    }));
-  }, [selectedAsset]);
 
   useEffect(() => {
     console.log("[Send] walletstate's address on init", walletState.address);
@@ -123,7 +207,7 @@ export const Send = () => {
       <div className="flex flex-col justify-between flex-grow p-4 rounded-lg overflow-y-auto">
         <>
           {/* TODO: add chain selection if self */}
-          <AssetInputSection />
+          <SendDataInputSection />
         </>
 
         {/* Info Section */}

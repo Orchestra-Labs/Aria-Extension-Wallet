@@ -21,7 +21,7 @@ export const ChainScroller: React.FC<ChainScrollerProps> = ({
   const { refreshData } = useRefreshData();
 
   const handleRefresh = useCallback(() => {
-    refreshData({ wallet: true, validator: false });
+    refreshData({ wallet: true });
   }, [refreshData]);
 
   const handleClick = (chain: SimplifiedChainInfo, feeToken: Asset | null) => {

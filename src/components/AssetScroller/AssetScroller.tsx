@@ -30,7 +30,7 @@ export const AssetScroller: React.FC<AssetScrollerProps> = ({
   const assetKeys = useAssetKeys(assets);
 
   const handleRefresh = useCallback(() => {
-    refreshData({ wallet: true, validator: false });
+    refreshData({ wallet: true });
   }, [refreshData]);
 
   const handleClick = (asset: Asset) => {

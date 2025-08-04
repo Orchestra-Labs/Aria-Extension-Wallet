@@ -27,7 +27,7 @@ export const ValidatorScroller: React.FC<ValidatorScrollerProps> = ({
 
   console.log('[ValidatorScroller] Received validators:', validators);
   const handleRefresh = useCallback(() => {
-    refreshData({ validator: true, wallet: false });
+    refreshData({ validator: true });
   }, [refreshData]);
 
   const handleClick = (combinedStakingInfo: FullValidatorInfo) => {

@@ -74,7 +74,7 @@ export const MicrophoneButton: React.FC = () => {
           });
 
           if (result) {
-            await refreshData({ address: wallet?.address });
+            await refreshData({ wallet: true, validator: true, address: wallet?.address });
           }
         } else {
           setIntent(null);

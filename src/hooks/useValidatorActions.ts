@@ -123,7 +123,7 @@ export const useValidatorActions = () => {
                   : TransactionType.CLAIM_TO_WALLET,
           );
           setSelectedValidators([]);
-          refreshData();
+          refreshData({ wallet: true, validator: true });
         }
         return result;
       } else {

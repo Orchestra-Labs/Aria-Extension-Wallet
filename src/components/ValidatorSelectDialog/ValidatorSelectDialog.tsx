@@ -168,7 +168,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
   useEffect(() => {
     if (isSuccess) {
-      refreshData();
+      refreshData({ wallet: true, validator: true });
     }
   }, [isSuccess]);
 

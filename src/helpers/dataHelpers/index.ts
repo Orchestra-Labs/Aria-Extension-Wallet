@@ -2,7 +2,7 @@ export * from './account';
 export * from './auth';
 export * from './chainRegistry';
 export * from './crypto';
-export * from './ibcChannels';
+export * from './ibcRegistry';
 export * from './localStorage';
 export * from './loginAttempts';
 export * from './password';

@@ -9,7 +9,6 @@ import {
   recipientAddressAtom,
   resetTransactionLogAtom,
   selectedAssetAtom,
-  updateTransactionTypeAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
 import { InputStatus } from '@/constants';
@@ -32,7 +31,6 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const [addressValidation, setAddressValidation] = useAtom(addressValidationAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
-  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
   const fullRegistry = useAtomValue(fullChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
@@ -82,7 +80,6 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         ...prevState,
         chainID: matchedChain.chain_id,
       }));
-      updateTransactionType({});
     } catch (error) {
       setStatus(InputStatus.ERROR, 'Invalid Bech32 encoding.');
     }
@@ -100,7 +97,6 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     if (newAddress === '') {
       setAllowValidatePassword(false);
       setStatus();
-      updateTransactionType({});
       resetLogs();
     }
 

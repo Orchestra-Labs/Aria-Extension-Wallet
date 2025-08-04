@@ -385,7 +385,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
       prepAddressDataReload();
     } else {
       console.log('[ChainSubscriptions] Only coins changed - refreshing wallet data');
-      refreshData({ validator: false });
+      refreshData({ wallet: true });
     }
 
     // Save to storage and account atom

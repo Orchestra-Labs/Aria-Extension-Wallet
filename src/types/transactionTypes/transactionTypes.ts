@@ -1,5 +1,5 @@
-import { InputStatus, NetworkLevel, TransactionStatus, TransactionType } from '@/constants';
-import { Asset, FeeToken } from './localStorageTypes';
+import { InputStatus, TransactionStatus, TransactionType } from '@/constants';
+import { Asset, FeeToken } from '../localStorageTypes';
 
 export interface TransactionDetails {
   type: TransactionType;
@@ -69,17 +69,4 @@ export interface SendObject {
   amount: string;
   denom: string;
   feeToken: FeeToken;
-}
-
-export interface SwapObject {
-  sendObject: SendObject;
-  resultDenom: string;
-}
-
-export interface IBCObject {
-  fromAddress: string;
-  sendObject: SendObject;
-  sendChain: string;
-  receiveChain: string;
-  networkLevel: NetworkLevel;
 }
