@@ -22,10 +22,13 @@ import {
   sendTransaction,
   swapTransaction,
 } from '@/helpers';
+import { useRefreshData } from './useRefreshData';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
 export const useSendActions = () => {
+  const { refreshData } = useRefreshData();
+
   console.log('[useTransactionHandler] Initializing hook');
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
@@ -280,6 +283,7 @@ export const useSendActions = () => {
             gasWanted: 0,
             gasPrice: 0,
           });
+          refreshData({ wallet: true });
         }
 
         return result;
