@@ -22,6 +22,7 @@ import {
   calculatedFeeAtom,
   resetTransactionLogAtom,
   updateTransactionTypeAtom,
+  loadSkipChainsAtom,
 } from '@/atoms';
 import {
   WalletSuccessScreen,
@@ -30,6 +31,7 @@ import {
   TransactionInfoPanel,
 } from '@/components';
 import { useSendActions } from '@/hooks/';
+import { getSupportedChains } from '@/helpers';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
 export const Send = () => {
@@ -58,6 +60,7 @@ export const Send = () => {
   const calculatedFee = useAtomValue(calculatedFeeAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
   const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
+  const loadSkipChains = useSetAtom(loadSkipChainsAtom);
 
   const resetStates = () => {
     console.log('[Send] Resetting transaction states');
@@ -115,7 +118,20 @@ export const Send = () => {
     console.log("[Send] walletstate's address on init", walletState.address);
     setRecipientAddress(walletState.address);
     loadFullRegistry();
+    loadSkipChains();
     resetLogs();
+
+    const fetchChainInfo = async () => {
+      try {
+        const chains = await getSupportedChains();
+        console.log('Fetched supported chains:', chains);
+        // You might want to store this in an atom or use it directly
+      } catch (error) {
+        console.error('Failed to fetch chain information:', error);
+      }
+    };
+
+    fetchChainInfo();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)

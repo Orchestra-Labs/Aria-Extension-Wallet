@@ -87,7 +87,6 @@ export const useSendActions = () => {
     console.group('[executeIBC] Starting IBC transaction');
     try {
       const sendChain = getChainInfo(sendState.chainID);
-
       const validChannel = await getValidIBCChannel({
         sendChain,
         receiveChainId: receiveState.chainID,

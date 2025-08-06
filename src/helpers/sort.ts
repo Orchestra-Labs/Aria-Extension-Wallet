@@ -84,6 +84,7 @@ function sortAssets(
   });
 }
 
+// TODO: add filter for subscribed assets (a receive tile only selection)
 export function filterAndSortAssets(
   assets: Asset[],
   searchTerm: string,

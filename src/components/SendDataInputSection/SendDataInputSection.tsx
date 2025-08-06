@@ -284,6 +284,8 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     }
   }, [hasSendError]);
 
+  // TODO: highlight on send dialog assets which can reach the selected receive asset
+  // TODO: highlight on receive dialog assets which are reachable by the selected send asset
   return (
     <>
       <AddressInput addBottomMargin={false} updateReceiveAsset={updateReceiveAsset} />

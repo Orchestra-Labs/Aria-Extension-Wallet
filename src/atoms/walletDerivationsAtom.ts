@@ -10,7 +10,7 @@ import {
   subscribedChainRegistryAtom,
   sessionWalletAtom,
   networkLevelAtom,
-  allRegistryAssetsAtom,
+  allReceivableAssetsAtom,
 } from '@/atoms';
 import { userAccountAtom } from './accountAtom';
 import { filterAndSortAssets } from '@/helpers';
@@ -139,17 +139,10 @@ export const filteredDialogAssetsAtom = atom(get => {
 
 // NOTE: for the asset select dialog for receivable assets (send page)
 export const filteredReceiveAssetsAtom = atom(get => {
-  const allAssets = get(allRegistryAssetsAtom);
-  const subscribedAssets = get(subscribedAssetsAtom);
+  const reachableAssets = get(allReceivableAssetsAtom);
   const searchTerm = get(dialogSearchTermAtom);
   const sortType = get(assetDialogSortTypeAtom);
   const sortOrder = get(assetDialogSortOrderAtom);
-
-  // Create a Set of subscribed asset denoms for quick lookup
-  const subscribedDenoms = new Set(subscribedAssets.map(asset => asset.denom));
-
-  // Filter to only include assets that are in the subscribed list
-  const reachableAssets = allAssets.filter(asset => subscribedDenoms.has(asset.denom));
 
   return filterAndSortAssets(reachableAssets, searchTerm, sortType, sortOrder);
 });

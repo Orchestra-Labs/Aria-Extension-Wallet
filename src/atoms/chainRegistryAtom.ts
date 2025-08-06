@@ -12,6 +12,7 @@ import {
   filterAndSortAssets,
   filterAndSortChains,
   getStoredChainRegistry,
+  getSupportedChains,
   getSymphonyChainId,
 } from '@/helpers';
 import { userAccountAtom } from './accountAtom';
@@ -236,4 +237,19 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
 
   return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
+});
+
+export const skipChainsAtom = atom<string[]>([]);
+export const loadSkipChainsAtom = atom(null, async (_, set) => {
+  try {
+    const chains = await getSupportedChains();
+    console.log('[loadSkipChainsAtom] Raw Skip API response:', chains);
+
+    const parsedChains = chains.map(chain => chain.chain_id);
+    console.log('[loadSkipChainsAtom] Parsed chain IDs:', parsedChains);
+
+    set(skipChainsAtom, parsedChains);
+  } catch (error) {
+    console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
+  }
 });
