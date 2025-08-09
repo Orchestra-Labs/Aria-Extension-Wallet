@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, SlideTray } from '@/ui-kit';
+import { Button, SlideTray, SlideTrayHandle } from '@/ui-kit';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -36,7 +36,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   buttonVariant,
   isClaimDialog = false,
 }) => {
-  const slideTrayRef = useRef<{ isOpen: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
 
   const { refreshData } = useRefreshData();
   const { runTransaction, runSimulation } = useValidatorActions();

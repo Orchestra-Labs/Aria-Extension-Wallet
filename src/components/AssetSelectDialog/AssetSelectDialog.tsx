@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SlideTray } from '@/ui-kit';
+import { SlideTray, SlideTrayHandle } from '@/ui-kit';
 import { IconContainer, LogoIcon } from '@/assets/icons';
 import { Asset } from '@/types';
 import { SortDialog } from '../SortDialog';
@@ -27,7 +27,7 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
   isReceiveDialog = false,
   onClick,
 }) => {
-  const slideTrayRef = useRef<{ closeWithAnimation: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
 
   const currentStateAtomSource = isReceiveDialog ? receiveStateAtom : sendStateAtom;
   const filteredAssetsAtomSource = isReceiveDialog

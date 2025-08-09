@@ -1,5 +1,6 @@
 import { SettingsOption } from '@/constants';
 
+// TODO: add '*' for case of view all on chain.  any selection removal de-selects 'view all' and sets to view specific assets on that chain
 export interface NetworkSubscriptionRecord {
   [chainID: string]: string[];
 }

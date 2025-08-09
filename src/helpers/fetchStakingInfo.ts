@@ -655,6 +655,7 @@ export const fetchValidatorData = async (
         console.error(`Community tax error: ${e.message}`);
         return defaultResponses.communityTax;
       }),
+      // TODO: change from bonded ratio to total amount bonded
       fetchBondedRatio(prefix, restUris).catch(e => {
         console.error(`Bonded ratio error: ${e.message}`);
         return defaultResponses.bondedRatio;
@@ -689,6 +690,7 @@ export const fetchValidatorData = async (
       );
 
       const commissionRate = parseFloat(validator.commission.commission_rates.rate) || 0;
+      // TODO: multiplied by amount allocation to staking reward.  community tax and staking reward are different
       const theoreticalApr =
         totalTokens > 0
           ? ((inflation * (1 - communityTax)) / bondedRatio) * (1 - commissionRate) * 100

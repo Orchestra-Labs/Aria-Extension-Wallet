@@ -12,11 +12,13 @@ import {
   updateTransactionLogEntryAtom,
   networkLevelAtom,
   chainInfoAtom,
+  skipChainsAtom,
 } from '@/atoms';
 import { TransactionStatus } from '@/constants';
 import { Asset, IBCObject, SendObject, TransactionResult, TransactionState } from '@/types';
 import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
 import {
+  executeSkipTransaction,
   getValidIBCChannel,
   sendIBCTransaction,
   sendTransaction,
@@ -43,6 +45,7 @@ export const useSendActions = () => {
   const transactionLog = useAtomValue(transactionLogAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const getChainInfo = useAtomValue(chainInfoAtom);
+  const skipChains = useAtomValue(skipChainsAtom);
 
   console.log('[useTransactionHandler] Current state:', {
     sendState,
@@ -86,6 +89,44 @@ export const useSendActions = () => {
   }): Promise<TransactionResult> => {
     console.group('[executeIBC] Starting IBC transaction');
     try {
+      // First try Skip API
+      const bothChainsSupported =
+        skipChains.includes(sendState.chainID) && skipChains.includes(receiveState.chainID);
+
+      if (bothChainsSupported) {
+        const skipResult = await executeSkipTransaction(
+          sendState,
+          receiveState,
+          walletState,
+          recipientAddress,
+          simulateTransaction,
+        );
+
+        console.log('[UseSendActions] skip result:', skipResult);
+
+        if (skipResult.success) {
+          // Handle both simulation and actual execution
+          if (simulateTransaction) {
+            return {
+              ...skipResult,
+              data: {
+                ...skipResult.data,
+                code: skipResult.data?.code ?? 0,
+                txHash: skipResult.data?.txHash ?? '',
+                gasWanted:
+                  skipResult.data?.gasWanted ??
+                  skipResult.data?.route?.estimated_gas_used?.toString() ??
+                  '0',
+              },
+            };
+          }
+          return skipResult;
+        }
+      } else {
+        console.log('One or both chains not supported by Skip, using direct IBC');
+      }
+
+      // Fallback to direct IBC if Skip fails
       const sendChain = getChainInfo(sendState.chainID);
       const validChannel = await getValidIBCChannel({
         sendChain,
@@ -133,6 +174,7 @@ export const useSendActions = () => {
   }): Promise<TransactionResult> => {
     console.group('[executeSwap] Starting swap transaction');
     try {
+      // Fall back to direct swap if Skip fails or not simulation
       const swapParams = {
         sendObject,
         resultDenom: receiveAsset.denom,
@@ -145,6 +187,8 @@ export const useSendActions = () => {
       console.groupEnd();
     }
   };
+
+  // TODO: add executeexchange function to handle coin to coin (not our stablecoins)
 
   const formatTransactionDescription = (
     sendState: TransactionState,

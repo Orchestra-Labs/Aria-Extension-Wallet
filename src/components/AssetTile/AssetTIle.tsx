@@ -1,5 +1,5 @@
 import { Asset } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
+import { SlideTray, Button, SlideTrayHandle } from '@/ui-kit';
 import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
@@ -16,6 +16,8 @@ import {
 import { formatBalanceDisplay } from '@/helpers';
 import { IconContainer } from '@/assets/icons';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
+import { CopyIcon } from 'lucide-react';
+import { useRef } from 'react';
 
 interface AssetTileProps {
   asset: Asset;
@@ -32,6 +34,8 @@ export const AssetTile = ({
   multiSelectEnabled = false,
   onClick,
 }: AssetTileProps) => {
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
+
   const navigate = useNavigate();
   const pathname = useLocation().pathname;
 
@@ -87,21 +91,51 @@ export const AssetTile = ({
     }
   };
 
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    navigator.clipboard.writeText(value);
+  };
+
   const scrollTile = (
-    <ScrollTile
-      title={title}
-      subtitle={subtitle}
-      value={value}
-      icon={<IconContainer src={logo} alt={symbol} />}
-      selected={isSelectable ? isSelected : undefined}
-      onClick={isSelectable ? handleClick : undefined}
-    />
+    <div
+      onClick={e => {
+        // Only handle click if it's not coming from a prevented element
+        const target = e.target as HTMLElement;
+        const isPreventedButton = target.closest('[data-prevent-tray-open]');
+
+        if (!isPreventedButton && !isSelectable) {
+          // For non-selectable tiles, let SlideTray handle the opening
+          return;
+        }
+
+        if (!isPreventedButton && isSelectable) {
+          handleClick();
+        }
+      }}
+    >
+      <ScrollTile
+        title={title}
+        value={value}
+        subtitle={subtitle}
+        subtitleClickOption={
+          isSelectable ? undefined : (
+            <Button variant="reactiveIcon" size="small" onClick={handleCopy} data-prevent-tray-open>
+              <CopyIcon className="h-3 w-3" />
+            </Button>
+          )
+        }
+        icon={<IconContainer src={logo} alt={symbol} />}
+        selected={isSelectable ? isSelected : undefined}
+        onClick={undefined}
+      />
+    </div>
   );
 
   return isSelectable ? (
     scrollTile
   ) : (
-    <SlideTray triggerComponent={<div>{scrollTile}</div>} title={title} showBottomBorder>
+    <SlideTray ref={slideTrayRef} triggerComponent={scrollTile} title={title} showBottomBorder>
       <div className="text-center mb-2">
         <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
           Amount: <span className="text-blue">{value}</span>

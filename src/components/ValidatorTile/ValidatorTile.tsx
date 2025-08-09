@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { FullValidatorInfo, ValidatorLogoInfo } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
+import { SlideTray, Button, SlideTrayHandle } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
 import {
@@ -62,7 +62,7 @@ const ValidatorTileComponent = ({
   forceCurrentViewStyle = false,
 }: ValidatorTileProps) => {
   // Refs and state
-  const slideTrayRef = useRef<{ isOpen: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
   const { runTransaction, runSimulation } = useValidatorActions();
 
   // Atoms
