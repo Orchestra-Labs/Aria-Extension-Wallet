@@ -62,6 +62,12 @@ const buttonVariants = cva<ButtonConfig>(
           'active:bg-neutral-3 active:text-neutral-1',
           'disabled:bg-neutral-3 disabled:text-neutral-1',
         ],
+        secondaryReactiveIcon: [
+          'rounded-full text-neutral-3',
+          'hover:bg-neutral-4 hover:text-white',
+          'active:bg-neutral-3 active:text-neutral-1',
+          'disabled:bg-neutral-3 disabled:text-neutral-1',
+        ],
         link: ['text-blue text-sm hover:text-blue-dark bg-transparent'],
         dialogOption: [
           'w-full text-sm text-white font-normal py-3 px-2',
