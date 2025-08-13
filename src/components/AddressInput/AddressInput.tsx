@@ -128,7 +128,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   };
 
   useEffect(() => {
-    validateAddress();
+    setStatus(InputStatus.SUCCESS);
   }, [recipientAddress]);
 
   return (
