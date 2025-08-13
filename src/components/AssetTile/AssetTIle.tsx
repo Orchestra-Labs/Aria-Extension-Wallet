@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ROUTES } from '@/constants';
+import { ICON_CHANGEOVER_TIMEOUT, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -12,12 +12,13 @@ import {
   sendStateAtom,
   selectedCoinListAtom,
   receiveStateAtom,
+  chainWalletAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay } from '@/helpers';
-import { IconContainer } from '@/assets/icons';
+import { IconContainer, VerifySuccess } from '@/assets/icons';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
-import { CopyIcon } from 'lucide-react';
-import { useRef } from 'react';
+import { Copy } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface AssetTileProps {
   asset: Asset;
@@ -44,6 +45,9 @@ export const AssetTile = ({
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
+  const walletState = useAtomValue(chainWalletAtom(asset.networkID));
+
+  const [copied, setCopied] = useState(false);
 
   const isChainSubscriptionsPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
@@ -94,7 +98,11 @@ export const AssetTile = ({
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    navigator.clipboard.writeText(value);
+
+    navigator.clipboard.writeText(walletState.address);
+    setCopied(true);
+    // Reset after the icon changeover timeout
+    setTimeout(() => setCopied(false), ICON_CHANGEOVER_TIMEOUT);
   };
 
   const scrollTile = (
@@ -126,7 +134,11 @@ export const AssetTile = ({
               onClick={handleCopy}
               className="data-prevent-tray-open"
             >
-              <CopyIcon className="h-3 w-3" />
+              {copied ? (
+                <VerifySuccess className="text-success animate-scale-up h-3 w-3" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
             </Button>
           )
         }
