@@ -4,7 +4,7 @@ import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ICON_CHANGEOVER_TIMEOUT, ROUTES } from '@/constants';
+import { ICON_CHANGEOVER_TIMEOUT, Position, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -13,12 +13,14 @@ import {
   selectedCoinListAtom,
   receiveStateAtom,
   chainWalletAtom,
+  chainInfoAtom,
 } from '@/atoms/';
-import { formatBalanceDisplay } from '@/helpers';
+import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
 import { IconContainer, VerifySuccess } from '@/assets/icons';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
 import { Copy } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { Tooltip } from '../Tooltip';
 
 interface AssetTileProps {
   asset: Asset;
@@ -46,8 +48,12 @@ export const AssetTile = ({
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
   const walletState = useAtomValue(chainWalletAtom(asset.networkID));
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   const [copied, setCopied] = useState(false);
+
+  const prefix = getChainInfo(asset.networkID).bech32_prefix;
+  const truncatedAddress = truncateWalletAddress(prefix, walletState.address);
 
   const isChainSubscriptionsPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
@@ -128,19 +134,21 @@ export const AssetTile = ({
         subtitle={subtitle}
         subtitleClickOption={
           isSelectable ? undefined : (
-            <Button
-              variant="secondaryReactiveIcon"
-              size="blank"
-              onClick={handleCopy}
-              className="w-5 h-5 p-0"
-              data-prevent-tray-open
-            >
-              {copied ? (
-                <VerifySuccess className="text-success animate-scale-up h-3 w-3" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </Button>
+            <Tooltip tooltipText={truncatedAddress} position={Position.BOTTOM}>
+              <Button
+                variant="secondaryReactiveIcon"
+                size="blank"
+                onClick={handleCopy}
+                className="w-5 h-5 p-0"
+                data-prevent-tray-open
+              >
+                {copied ? (
+                  <VerifySuccess className="text-success animate-scale-up h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </Button>
+            </Tooltip>
           )
         }
         icon={<IconContainer src={logo} alt={symbol} />}

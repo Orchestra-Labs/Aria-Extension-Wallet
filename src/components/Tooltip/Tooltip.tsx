@@ -1,44 +1,47 @@
-import React, { ReactNode } from 'react';
+import React from 'react';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import { Position } from '@/constants';
 
+export enum TriggerType {
+  ON_HOVER = 'mouseenter focus',
+  ON_CLICK = 'click',
+}
+
 interface TooltipProps {
-  children: ReactNode;
+  children: React.ReactElement;
   tooltipText: string;
   maxWidth?: number;
   position?: Position;
+  trigger?: TriggerType;
+  className?: string;
 }
 
-const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip: React.FC<TooltipProps> = ({
   children,
   tooltipText,
   maxWidth = 150,
   position = Position.TOP,
+  trigger = TriggerType.ON_HOVER,
+  className = '',
 }) => {
+  // Clone the child element to ensure it can receive refs
+  const childWithRef = React.cloneElement(children, {
+    className: `${children.props.className || ''} ${className}`,
+  });
+
   return (
-    <div className="flex justify-center items-center w-full">
-      <div className="flex-1 flex justify-center items-center" />
-
-      <div className="flex items-center">
-        <div className="text-white text-center">{children}</div>
-
-        <Tippy
-          content={tooltipText}
-          placement={position}
-          maxWidth={`${maxWidth}px`}
-          arrow={true}
-          theme="dark"
-        >
-          <span className="text-blue rounded-full">
-            <span className="p-1 text-sm">?</span>
-          </span>
-        </Tippy>
-      </div>
-
-      <div className="flex-1 flex justify-center items-center" />
-    </div>
+    <Tippy
+      content={tooltipText}
+      placement={position}
+      maxWidth={maxWidth}
+      arrow={true}
+      theme="dark"
+      trigger={trigger}
+      interactive={trigger === TriggerType.ON_CLICK}
+      hideOnClick={trigger === TriggerType.ON_CLICK ? false : true}
+    >
+      {childWithRef}
+    </Tippy>
   );
 };
-
-export default Tooltip;
