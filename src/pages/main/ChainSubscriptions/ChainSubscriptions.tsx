@@ -16,11 +16,14 @@ import {
   fullChainRegistryAtom,
   networkLevelAtom,
   subscribedChainRegistryAtom,
+  chainDenomsAtom,
+  chainInfoAtom,
 } from '@/atoms';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import {
   AssetSortType,
+  DEFAULT_DENOM_SUBSCRIPTION_RECORD,
   DEFAULT_SELECTIONS,
   DEFAULT_SUBSCRIPTION,
   NetworkLevel,
@@ -30,7 +33,7 @@ import {
   SortOrder,
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { Asset, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
+import { Asset, DenomSubscriptionRecord, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
 import { saveAccountByID, getPrimaryFeeToken, getSymphonyChainId } from '@/helpers';
 import { useDataProviderControls } from '@/data';
 import { useRefreshData } from '@/hooks';
@@ -73,6 +76,8 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   const [subscriptionSelections, setSubscriptionSelections] = useAtom(subscriptionSelectionsAtom);
   const selectedChainIds = useAtomValue(selectedChainIdsAtom);
   const setSubscribedChainRegistryAtom = useSetAtom(subscribedChainRegistryAtom);
+  const denomsForChain = useAtomValue(chainDenomsAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   const [activeTab, setActiveTab] = useState<SubscriptionTab>(SubscriptionTab.CHAINS_TAB);
   const [initialChainIds, setInitialChainIds] = useState<string[]>([]);
@@ -128,7 +133,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     const allAssetsFromChains: Asset[] = [];
 
     for (const chainId of subscribedChainIds) {
-      const chain = chainRegistry[networkLevel][chainId];
+      const chain = getChainInfo(chainId);
       if (chain?.assets) {
         allAssetsFromChains.push(...Object.values(chain.assets));
       }
@@ -136,7 +141,9 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
 
     // Get all selected denoms from subscriptionSelections for current network level
     const selectedDenoms = new Set(
-      Object.values(subscriptionSelections[networkLevel]).flatMap(denoms => denoms),
+      Object.values(subscriptionSelections[networkLevel]).flatMap(
+        denomSubscription => denomSubscription.subscribedDenoms,
+      ),
     );
 
     // Check if all assets from subscribed chains are selected
@@ -171,8 +178,8 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
 
     // Update selections for each chain to include all assets
     newSelections[networkLevel] = {};
-    Object.entries(assetsByChain).forEach(([chainId, assets]) => {
-      newSelections[networkLevel][chainId] = assets.map(a => a.denom);
+    Object.keys(assetsByChain).forEach(([chainId]) => {
+      newSelections[networkLevel][chainId] = DEFAULT_DENOM_SUBSCRIPTION_RECORD;
     });
 
     setSubscriptionSelections(newSelections);
@@ -182,8 +189,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     const newSelections = { ...subscriptionSelections };
 
     displayChains.forEach(chain => {
-      const feeToken = getPrimaryFeeToken(chain);
-      newSelections[networkLevel][chain.chain_id] = feeToken ? [feeToken.denom] : [];
+      newSelections[networkLevel][chain.chain_id] = DEFAULT_DENOM_SUBSCRIPTION_RECORD;
     });
 
     setSubscriptionSelections(newSelections);
@@ -209,12 +215,15 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
 
     for (const asset of chainAssets) {
       const chainId = asset.networkID;
-      const denoms = updated[chainId] || [];
+      const denoms = updated[chainId].subscribedDenoms || [];
       const filtered = denoms.filter(d => d !== asset.denom);
       if (filtered.length === 0) {
         delete updated[chainId];
       } else {
-        updated[chainId] = filtered;
+        updated[chainId] = {
+          viewAll: false,
+          subscribedDenoms: filtered,
+        };
       }
     }
 
@@ -229,52 +238,148 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     navigate(ROUTES.APP.ROOT);
   };
 
-  const handleSelectCoin = (coin: Asset) => {
-    const currentDenoms = subscriptionSelections[networkLevel][coin.networkID] || [];
+  const allDenomsAreSubscribed = (chainId: string, subscribedDenoms: string[]): boolean => {
+    const allDenomsForChain = denomsForChain(chainId);
 
-    if (currentDenoms.includes(coin.denom)) {
+    return (
+      subscribedDenoms.length === allDenomsForChain.length &&
+      allDenomsForChain.every(denom => subscribedDenoms.includes(denom))
+    );
+  };
+
+  const subscribeOrSetViewAll = (
+    chainId: string,
+    denoms: string[],
+    feeToken: string,
+  ): DenomSubscriptionRecord => {
+    const allAreSubscribed = allDenomsAreSubscribed(chainId, [...denoms, feeToken]);
+    const feeTokenSelection = [feeToken];
+
+    return {
+      viewAll: allAreSubscribed,
+      subscribedDenoms: allAreSubscribed ? [] : feeTokenSelection,
+    };
+  };
+
+  const handleSelectCoin = (coin: Asset) => {
+    const currentSelection = subscriptionSelections[networkLevel][coin.networkID] || {
+      ...DEFAULT_DENOM_SUBSCRIPTION_RECORD,
+    };
+    const chainId = coin.networkID;
+
+    if (currentSelection.subscribedDenoms.includes(coin.denom)) {
+      // Coin is currently selected - deselect it
       setSubscriptionSelections(prev => {
         const updatedNetworkSelections = { ...prev[networkLevel] };
-        const updatedDenoms = updatedNetworkSelections[coin.networkID].filter(
-          d => d !== coin.denom,
-        );
+        const updatedDenoms = currentSelection.subscribedDenoms.filter(d => d !== coin.denom);
 
-        if (updatedDenoms.length === 0) {
-          // Remove chain if no coins left
-          delete updatedNetworkSelections[coin.networkID];
-        } else {
-          updatedNetworkSelections[coin.networkID] = updatedDenoms;
+        console.log('[ChainSubscriptions handleSelection] checking value of viewAll');
+        console.log('[ChainSubscriptions handleSelection]', currentSelection.viewAll);
+        // If we're deselecting the last coin, remove the chain entry
+        if (updatedDenoms.length === 0 && !currentSelection.viewAll) {
+          const { [chainId]: _, ...rest } = updatedNetworkSelections;
+          return {
+            ...prev,
+            [networkLevel]: rest,
+          };
         }
 
+        // Otherwise update the denom list and ensure viewAll is false
         return {
           ...prev,
-          [networkLevel]: updatedNetworkSelections,
+          [networkLevel]: {
+            ...updatedNetworkSelections,
+            [chainId]: {
+              viewAll: false,
+              subscribedDenoms: updatedDenoms,
+            },
+          },
         };
       });
     } else {
-      setSubscriptionSelections(prev => ({
-        ...prev,
-        [networkLevel]: {
-          ...prev[networkLevel],
-          [coin.networkID]: [...(prev[networkLevel][coin.networkID] || []), coin.denom],
-        },
-      }));
+      // Coin is not selected - select it
+      setSubscriptionSelections(prev => {
+        const updatedNetworkSelections = { ...prev[networkLevel] };
+        const denomSubscription = subscribeOrSetViewAll(
+          chainId,
+          currentSelection.subscribedDenoms,
+          coin.denom,
+        );
+
+        return {
+          ...prev,
+          [networkLevel]: {
+            ...updatedNetworkSelections,
+            [chainId]: denomSubscription,
+          },
+        };
+      });
     }
   };
 
-  const handleSelectChain = (chain: SimplifiedChainInfo, feeToken: Asset | null) => {
+  const handleSelectChain = (
+    chain: SimplifiedChainInfo,
+    viewAll: boolean,
+    feeToken: Asset | null,
+  ) => {
     setSubscriptionSelections(prev => {
       const newSelections = { ...prev };
       const chainId = chain.chain_id;
 
-      if (newSelections[networkLevel][chainId]) {
-        const { [chainId]: _, ...rest } = newSelections[networkLevel];
+      if (!newSelections[networkLevel]) {
+        newSelections[networkLevel] = {};
+      }
+
+      const networkLevelSelections = newSelections[networkLevel];
+      const currentNetwork = networkLevelSelections[chainId];
+
+      if (currentNetwork) {
+        // If chain is already selected, remove it
+        const { [chainId]: _, ...rest } = networkLevelSelections;
         newSelections[networkLevel] = rest;
       } else {
-        // TODO: if no assets on the chain, set to "all others, however that will be done.  currently it's an unsupported chain"
+        // If chain is not selected, set initial coin selection by viewAll choice
+
+        const denomSubscription =
+          viewAll || !feeToken
+            ? DEFAULT_DENOM_SUBSCRIPTION_RECORD
+            : subscribeOrSetViewAll(chainId, [], feeToken?.denom);
         newSelections[networkLevel] = {
-          ...newSelections[networkLevel],
-          [chainId]: feeToken ? [feeToken.denom] : [],
+          ...networkLevelSelections,
+          [chainId]: denomSubscription,
+        };
+      }
+
+      return newSelections;
+    });
+  };
+
+  const handleChainToggle = (
+    chain: SimplifiedChainInfo,
+    viewAll: boolean,
+    feeToken: Asset | null,
+  ) => {
+    setSubscriptionSelections(prev => {
+      const newSelections = { ...prev };
+      const chainId = chain.chain_id;
+
+      if (!newSelections[networkLevel]?.[chainId]) {
+        return prev;
+      }
+
+      if (viewAll) {
+        console.log('[ChainSubscriptions handleChainToggle] toggle on');
+        // Toggling ON - set to viewAll true
+        newSelections[networkLevel][chainId] = {
+          viewAll: true,
+          subscribedDenoms: [],
+        };
+      } else {
+        console.log('[ChainSubscriptions handleChainToggle] toggle off');
+        // Toggling OFF - set to just primary fee token
+        newSelections[networkLevel][chainId] = {
+          viewAll: false,
+          subscribedDenoms: feeToken ? [feeToken.denom] : [],
         };
       }
 
@@ -300,7 +405,8 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
 
       // Helper function to get the best coin denom for a chain
       const getBestCoinDenom = (networkLevel: NetworkLevel, chainId: string): string => {
-        const subscribedCoins = subscriptionSelections[networkLevel][chainId] || [];
+        const subscribedCoins =
+          subscriptionSelections[networkLevel][chainId].subscribedDenoms || [];
         const chain = chainRegistry[networkLevel][chainId];
 
         // Priority 1: Primary fee token (if subscribed)
@@ -528,7 +634,11 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
         ) : (
           <div className="flex-grow flex flex-col overflow-hidden">
             {activeTab === SubscriptionTab.CHAINS_TAB ? (
-              <ChainScroller chains={displayChains} onChainSelect={handleSelectChain} />
+              <ChainScroller
+                chains={displayChains}
+                onChainSelect={handleSelectChain}
+                onToggle={handleChainToggle}
+              />
             ) : (
               <AssetScroller
                 assets={chainAssets}

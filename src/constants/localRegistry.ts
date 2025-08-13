@@ -1,5 +1,6 @@
 import {
   AssetRegistry,
+  DenomSubscriptionRecord,
   LocalChainRegistry,
   NetworkSubscriptionRecord,
   SubscriptionRecord,
@@ -112,11 +113,16 @@ export const CHAIN_NODES = {
 export const DEFAULT_MAINNET_ASSET = SYMPHONY_MAINNET_ASSET_REGISTRY[DEFAULT_DENOM];
 export const DEFAULT_TESTNET_ASSET = SYMPHONY_TESTNET_ASSET_REGISTRY[DEFAULT_DENOM];
 
+export const DEFAULT_DENOM_SUBSCRIPTION_RECORD: DenomSubscriptionRecord = {
+  viewAll: true,
+  subscribedDenoms: [],
+};
+
 export const DEFAULT_MAINNET_SUBSCRIPTION_RECORD: NetworkSubscriptionRecord = {
-  [SYMPHONY_MAINNET_ID]: [DEFAULT_MAINNET_ASSET.denom],
+  [SYMPHONY_MAINNET_ID]: DEFAULT_DENOM_SUBSCRIPTION_RECORD,
 };
 export const DEFAULT_TESTNET_SUBSCRIPTION_RECORD: NetworkSubscriptionRecord = {
-  [SYMPHONY_TESTNET_ID]: [DEFAULT_TESTNET_ASSET.denom],
+  [SYMPHONY_TESTNET_ID]: DEFAULT_DENOM_SUBSCRIPTION_RECORD,
 };
 
 export const DEFAULT_SUBSCRIPTION: SubscriptionRecord = {

@@ -41,6 +41,17 @@ export const unloadFullRegistryAtom = atom(null, (_, set) => {
   set(fullChainRegistryAtom, EMPTY_CHAIN_REGISTRY);
 });
 
+export const chainDenomsAtom = atom(get => {
+  const registry = get(fullChainRegistryAtom);
+  const networkLevel = get(networkLevelAtom);
+
+  return (chainId: string) => {
+    const chain = registry[networkLevel][chainId];
+    if (!chain?.assets) return [];
+    return Object.values(chain.assets).map(asset => asset.denom);
+  };
+});
+
 export const subscriptionSelectionsAtom = atom<SubscriptionRecord>(DEFAULT_SUBSCRIPTION);
 
 export const chainInfoAtom = atom(get => {
@@ -80,53 +91,11 @@ export const selectedCoinListAtom = atom<Asset[]>(get => {
   const allAssets = get(allAssetsFromSubscribedChainsAtom);
 
   return allAssets.filter(asset => {
-    const selectedDenoms = subscriptionSelections[asset.networkID] || [];
-    return selectedDenoms.includes(asset.denom);
-  });
-});
-
-export const addCoinToChainAtom = atom(null, (get, set, { chainId, denom }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  const updated = {
-    ...current,
-    [networkLevel]: {
-      ...current[networkLevel],
-      [chainId]: [...(current[networkLevel][chainId] || []), denom],
-    },
-  };
-  set(subscriptionSelectionsAtom, updated);
-});
-
-export const removeCoinFromChainAtom = atom(null, (get, set, { chainId, denom }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  const currentDenoms = current[networkLevel][chainId] || [];
-  const updatedDenoms = currentDenoms.filter(d => d !== denom);
-
-  const updatedChains =
-    updatedDenoms.length === 0
-      ? Object.fromEntries(Object.entries(current[networkLevel]).filter(([id]) => id !== chainId))
-      : {
-          ...current[networkLevel],
-          [chainId]: updatedDenoms,
-        };
-
-  set(subscriptionSelectionsAtom, {
-    ...current,
-    [networkLevel]: updatedChains,
-  });
-});
-
-export const setChainCoinsAtom = atom(null, (get, set, { chainId, denoms }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  set(subscriptionSelectionsAtom, {
-    ...current,
-    [networkLevel]: {
-      ...current[networkLevel],
-      [chainId]: denoms,
-    },
+    const chainSelection = subscriptionSelections[asset.networkID];
+    // Include asset if either:
+    // 1. viewAll is true for the chain, OR
+    // 2. the asset's denom is in the subscribedDenoms list
+    return chainSelection.viewAll || (chainSelection.subscribedDenoms || []).includes(asset.denom);
   });
 });
 

@@ -1,4 +1,9 @@
-import { isFetchingWalletDataAtom, subscribedChainRegistryAtom, networkLevelAtom } from '@/atoms';
+import {
+  isFetchingWalletDataAtom,
+  subscribedChainRegistryAtom,
+  networkLevelAtom,
+  fullChainRegistryAtom,
+} from '@/atoms';
 import { fetchWalletAssets } from '@/helpers';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { sessionWalletAtom, updateChainWalletAtom } from '@/atoms/walletAtom';
@@ -6,6 +11,7 @@ import { userAccountAtom } from '@/atoms';
 
 export function useWalletDataRefresh() {
   const setIsFetchingData = useSetAtom(isFetchingWalletDataAtom);
+  const fullChainRegistry = useAtomValue(fullChainRegistryAtom);
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const updateChainWallet = useSetAtom(updateChainWalletAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
@@ -63,6 +69,7 @@ export function useWalletDataRefresh() {
             chainId,
             chainSubscriptions,
             currentNetworkChains,
+            fullChainRegistry[networkLevel],
           );
 
           if (assets.length > 0) {

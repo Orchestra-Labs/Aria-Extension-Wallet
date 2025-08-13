@@ -548,14 +548,17 @@ export const filterChainRegistryToSubscriptions = (
   const result: LocalChainRegistry = {};
 
   for (const chainID in subscriptions) {
-    const wantedDenoms = subscriptions[chainID];
+    const viewAll = subscriptions[chainID].viewAll;
+    const wantedDenoms = subscriptions[chainID].subscribedDenoms;
     const match = registry[chainID];
 
     if (!match) continue;
 
-    const filteredAssets = Object.fromEntries(
-      Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
-    );
+    const filteredAssets = viewAll
+      ? match.assets
+      : Object.fromEntries(
+          Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
+        );
 
     result[chainID] = {
       ...match,

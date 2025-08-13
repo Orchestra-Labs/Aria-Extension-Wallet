@@ -6,7 +6,8 @@ import { Asset, SimplifiedChainInfo } from '@/types';
 
 interface ChainScrollerProps {
   chains: SimplifiedChainInfo[];
-  onChainSelect: (chain: SimplifiedChainInfo, feeToken: Asset | null) => void;
+  onChainSelect: (chain: SimplifiedChainInfo, viewAll: boolean, feeToken: Asset | null) => void;
+  onToggle?: (chain: SimplifiedChainInfo, viewAll: boolean, primaryFeeToken: Asset | null) => void;
   isDialog?: boolean;
   lazyLoad?: boolean;
 }
@@ -14,6 +15,7 @@ interface ChainScrollerProps {
 export const ChainScroller: React.FC<ChainScrollerProps> = ({
   chains,
   onChainSelect,
+  onToggle,
   isDialog = false,
   lazyLoad = true,
 }) => {
@@ -24,11 +26,18 @@ export const ChainScroller: React.FC<ChainScrollerProps> = ({
     refreshData({ wallet: true });
   }, [refreshData]);
 
-  const handleClick = (chain: SimplifiedChainInfo, feeToken: Asset | null) => {
+  const handleClick = (chain: SimplifiedChainInfo, viewAll: boolean, feeToken: Asset | null) => {
     if (tileScrollerRef.current?.shouldPreventClick()) {
       return;
     }
-    onChainSelect(chain, feeToken);
+    onChainSelect(chain, viewAll, feeToken);
+  };
+
+  const handleToggle = (chain: SimplifiedChainInfo, viewAll: boolean, feeToken: Asset | null) => {
+    if (tileScrollerRef.current?.shouldPreventClick()) {
+      return;
+    }
+    onToggle?.(chain, viewAll, feeToken);
   };
 
   return (
@@ -41,7 +50,12 @@ export const ChainScroller: React.FC<ChainScrollerProps> = ({
             key={chain.chain_id}
             className="tile-item" // Essential for lazy loading
           >
-            <ChainTile chain={chain} onClick={handleClick} isDialog={isDialog} />
+            <ChainTile
+              chain={chain}
+              onClick={handleClick}
+              onToggle={handleToggle}
+              isDialog={isDialog}
+            />
           </div>
         ))
       )}

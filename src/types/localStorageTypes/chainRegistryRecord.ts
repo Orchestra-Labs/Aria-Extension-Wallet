@@ -21,6 +21,7 @@ export interface Asset {
   amount: string;
   exchangeRate?: string;
   isIbc: boolean;
+  ibcDenom?: string;
   logo: string;
   symbol: string;
   name: string;

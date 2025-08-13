@@ -120,7 +120,12 @@ export const AssetTile = ({
         subtitle={subtitle}
         subtitleClickOption={
           isSelectable ? undefined : (
-            <Button variant="reactiveIcon" size="small" onClick={handleCopy} data-prevent-tray-open>
+            <Button
+              variant="reactiveIcon"
+              size="small"
+              onClick={handleCopy}
+              className="data-prevent-tray-open"
+            >
               <CopyIcon className="h-3 w-3" />
             </Button>
           )

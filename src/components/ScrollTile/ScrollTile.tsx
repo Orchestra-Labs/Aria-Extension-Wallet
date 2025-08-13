@@ -71,7 +71,7 @@ export const ScrollTile = ({
           {formattedTitle}
         </h6>
         <div className={subtitleClickOption ? 'flex items-center' : ''}>
-          <p className={`text-xs ${subtitleColor} text-left line-clamp-1 select-none flex-1`}>
+          <p className={`text-xs ${subtitleColor} text-left line-clamp-1 select-none`}>
             {subtitle}
           </p>
           {subtitleClickOption && (

@@ -28,6 +28,7 @@ export * from './SearchBar';
 export * from './SortDialog';
 export * from './TileScroller';
 export * from './Toast';
+export * from './Toggle';
 export * from './Tooltip';
 export * from './TransactionInfoPanel';
 export * from './TransactionResultsTile';

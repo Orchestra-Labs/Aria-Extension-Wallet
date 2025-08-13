@@ -11,6 +11,7 @@ import {
   sessionWalletAtom,
   networkLevelAtom,
   allReceivableAssetsAtom,
+  fullChainRegistryAtom,
 } from '@/atoms';
 import { userAccountAtom } from './accountAtom';
 import { filterAndSortAssets } from '@/helpers';
@@ -22,77 +23,96 @@ export const symphonyAssetsAtom = atom<Asset[]>([]);
 export const subscribedAssetsAtom = atom(get => {
   const { chainWallets } = get(sessionWalletAtom);
   const userAccount = get(userAccountAtom);
-  const chainRegistry = get(subscribedChainRegistryAtom);
+  const subscribedChainRegistry = get(subscribedChainRegistryAtom);
+  const fullChainRegistry = get(fullChainRegistryAtom);
   const networkLevel = get(networkLevelAtom);
-
-  console.log(`[subscribedAssetsAtom] Building for ${networkLevel}`);
 
   if (!userAccount?.settings.chainSubscriptions[networkLevel]) {
     console.log('[subscribedAssetsAtom] No chain subscriptions found');
     return [];
   }
 
-  // Create wallet assets map for quick lookup (includes IBC assets)
-  const walletAssets = Object.values(chainWallets)
-    .flatMap(wallet => wallet.assets)
-    .filter(asset => {
-      const chainInfo = chainRegistry[networkLevel][asset.networkID];
-      return chainInfo !== undefined;
-    });
+  // Split wallet assets into regular and IBC assets
+  const allWalletAssets = Object.values(chainWallets).flatMap(wallet => wallet.assets);
+  const regularAssets = allWalletAssets.filter(asset => !asset.isIbc);
+  const ibcAssets = allWalletAssets.filter(asset => asset.isIbc);
 
-  const walletAssetsMap = walletAssets.reduce(
-    (map, asset) => {
-      if (!map[asset.networkID]) map[asset.networkID] = {};
-      map[asset.networkID][asset.denom] = asset;
-      return map;
-    },
-    {} as Record<string, Record<string, Asset>>,
-  );
+  console.log('[subscribedAssetsAtom] wallet assets', {
+    regular: regularAssets,
+    ibc: ibcAssets,
+  });
 
-  // Create Set of subscribed denoms for IBC checking
-  const subscribedDenoms = new Set(
-    Object.values(userAccount.settings.chainSubscriptions[networkLevel]).flatMap(denoms => denoms),
+  // Get current chain registries
+  const currentSubscribedChains = subscribedChainRegistry[networkLevel];
+  const currentFullChains = fullChainRegistry[networkLevel];
+  const chainSubscriptions = userAccount.settings.chainSubscriptions[networkLevel];
+
+  // Create a map of all subscribed denoms across all chains for IBC checking
+  const allSubscribedDenoms = new Set(
+    Object.values(chainSubscriptions).flatMap(sub => sub.subscribedDenoms),
   );
 
   const subscribedAssets: Asset[] = [];
-  const currentChains = chainRegistry[networkLevel];
 
-  // Process 1: Registry assets (for zero-balance native assets)
-  for (const [networkID, denoms] of Object.entries(
-    userAccount.settings.chainSubscriptions[networkLevel],
-  )) {
-    const chainInfo = currentChains[networkID];
+  // Process regular assets first
+  for (const asset of regularAssets) {
+    const chainSubscription = chainSubscriptions[asset.networkID];
+    if (!chainSubscription) continue;
+
+    const chainInfo =
+      currentSubscribedChains[asset.networkID] || currentFullChains[asset.networkID];
     if (!chainInfo) continue;
 
-    const chainAssets = Object.values(chainInfo.assets || {});
-
-    for (const denom of denoms) {
-      const assetFromRegistry = chainAssets.find(a => a.denom === denom);
-      if (!assetFromRegistry) continue;
-
-      const walletAsset = walletAssetsMap[networkID]?.[denom];
-
-      subscribedAssets.push({
-        ...assetFromRegistry,
-        amount: walletAsset?.amount || '0',
-        networkID: chainInfo.chain_id,
-        networkName: chainInfo.chain_name,
-        isIbc: walletAsset?.isIbc || false,
-      });
+    // Check if viewAll is true or if the denom is in the subscription list
+    if (chainSubscription.viewAll || chainSubscription.subscribedDenoms.includes(asset.denom)) {
+      subscribedAssets.push(asset);
     }
   }
 
-  // Process 2: Wallet assets (for IBC assets and any additional balances)
-  for (const asset of walletAssets) {
-    // Skip if already included from registry processing
-    if (subscribedAssets.some(a => a.denom === asset.denom && a.networkID === asset.networkID))
-      continue;
+  // Process IBC assets
+  for (const asset of ibcAssets) {
+    const chainSubscription = chainSubscriptions[asset.networkID];
+    if (!chainSubscription) continue;
 
-    // Check if IBC asset with subscribed base denom
-    const isSubscribedIbc = asset.isIbc && asset.denom && subscribedDenoms.has(asset.denom);
+    const chainInfo =
+      currentSubscribedChains[asset.networkID] || currentFullChains[asset.networkID];
+    if (!chainInfo) continue;
 
-    if (subscribedDenoms.has(asset.denom) || isSubscribedIbc) {
+    // Check if viewAll is true for this chain OR
+    // if any chain's subscription list has this denom or ibc denom
+    const isSubscribed =
+      chainSubscription.viewAll ||
+      allSubscribedDenoms.has(asset.denom) ||
+      (asset.ibcDenom && allSubscribedDenoms.has(asset.ibcDenom));
+
+    if (isSubscribed) {
       subscribedAssets.push(asset);
+    }
+  }
+
+  // Process registry assets for zero-balance native assets
+  for (const [networkID, denomSubscriptions] of Object.entries(chainSubscriptions)) {
+    const viewAll = denomSubscriptions.viewAll;
+    const chainInfo = viewAll ? currentFullChains[networkID] : currentSubscribedChains[networkID];
+    if (!chainInfo) continue;
+
+    const chainAssets = Object.values(chainInfo.assets || {});
+    for (const asset of chainAssets) {
+      // Skip if already included from wallet assets processing
+      if (subscribedAssets.some(a => a.denom === asset.denom && a.networkID === networkID)) {
+        continue;
+      }
+
+      // Only include if viewAll is true or denom is in subscription list
+      if (viewAll || denomSubscriptions.subscribedDenoms.includes(asset.denom)) {
+        subscribedAssets.push({
+          ...asset,
+          amount: '0',
+          networkID: chainInfo.chain_id,
+          networkName: chainInfo.chain_name,
+          isIbc: false,
+        });
+      }
     }
   }
 

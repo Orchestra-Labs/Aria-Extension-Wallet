@@ -34,6 +34,7 @@ export const updateChainWalletAtom = atom(
       oldAddress: existingWallet.address,
       newAddress: update.address,
       assetsCount: update.assets?.length,
+      assets: update.assets,
     });
 
     set(sessionWalletAtom, {

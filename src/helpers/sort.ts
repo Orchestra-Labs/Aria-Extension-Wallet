@@ -94,6 +94,7 @@ export function filterAndSortAssets(
 ): Asset[] {
   const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
 
+  console.log('[filterAndSortAssets] assets:', assets);
   // First filter the assets
   const filteredAssets = assets.filter(asset => {
     if (!showAllAssets && parseFloat(asset.amount) <= 0) return false;
