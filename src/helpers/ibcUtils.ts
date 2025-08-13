@@ -41,7 +41,7 @@ export const processIbcData = (
     try {
       // Skip if invalid structure
       if (!fileData?.chain_1 || !fileData?.chain_2 || !fileData?.channels?.[0]) {
-        console.warn('Skipping invalid IBC file structure:', fileData);
+        // console.warn('Skipping invalid IBC file structure:', fileData);
         continue;
       }
 
@@ -50,9 +50,9 @@ export const processIbcData = (
 
       // Skip if chain IDs not found
       if (!chain1Id || !chain2Id) {
-        console.warn(
-          `Skipping - Could not resolve chain IDs for: ${fileData.chain_1.chain_name} or ${fileData.chain_2.chain_name}`,
-        );
+        // console.warn(
+        //   `Skipping - Could not resolve chain IDs for: ${fileData.chain_1.chain_name} or ${fileData.chain_2.chain_name}`,
+        // );
         continue;
       }
 

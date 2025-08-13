@@ -294,6 +294,7 @@ export const useSendActions = () => {
 
       if (result.success && result.data?.code === 0) {
         console.log('[useTransactionHandler] Transaction successful');
+        // TODO: handle skip go's multiple routes and fees
         if (isSimulation) {
           const gasWanted = parseInt(result.data.gasWanted || '0', 10);
           const gasPrice = feeState.feeToken.gasPriceStep.average;
