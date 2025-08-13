@@ -52,7 +52,8 @@ export const AssetTile = ({
 
   const [copied, setCopied] = useState(false);
 
-  const prefix = getChainInfo(asset.networkID).bech32_prefix;
+  const chain = getChainInfo(asset.networkID);
+  const prefix = chain.bech32_prefix;
   const truncatedAddress = truncateWalletAddress(prefix, walletState.address);
 
   const isChainSubscriptionsPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
@@ -151,7 +152,7 @@ export const AssetTile = ({
             </Tooltip>
           )
         }
-        icon={<IconContainer src={logo} alt={symbol} />}
+        icon={<IconContainer src={logo || chain.logo_uri} alt={symbol} />}
         selected={isSelectable ? isSelected : undefined}
         onClick={undefined}
       />
