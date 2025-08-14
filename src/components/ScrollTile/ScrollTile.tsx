@@ -34,13 +34,10 @@ export const ScrollTile = ({
   const subtitleColor = selectTextColorByStatus(subtitleStatus, 'text-neutral-1');
   const secondarySubtitleColor = selectTextColorByStatus(secondarySubtitleStatus, 'text-neutral-1');
 
-  const baseClasses = 'p-2 min-h-[52px] rounded-md flex items-center cursor-pointer border';
-  const selectedClasses = `border-blue bg-blue-hover text-blue-dark
-    active:bg-blue-hover-secondary active:text-blue-dark active:border-blue 
-    hover:bg-blue-pressed-secondary hover:text-blue hover:border-blue-darker`;
-  const unselectedClasses = `border-neutral-4 text-neutral-1
-    hover:bg-neutral-4 hover:text-neutral-1 hover:border-grey
-    active:bg-neutral-2 active:text-neutral-1 active:border-grey`;
+  const baseClasses =
+    'w-full flex items-center justify-between rounded-xl bg-neutral-6/50 border border-neutral-4 px-4 py-3 mb-2 hover:bg-neutral-6 transition-colors cursor-pointer';
+  const selectedClasses = `ring-2 ring-blue`;
+  const unselectedClasses = ``;
 
   const tileClasses = cn(baseClasses, selected ? selectedClasses : unselectedClasses);
 

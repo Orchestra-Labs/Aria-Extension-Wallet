@@ -1,5 +1,5 @@
 import { STORED_DATA_TIMEOUT } from '@/constants';
-import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from './localstorage';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from './localStorage';
 
 interface LoginAttempt {
   count: number;
