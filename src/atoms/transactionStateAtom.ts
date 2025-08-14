@@ -161,13 +161,13 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
   set(_sendStateAtom, {
     ...DEFAULT_SEND_STATE,
     asset: selectedAsset,
-    chainID: selectedAsset.networkID,
+    chainId: selectedAsset.networkID,
   });
 
   set(_receiveStateAtom, {
     ...DEFAULT_RECEIVE_STATE,
     asset: selectedAsset,
-    chainID: selectedAsset.networkID,
+    chainId: selectedAsset.networkID,
   });
 
   // Reset fee state

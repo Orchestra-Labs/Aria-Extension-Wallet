@@ -1,6 +1,6 @@
 import { TransactionType } from '@/constants';
 import { TransactionDetails, TransactionState } from '@/types';
-import { chainInfoAtom } from './chainRegistryAtom';
+import { chainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
 import { chainWalletAtom } from './walletAtom';
 import { recipientAddressAtom } from './addressAtom';
 import { getTransactionType, getValidIBCChannel, isValidSwap, isValidTransaction } from '@/helpers';
@@ -29,26 +29,46 @@ export const updateTransactionTypeAtom = atom(
     const getChainInfo = get(chainInfoAtom);
     const sendState = params.sendState || get(sendStateAtom);
     const receiveState = params.receiveState || get(receiveStateAtom);
-    const walletAddress = params.walletAddress || get(chainWalletAtom(sendState.chainID))?.address;
+    const walletAddress = params.walletAddress || get(chainWalletAtom(sendState.chainId))?.address;
     const recipientAddress = params.recipientAddress || get(recipientAddressAtom);
+    const skipChains = get(skipChainsAtom);
 
     if (!sendState.asset || !receiveState.asset) {
       console.error('Missing assets for transaction type update');
       return;
     }
 
-    console.log('[TransactionType] Chain IDs', sendState.chainID, receiveState.chainID);
-    const sendChain = getChainInfo(sendState.chainID);
+    console.log('[TransactionType] Chain IDs', sendState.chainId, receiveState.chainId);
+    const sendChain = getChainInfo(sendState.chainId);
     const restUris = sendChain.rest_uris;
 
     try {
-      const isValidIbcTx = await getValidIBCChannel({
-        sendChain,
-        receiveChainId: receiveState.chainID,
-        networkLevel: sendChain.network_level,
-        prefix: sendChain.bech32_prefix,
-        restUris,
-      });
+      const receiveChainId = receiveState.chainId;
+      console.log('[TransactionTypeAtom] Skip Chains:', skipChains);
+      const isSendChainSupported = skipChains.includes(sendChain.chain_id);
+      console.log(
+        '[TransactionTypeAtom] isSendChainSupported:',
+        sendChain.chain_id,
+        isSendChainSupported,
+      );
+      const isReceiveChainSupported = skipChains.includes(receiveChainId);
+      console.log(
+        '[TransactionTypeAtom] isReceiveChainSupported:',
+        receiveChainId,
+        isReceiveChainSupported,
+      );
+
+      const isSkipSupported = isSendChainSupported && isReceiveChainSupported;
+      console.log('[TransactionTypeAtom] Is skip supported?:', isSkipSupported);
+      const isValidIbcTx =
+        isSkipSupported ||
+        (await getValidIBCChannel({
+          sendChain,
+          receiveChainId: receiveChainId,
+          networkLevel: sendChain.network_level,
+          prefix: sendChain.bech32_prefix,
+          restUris,
+        }));
       console.log('[TransactionTypeAtom] Is IBC enabled?:', isValidIbcTx);
 
       const isValidSwapTx = isValidSwap({

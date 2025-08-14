@@ -58,11 +58,25 @@ export const AddressInput: React.FC<AddressInputProps> = ({
 
     try {
       const decoded = bech32.decode(recipientAddress);
+      console.log('[AddressInput] Decoded address:', {
+        prefix: decoded.prefix,
+        words: decoded.words,
+      });
 
       if (!decoded.prefix) {
         setStatus(InputStatus.ERROR, 'Missing prefix.');
         return;
       }
+
+      // Log all available chains and their prefixes for debugging
+      console.log('[AddressInput] Available chains:', {
+        networkLevel,
+        chains: Object.values(fullRegistry[networkLevel]).map(chain => ({
+          chainId: chain.chain_id,
+          prefix: chain.bech32_prefix,
+          name: chain.chain_name,
+        })),
+      });
 
       // Find the chain info for this prefix
       const matchedChain = Object.values(fullRegistry[networkLevel]).find(
@@ -73,13 +87,22 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         setStatus(InputStatus.WARNING, 'Prefix not known.');
         return;
       }
+      console.log('[AddressInput] Matched chain:', matchedChain);
 
       setStatus(InputStatus.SUCCESS);
-      if (receiveState.chainID !== matchedChain.chain_id) resetLogs();
-      setReceiveState(prevState => ({
-        ...prevState,
-        chainID: matchedChain.chain_id,
-      }));
+      if (receiveState.chainId !== matchedChain.chain_id) {
+        console.log(
+          '[AddressInput] Updating receive chain from',
+          receiveState.chainId,
+          'to',
+          matchedChain.chain_id,
+        );
+        resetLogs();
+        setReceiveState(prevState => ({
+          ...prevState,
+          chainId: matchedChain.chain_id,
+        }));
+      }
     } catch (error) {
       setStatus(InputStatus.ERROR, 'Invalid Bech32 encoding.');
     }
@@ -101,6 +124,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     }
 
     if (allowValidateAddress) {
+      if (Object.keys(fullRegistry[networkLevel]).length > 0 && recipientAddress) validateAddress();
       validateAddress();
     }
   };
@@ -128,8 +152,9 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   };
 
   useEffect(() => {
-    setStatus(InputStatus.SUCCESS);
-  }, [recipientAddress]);
+    // Only validate if we have the full registry data
+    if (Object.keys(fullRegistry[networkLevel]).length > 0 && recipientAddress) validateAddress();
+  }, [recipientAddress, fullRegistry]);
 
   return (
     <div className={cn(`flex items-baseline ${addBottomMargin ? 'mb-4' : ''} space-x-2`)}>

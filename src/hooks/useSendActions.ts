@@ -35,7 +35,7 @@ export const useSendActions = () => {
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
-  const walletState = useAtomValue(chainWalletAtom(sendState.chainID));
+  const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const transactionType = useAtomValue(transactionTypeAtom);
   const [feeState, setFeeState] = useAtom(feeStateAtom);
@@ -64,7 +64,7 @@ export const useSendActions = () => {
   }): Promise<TransactionResult> => {
     console.group('[executeSend] Starting standard send transaction');
     try {
-      const sendChain = getChainInfo(sendState.chainID);
+      const sendChain = getChainInfo(sendState.chainId);
       const prefix = sendChain.bech32_prefix;
       const rpcUris = sendChain.rpc_uris;
 
@@ -87,13 +87,22 @@ export const useSendActions = () => {
     sendObject: SendObject;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[executeIBC] Starting IBC transaction');
+    console.group('[useSendActions] executeIBC - Starting IBC transaction');
     try {
-      // First try Skip API
+      console.log('[useSendActions] Checking if both chains are supported by Skip');
       const bothChainsSupported =
-        skipChains.includes(sendState.chainID) && skipChains.includes(receiveState.chainID);
+        skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
 
       if (bothChainsSupported) {
+        console.log('[useSendActions] Both chains supported by Skip, using Skip API');
+        console.log('[useSendActions] Calling executeSkipTransaction with params:', {
+          sendState,
+          receiveState,
+          walletState,
+          recipientAddress,
+          simulateTransaction,
+        });
+
         const skipResult = await executeSkipTransaction(
           sendState,
           receiveState,
@@ -102,47 +111,65 @@ export const useSendActions = () => {
           simulateTransaction,
         );
 
-        console.log('[UseSendActions] skip result:', skipResult);
+        console.log('[useSendActions] Skip API result:', JSON.stringify(skipResult, null, 2));
 
         if (skipResult.success) {
-          // Handle both simulation and actual execution
-          if (simulateTransaction) {
+          if (simulateTransaction && skipResult.data?.route) {
+            console.log('[useSendActions] Processing simulation result from Skip route');
+            const routeInfo = skipResult.data.route;
+            const estimatedGas =
+              routeInfo.estimated_fees?.reduce(
+                (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+                0,
+              ) || '0';
+
+            console.log('[useSendActions] Estimated gas from route:', estimatedGas);
+
             return {
               ...skipResult,
               data: {
                 ...skipResult.data,
-                code: skipResult.data?.code ?? 0,
-                txHash: skipResult.data?.txHash ?? '',
-                gasWanted:
-                  skipResult.data?.gasWanted ??
-                  skipResult.data?.route?.estimated_gas_used?.toString() ??
-                  '0',
+                gasWanted: estimatedGas,
               },
             };
           }
+          console.log('[useSendActions] Skip transaction successful');
           return skipResult;
+        } else {
+          console.log('[useSendActions] Skip API failed, falling back to direct IBC');
         }
       } else {
-        console.log('One or both chains not supported by Skip, using direct IBC');
+        console.log('[useSendActions] One or both chains not supported by Skip:', {
+          sendChainSupported: skipChains.includes(sendState.chainId),
+          receiveChainSupported: skipChains.includes(receiveState.chainId),
+        });
       }
 
-      // Fallback to direct IBC if Skip fails
-      const sendChain = getChainInfo(sendState.chainID);
+      // Fallback to direct IBC
+      console.log('[useSendActions] Attempting direct IBC fallback');
+      const sendChain = getChainInfo(sendState.chainId);
+      console.log('[useSendActions] Getting valid IBC channel for:', {
+        sendChain: sendChain.chain_id,
+        receiveChainId: receiveState.chainId,
+      });
+
       const validChannel = await getValidIBCChannel({
         sendChain,
-        receiveChainId: receiveState.chainID,
+        receiveChainId: receiveState.chainId,
         networkLevel,
         prefix: sendChain.bech32_prefix,
         restUris: sendChain.rest_uris,
       });
 
       if (!validChannel) {
+        console.error('[useSendActions] No valid IBC channel found');
         return {
           success: false,
           message: 'No valid IBC channel found for this connection',
         };
       }
 
+      console.log('[useSendActions] Found valid IBC channel:', validChannel);
       const ibcObject: IBCObject = {
         fromAddress: walletState.address,
         sendObject,
@@ -152,6 +179,7 @@ export const useSendActions = () => {
         },
       };
 
+      console.log('[useSendActions] Executing direct IBC transaction with:', ibcObject);
       return await sendIBCTransaction({
         ibcObject,
         prefix: sendChain.bech32_prefix,
@@ -179,7 +207,7 @@ export const useSendActions = () => {
         sendObject,
         resultDenom: receiveAsset.denom,
       };
-      const sendChain = getChainInfo(sendState.chainID);
+      const sendChain = getChainInfo(sendState.chainId);
       const restUris = sendChain.rest_uris;
 
       return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
@@ -199,7 +227,7 @@ export const useSendActions = () => {
     const toAddress = recipientAddress
       ? `to ${recipientAddress.substring(0, 10)}...${recipientAddress.substring(recipientAddress.length - 5)}`
       : '';
-    const chainInfo = isIBC ? ` on ${sendState.chainID}` : '';
+    const chainInfo = isIBC ? ` on ${sendState.chainId}` : '';
 
     return `Send ${amount} ${toAddress}${chainInfo}`;
   };
@@ -207,27 +235,28 @@ export const useSendActions = () => {
   const handleTransaction = async ({
     isSimulation = false,
   } = {}): Promise<TransactionResult | null> => {
-    console.log('[useTransactionHandler] Starting transaction');
+    console.log('[useSendActions] handleTransaction - Starting transaction', { isSimulation });
 
     const description = formatTransactionDescription(
       sendState,
       recipientAddress,
       transactionType.isIBC,
     );
+    console.log('[useSendActions] Transaction description:', description);
 
     const hasExistingEntries = transactionLog.entries.length > 0;
+    console.log('[useSendActions] Existing transaction log entries:', hasExistingEntries);
 
-    // Add or update log entry based on existing entries
+    // Log entry handling
     let logIndex = 0;
     if (!hasExistingEntries) {
-      // Add new entry if no existing logs
+      console.log('[useSendActions] Adding new transaction log entry');
       addLogEntry({
         description,
         status: TransactionStatus.LOADING,
       });
     } else {
-      // Update entry if logs exist
-      // TODO: update to handle multi-step transactions
+      console.log('[useSendActions] Updating existing transaction log entry');
       logIndex = 0;
       updateLogEntry({
         index: logIndex,
@@ -239,7 +268,7 @@ export const useSendActions = () => {
     }
 
     if (!isSimulation) {
-      console.log('[useTransactionHandler] Setting loading state');
+      console.log('[useSendActions] Setting transaction status to LOADING');
       setTransactionStatus({
         status: TransactionStatus.LOADING,
         txHash: '',
@@ -247,8 +276,9 @@ export const useSendActions = () => {
     }
 
     try {
-      console.log('[useTransactionHandler] Current fee state:', feeState);
+      console.log('[useSendActions] Current fee state:', feeState);
       const adjustedAmount = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
+      console.log('[useSendActions] Adjusted amount:', adjustedAmount);
 
       const sendObject = {
         recipientAddress: recipientAddress || walletState.address,
@@ -257,33 +287,40 @@ export const useSendActions = () => {
         feeToken: feeState.feeToken,
       };
 
-      console.log('[useTransactionHandler] Prepared send object:', sendObject);
-      console.log('[useTransactionHandler] Current transactiontype:', transactionType);
+      console.log('[useSendActions] Prepared send object:', sendObject);
+      console.log('[useSendActions] Transaction type:', {
+        isIBC: transactionType.isIBC,
+        isSwap: transactionType.isSwap,
+        isValid: transactionType.isValid,
+      });
 
       let result: TransactionResult;
       if (transactionType.isIBC) {
-        console.log('[useTransactionHandler] Executing IBC transfer');
+        console.log('[useSendActions] Executing IBC transfer path');
         result = await executeIBC({ sendObject, simulateTransaction: isSimulation });
       } else if (transactionType.isSwap) {
-        console.log('[useTransactionHandler] Executing swap');
+        console.log('[useSendActions] Executing swap path');
         result = await executeSwap({
           sendObject,
           simulateTransaction: isSimulation,
           receiveAsset: receiveState.asset,
         });
       } else {
-        console.log('[useTransactionHandler] Executing standard send');
+        console.log('[useSendActions] Executing standard send path');
         result = await executeSend({ sendObject, simulateTransaction: isSimulation });
       }
 
-      console.log('[useTransactionHandler] Result:', result);
+      console.log('[useSendActions] Transaction result:', {
+        success: result.success,
+        code: result.data?.code,
+        message: result.message,
+      });
 
-      // Update transaction log
       const success = result?.data?.code === 0;
+      console.log('[useSendActions] Transaction success status:', success);
 
-      // Update log entry with result
+      // Update log entry
       updateLogEntry({
-        // TODO: update with index for multi-step transactions
         index: 0,
         updates: {
           status: success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
@@ -293,18 +330,16 @@ export const useSendActions = () => {
       });
 
       if (result.success && result.data?.code === 0) {
-        console.log('[useTransactionHandler] Transaction successful');
-        // TODO: handle skip go's multiple routes and fees
+        console.log('[useSendActions] Handling successful transaction');
         if (isSimulation) {
           const gasWanted = parseInt(result.data.gasWanted || '0', 10);
           const gasPrice = feeState.feeToken.gasPriceStep.average;
           const feeInBaseUnits = gasWanted * gasPrice;
 
-          console.log('[useTransactionHandler] Updating fee state with simulation results', {
+          console.log('[useSendActions] Simulation results:', {
             gasWanted,
             gasPrice,
             feeInBaseUnits,
-            currentFeeState: feeState,
           });
 
           setFeeState({
@@ -314,8 +349,9 @@ export const useSendActions = () => {
             gasPrice,
           });
 
-          console.log('[useTransactionHandler] Updated fee state');
+          console.log('[useSendActions] Updated fee state after simulation');
         } else {
+          console.log('[useSendActions] Handling actual transaction success');
           handleTransactionSuccess(
             result.data.txHash || '',
             setTransactionStatus,
@@ -329,11 +365,10 @@ export const useSendActions = () => {
           });
           refreshData({ wallet: true });
         }
-
         return result;
       } else {
         const errorMessage = `Transaction failed: ${result.message || 'Unknown error'}`;
-        console.error('[useTransactionHandler]', errorMessage);
+        console.error('[useSendActions] Transaction failed:', errorMessage);
         handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
         return null;
       }
@@ -341,7 +376,10 @@ export const useSendActions = () => {
       const errorMessage = `Transaction failed: ${
         error instanceof Error ? error.message : String(error)
       }`;
-      console.error('[useTransactionHandler] Caught error:', error);
+      console.error('[useSendActions] Caught error in handleTransaction:', {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       handleTransactionError(errorMessage, setTransactionStatus, transactionType.type);
       return null;
     }

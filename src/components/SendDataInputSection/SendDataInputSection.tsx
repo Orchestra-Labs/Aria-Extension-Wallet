@@ -19,6 +19,8 @@ import {
   resetTransactionLogAtom,
   transactionTypeAtom,
   transactionErrorAtom,
+  updateTransactionTypeAtom,
+  chainWalletAtom,
 } from '@/atoms';
 import { useEffect } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -46,6 +48,8 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const hasSendError = useAtomValue(hasSendErrorAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
   const transactionError = useAtomValue(transactionErrorAtom);
+  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
+  const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
 
   // New atoms for simulation state
   const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
@@ -230,6 +234,25 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     setSendError({ message: '', status: InputStatus.NEUTRAL });
     resetLogs();
   };
+
+  useEffect(() => {
+    const updateTxType = async () => {
+      if (!walletState.address) return;
+
+      try {
+        await updateTransactionType({
+          sendState,
+          receiveState,
+          walletAddress: walletState.address,
+          recipientAddress: recipientAddress,
+        });
+      } catch (error) {
+        console.error('Error updating transaction type:', error);
+      }
+    };
+
+    updateTxType();
+  }, [sendState, receiveState, recipientAddress, walletState]);
 
   // Effects
   useEffect(() => {

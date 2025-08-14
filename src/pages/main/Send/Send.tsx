@@ -5,7 +5,6 @@ import { Button, Separator } from '@/ui-kit';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   recipientAddressAtom,
-  receiveStateAtom,
   sendStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
@@ -21,7 +20,6 @@ import {
   loadFullRegistryAtom,
   calculatedFeeAtom,
   resetTransactionLogAtom,
-  updateTransactionTypeAtom,
   loadSkipChainsAtom,
 } from '@/atoms';
 import {
@@ -31,7 +29,6 @@ import {
   TransactionInfoPanel,
 } from '@/components';
 import { useSendActions } from '@/hooks/';
-import { getSupportedChains } from '@/helpers';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
 export const Send = () => {
@@ -39,8 +36,8 @@ export const Send = () => {
   const { runTransaction } = useSendActions();
 
   // const symphonyAssets = useAtomValue(symphonyAssetsAtom);
+  // TODO: set send state from selected asset
   const sendState = useAtomValue(sendStateAtom);
-  const receiveState = useAtomValue(receiveStateAtom);
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const addressVerified = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
@@ -59,7 +56,6 @@ export const Send = () => {
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const calculatedFee = useAtomValue(calculatedFeeAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
-  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
   const loadSkipChains = useSetAtom(loadSkipChainsAtom);
 
   const resetStates = () => {
@@ -82,25 +78,6 @@ export const Send = () => {
   };
 
   useEffect(() => {
-    const updateTxType = async () => {
-      if (!walletState.address) return;
-
-      try {
-        await updateTransactionType({
-          sendState,
-          receiveState,
-          walletAddress: walletState.address,
-          recipientAddress: recipientAddress,
-        });
-      } catch (error) {
-        console.error('Error updating transaction type:', error);
-      }
-    };
-
-    updateTxType();
-  }, [sendState, receiveState, recipientAddress, walletState]);
-
-  useEffect(() => {
     if (!transactionError) return;
 
     const timeout = setTimeout(() => {
@@ -120,18 +97,6 @@ export const Send = () => {
     loadFullRegistry();
     loadSkipChains();
     resetLogs();
-
-    const fetchChainInfo = async () => {
-      try {
-        const chains = await getSupportedChains();
-        console.log('Fetched supported chains:', chains);
-        // You might want to store this in an atom or use it directly
-      } catch (error) {
-        console.error('Failed to fetch chain information:', error);
-      }
-    };
-
-    fetchChainInfo();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)

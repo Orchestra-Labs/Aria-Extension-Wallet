@@ -92,11 +92,11 @@ export const executeSkipTransaction = async (
   sendState: {
     amount: number;
     asset: { denom: string; exponent: number };
-    chainID: string;
+    chainId: string;
   },
   receiveState: {
     asset: { denom: string };
-    chainID: string;
+    chainId: string;
   },
   walletState: { address: string },
   recipientAddress: string | undefined,

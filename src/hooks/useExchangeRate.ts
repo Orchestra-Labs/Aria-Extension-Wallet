@@ -29,7 +29,7 @@ export function useExchangeRate() {
     return chainRegistry[networkLevel][chainId] || chainRegistry[networkLevel][symphonyChainId];
   };
 
-  const chainInfo = getChainInfo(sendState.chainID);
+  const chainInfo = getChainInfo(sendState.chainId);
   const prefix = chainInfo?.bech32_prefix || '';
   const restUris = chainInfo?.rest_uris || [];
 
@@ -56,7 +56,7 @@ export function useExchangeRate() {
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
 
       if (!restUris.length) {
-        throw new Error(`No REST endpoints available for chain ${sendState.chainID}`);
+        throw new Error(`No REST endpoints available for chain ${sendState.chainId}`);
       }
 
       // Use queryRestNode to query exchange rates

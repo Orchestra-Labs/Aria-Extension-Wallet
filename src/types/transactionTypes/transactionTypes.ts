@@ -11,7 +11,7 @@ export interface TransactionDetails {
 export interface FeeState {
   asset: Asset;
   amount: number; // Always stored in base units
-  chainID: string;
+  chainId: string;
   feeToken: FeeToken;
   gasWanted: number;
   gasPrice: number;
@@ -56,7 +56,7 @@ export interface TransactionStatusState {
 export interface TransactionState {
   asset: Asset;
   amount: number;
-  chainID: string;
+  chainId: string;
 }
 
 export interface AddressValidationState {

@@ -4,19 +4,19 @@ import { DEFAULT_MAINNET_ASSET } from './localRegistry';
 export const DEFAULT_SEND_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
-  chainID: SYMPHONY_MAINNET_ID,
+  chainId: SYMPHONY_MAINNET_ID,
 };
 
 export const DEFAULT_RECEIVE_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
-  chainID: SYMPHONY_MAINNET_ID,
+  chainId: SYMPHONY_MAINNET_ID,
 };
 
 export const DEFAULT_FEE_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
-  chainID: DEFAULT_MAINNET_ASSET.networkID,
+  chainId: DEFAULT_MAINNET_ASSET.networkID,
   feeToken: DEFAULT_FEE_TOKEN,
   gasWanted: 0,
   gasPrice: 0,

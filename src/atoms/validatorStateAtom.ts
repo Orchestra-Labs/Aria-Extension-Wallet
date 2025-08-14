@@ -65,7 +65,7 @@ export const validatorFeeStateAtom = atom<
     const chain = getChainInfo(chainId);
 
     // Always reset when chain changes
-    if (currentState.chainID !== selectedChainId) {
+    if (currentState.chainId !== selectedChainId) {
       const feeToken = chain?.fees?.[0] || DEFAULT_FEE_TOKEN;
       const asset = chain?.assets?.[feeToken.denom] || DEFAULT_FEE_STATE.asset;
 
@@ -152,7 +152,7 @@ export const resetValidatorTransactionAtom = atom(null, (get, set) => {
   set(_validatorFeeStateAtom, {
     ...get(_validatorFeeStateAtom),
     ...DEFAULT_FEE_STATE,
-    chainID: chainId,
+    chainId: chainId,
     feeToken,
     asset,
   });
