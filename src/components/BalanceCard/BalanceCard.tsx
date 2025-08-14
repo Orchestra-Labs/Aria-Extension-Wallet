@@ -271,19 +271,12 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           </div>
 
           <div className="flex justify-center space-x-2 mt-2">
-            {[...Array(totalSteps)].map((_, index) =>
-              index === currentStep ? (
-                <span key={index} className="w-2 h-2 rounded-full bg-blue" />
-              ) : (
-                <Button
-                  key={index}
-                  variant="unselected"
-                  size="blank"
-                  onClick={() => swipeTo(index)}
-                  className="w-2 h-2 rounded-full bg-neutral-4"
-                />
-              ),
-            )}
+            {[...Array(totalSteps)].map((_, i) => (
+  <span
+    key={i}
+    className={`h-1 rounded-full ${i === currentStep ? 'w-6 bg-blue' : 'w-3 bg-neutral-3'}`}
+  />
+))}
           </div>
         </div>
       )}
