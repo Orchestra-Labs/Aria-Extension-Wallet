@@ -38,7 +38,7 @@ export const updateTransactionTypeAtom = atom(
       return;
     }
 
-    console.log('[TransactionType] Chain IDs', sendState.chainId, receiveState.chainId);
+    console.log('[TransactionType] Chain ids', sendState.chainId, receiveState.chainId);
     const sendChain = getChainInfo(sendState.chainId);
     const restUris = sendChain.rest_uris;
 

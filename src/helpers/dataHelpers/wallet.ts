@@ -13,7 +13,7 @@ export const createWallet = async (
   walletName: string,
 ): Promise<{ wallet: Secp256k1HdWallet; walletRecord: WalletRecord }> => {
   try {
-    const walletID = generateUUID();
+    const walletId = generateUUID();
 
     const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
       prefix: SYMPHONY_PREFIX,
@@ -27,7 +27,7 @@ export const createWallet = async (
     console.log('Mnemonic encrypted successfully');
 
     const walletRecord: WalletRecord = {
-      id: walletID,
+      id: walletId,
       name: walletName,
       encryptedMnemonic,
       settings: {},

@@ -130,7 +130,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         ...prev,
         amount: newState.sendAmount,
         asset: newState.sendAsset,
-        chainID: newState.sendAsset.networkID,
+        chainId: newState.sendAsset.chainId,
       }));
     }
 

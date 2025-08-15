@@ -36,12 +36,14 @@ const createTransactionAtom = (
   return atom(
     get => {
       const baseState = get(storageAtom);
-      if (baseState.asset === defaultState.asset) {
-        const selectedAsset = get(selectedAssetAtom);
+      const selectedAsset = get(selectedAssetAtom);
+
+      // Only apply defaults if chainId matches default
+      if (baseState.chainId === defaultState.chainId) {
         return {
-          ...defaultState,
+          ...baseState, // Preserve any existing state
           asset: selectedAsset,
-          chainID: selectedAsset.networkID,
+          chainId: selectedAsset.chainId,
         };
       }
       return baseState;
@@ -78,7 +80,7 @@ export const feeStateAtom = atom<FeeState, [FeeState | ((prev: FeeState) => FeeS
     const networkLevel = get(networkLevelAtom);
     const chainRegistry = get(subscribedChainRegistryAtom);
 
-    const chainInfo = chainRegistry[networkLevel][selectedAsset.networkID];
+    const chainInfo = chainRegistry[networkLevel][selectedAsset.chainId];
     const feeToken =
       chainInfo?.fees?.find(fee => fee.denom === selectedAsset.denom) || chainInfo?.fees?.[0];
 
@@ -86,7 +88,7 @@ export const feeStateAtom = atom<FeeState, [FeeState | ((prev: FeeState) => FeeS
       ...currentState, // Preserve any other manually set fields
       asset: selectedAsset,
       amount: 0,
-      chainID: selectedAsset.networkID,
+      chainId: selectedAsset.chainId,
       feeToken: feeToken || DEFAULT_FEE_TOKEN,
       gasWanted: 0,
       gasPrice: 0,
@@ -161,13 +163,13 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
   set(_sendStateAtom, {
     ...DEFAULT_SEND_STATE,
     asset: selectedAsset,
-    chainId: selectedAsset.networkID,
+    chainId: selectedAsset.chainId,
   });
 
   set(_receiveStateAtom, {
     ...DEFAULT_RECEIVE_STATE,
     asset: selectedAsset,
-    chainId: selectedAsset.networkID,
+    chainId: selectedAsset.chainId,
   });
 
   // Reset fee state

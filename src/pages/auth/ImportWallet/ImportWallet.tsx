@@ -67,9 +67,9 @@ export const ImportWallet = () => {
   const getCurrentMnemonic = () => (use24Words ? mnemonic24 : mnemonic12);
   const getStringMnemonic = () => getCurrentMnemonic().join(' ');
 
-  const logIn = async (mnemonic: string, walletName: string, accountID: string) => {
+  const logIn = async (mnemonic: string, walletName: string, accountId: string) => {
     const { wallet } = await createWallet(mnemonic, password, walletName);
-    await saveSessionData(wallet, accountID, false);
+    await saveSessionData(wallet, accountId, false);
     setIsLoggedIn(true);
   };
 

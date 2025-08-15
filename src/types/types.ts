@@ -2,7 +2,7 @@ import { Asset } from './localStorageTypes';
 
 export interface SessionToken {
   mnemonic: string;
-  accountID: string;
+  accountId: string;
   rememberMe: boolean;
   timestamp: string;
 }

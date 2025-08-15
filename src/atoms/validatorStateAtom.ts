@@ -71,7 +71,7 @@ export const validatorFeeStateAtom = atom<
 
       return {
         ...DEFAULT_FEE_STATE,
-        chainID: selectedChainId,
+        chainId: selectedChainId,
         feeToken,
         asset,
       };

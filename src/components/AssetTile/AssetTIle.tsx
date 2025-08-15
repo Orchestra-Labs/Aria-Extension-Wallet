@@ -47,12 +47,12 @@ export const AssetTile = ({
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
-  const walletState = useAtomValue(chainWalletAtom(asset.networkID));
+  const walletState = useAtomValue(chainWalletAtom(asset.chainId));
   const getChainInfo = useAtomValue(chainInfoAtom);
 
   const [copied, setCopied] = useState(false);
 
-  const chain = !isSelectable ? getChainInfo(asset.networkID) : undefined;
+  const chain = !isSelectable ? getChainInfo(asset.chainId) : undefined;
   const prefix = chain?.bech32_prefix;
   const truncatedAddress = prefix ? truncateWalletAddress(prefix, walletState.address) : '';
 
@@ -188,7 +188,7 @@ export const AssetTile = ({
         >
           Send
         </Button>
-        <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.networkID} />
+        <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.chainId} />
         <Button
           size="medium"
           className="w-full"

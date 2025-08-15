@@ -24,7 +24,7 @@ export const getSessionToken = (): SessionToken | null => {
     const token = JSON.parse(tokenString);
 
     // Validate token structure
-    if (!token || !token.mnemonic || !token.accountID) {
+    if (!token || !token.mnemonic || !token.accountId) {
       console.error('Invalid token structure:', token);
       return null;
     }
@@ -55,7 +55,7 @@ export const isTokenValid = (): boolean => {
 // TODO: save full wallet information or just address depending on auth vs UX level selected.  only need 1 function to handle both cases
 export const saveSessionData = async (
   wallet: Secp256k1HdWallet,
-  accountID: string,
+  accountId: string,
   persist: boolean = false,
 ): Promise<SessionToken> => {
   const mnemonic = wallet.mnemonic;
@@ -63,7 +63,7 @@ export const saveSessionData = async (
 
   const sessionToken: SessionToken = {
     mnemonic,
-    accountID,
+    accountId,
     rememberMe: persist,
     timestamp: sessionStartTime,
   };

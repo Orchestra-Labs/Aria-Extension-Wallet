@@ -107,23 +107,23 @@ const getBalances = async (
 
 export async function fetchWalletAssets(
   walletAddress: string,
-  chainID: string,
+  chainId: string,
   subscriptions: SubscriptionRecord,
   chainRegistry: LocalChainRegistry,
   fullChainRegistry: LocalChainRegistry,
 ): Promise<Asset[]> {
   console.log(
-    `[fetchWalletAssets ${chainID}] Starting fetchWalletAssets for address: ${walletAddress}`,
+    `[fetchWalletAssets ${chainId}] Starting fetchWalletAssets for address: ${walletAddress}`,
   );
 
   if (!walletAddress) {
-    console.log(`[fetchWalletAssets ${chainID}] No wallet address provided`);
+    console.log(`[fetchWalletAssets ${chainId}] No wallet address provided`);
     return [];
   }
 
-  const chainInfo = chainRegistry[chainID];
+  const chainInfo = chainRegistry[chainId];
   if (!chainInfo) {
-    console.warn(`[fetchWalletAssets ${chainID}] No chain info found in registry`);
+    console.warn(`[fetchWalletAssets ${chainId}] No chain info found in registry`);
     return [];
   }
 
@@ -135,18 +135,18 @@ export async function fetchWalletAssets(
     chain_name,
     assets = {},
   } = chainInfo;
-  const networkName = pretty_name || chain_name || chainID;
+  const networkName = pretty_name || chain_name || chainId;
 
-  console.log(`[fetchWalletAssets ${chainID}] Processing chain: ${networkName} (${network_level})`);
+  console.log(`[fetchWalletAssets ${chainId}] Processing chain: ${networkName} (${network_level})`);
   console.log(
-    `[fetchWalletAssets ${chainID}] Found ${Object.keys(assets).length} assets in registry`,
+    `[fetchWalletAssets ${chainId}] Found ${Object.keys(assets).length} assets in registry`,
   );
 
   // 1. First fetch all necessary data
-  console.log(`[fetchWalletAssets ${chainID}] Fetching balances and prices...`);
+  console.log(`[fetchWalletAssets ${chainId}] Fetching balances and prices...`);
   const [rawBalances, coinGeckoPrices] = await Promise.all([
     getBalances(walletAddress, rest_uris || []).then(balances => {
-      console.log(`[fetchWalletAssets ${chainID}] Retrieved ${balances.length} raw balances`);
+      console.log(`[fetchWalletAssets ${chainId}] Retrieved ${balances.length} raw balances`);
       return balances;
     }),
     (async () => {
@@ -157,7 +157,7 @@ export async function fetchWalletAssets(
         });
       });
       console.log(
-        `[fetchWalletAssets ${chainID}] Fetching prices for ${coinGeckoIds.size} CoinGecko IDs`,
+        `[fetchWalletAssets ${chainId}] Fetching prices for ${coinGeckoIds.size} CoinGecko Ids`,
       );
       return fetchAssetPrices(Array.from(coinGeckoIds), network_level === NetworkLevel.TESTNET);
     })(),
@@ -165,28 +165,28 @@ export async function fetchWalletAssets(
 
   // 2. Determine subscription status
   const networkSubscriptions = subscriptions[network_level] || {};
-  const shouldFetchAllAssets = networkSubscriptions[chainID]?.viewAll || false;
+  const shouldFetchAllAssets = networkSubscriptions[chainId]?.viewAll || false;
   const thisChainSubscribedDenoms = shouldFetchAllAssets
     ? Object.keys(assets)
-    : networkSubscriptions[chainID]?.subscribedDenoms || [];
+    : networkSubscriptions[chainId]?.subscribedDenoms || [];
 
   console.log(
-    `[fetchWalletAssets ${chainID}] Subscription status - viewAll: ${shouldFetchAllAssets}, subscribedDenoms:`,
+    `[fetchWalletAssets ${chainId}] Subscription status - viewAll: ${shouldFetchAllAssets}, subscribedDenoms:`,
     thisChainSubscribedDenoms,
   );
 
   // 3. Process all balances into assets
-  console.log(`[fetchWalletAssets ${chainID}] Processing ${rawBalances.length} raw balances...`);
+  console.log(`[fetchWalletAssets ${chainId}] Processing ${rawBalances.length} raw balances...`);
   const processedAssets = await Promise.all(
     rawBalances.map(async ({ denom, amount }) => {
-      console.log(`[fetchWalletAssets ${chainID}] Processing denom: ${denom}`);
+      console.log(`[fetchWalletAssets ${chainId}] Processing denom: ${denom}`);
       let baseDenom = denom;
       let isIbc = false;
       let ibcDenom: string = denom;
 
       // Handle IBC assets
       if (denom.startsWith(IBC_PREFIX)) {
-        console.log(`[fetchWalletAssets ${chainID}] Detected IBC denom: ${denom}`);
+        console.log(`[fetchWalletAssets ${chainId}] Detected IBC denom: ${denom}`);
         try {
           const { baseDenom: resolvedDenom } = await resolveIbcAsset(
             denom,
@@ -197,11 +197,11 @@ export async function fetchWalletAssets(
           isIbc = true;
           ibcDenom = denom;
           console.log(
-            `[fetchWalletAssets ${chainID}] Resolved IBC denom ${denom} to ${resolvedDenom}`,
+            `[fetchWalletAssets ${chainId}] Resolved IBC denom ${denom} to ${resolvedDenom}`,
           );
         } catch (error) {
           console.warn(
-            `[fetchWalletAssets ${chainID}] Failed to resolve IBC denom ${denom}:`,
+            `[fetchWalletAssets ${chainId}] Failed to resolve IBC denom ${denom}:`,
             error,
           );
           if (!shouldFetchAllAssets) return null;
@@ -237,7 +237,7 @@ export async function fetchWalletAssets(
 
       if (!assetMetadata && !shouldFetchAllAssets) {
         console.log(
-          `[fetchWalletAssets ${chainID}] No metadata found for ${baseDenom} and not fetching all assets`,
+          `[fetchWalletAssets ${chainId}] No metadata found for ${baseDenom} and not fetching all assets`,
         );
         return null;
       }
@@ -250,7 +250,7 @@ export async function fetchWalletAssets(
         : 0;
 
       console.log(
-        `[fetchWalletAssets ${chainID}] Processed asset: ${baseDenom}, amount: ${amountAdjusted}, price: ${price}, isIbc: ${isIbc}`,
+        `[fetchWalletAssets ${chainId}] Processed asset: ${baseDenom}, amount: ${amountAdjusted}, price: ${price}, isIbc: ${isIbc}`,
       );
 
       return {
@@ -267,14 +267,14 @@ export async function fetchWalletAssets(
         price,
         isIbc,
         ibcDenom,
-        networkID: chainID,
+        chainId: chainId,
         networkName,
       };
     }),
   );
 
   // 4. Filter down to subscribed assets
-  console.log(`[${chainID}] Filtering to subscribed assets...`);
+  console.log(`[${chainId}] Filtering to subscribed assets...`);
   const subscribedAssets = processedAssets.filter(asset => {
     // Check if this asset matches any subscribed denom (case-insensitive)
     const isSubscribed = thisChainSubscribedDenoms.some(
@@ -285,14 +285,14 @@ export async function fetchWalletAssets(
 
     if (!isSubscribed && shouldFetchAllAssets) {
       // If viewAll is true, include all assets from this chain
-      return safeTrimLowerCase(asset?.networkID) === safeTrimLowerCase(chainID);
+      return safeTrimLowerCase(asset?.chainId) === safeTrimLowerCase(chainId);
     }
 
     return isSubscribed;
   }) as Asset[];
 
   console.log(
-    `[fetchWalletAssets ${chainID}] Total subscribed assets:`,
+    `[fetchWalletAssets ${chainId}] Total subscribed assets:`,
     subscribedAssets.length,
     subscribedAssets,
   );

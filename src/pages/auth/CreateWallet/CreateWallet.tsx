@@ -189,9 +189,9 @@ export const CreateWallet = () => {
   // TODO: include "add network" screen (dev mode)
   // TODO: Add Manual RPC changes in-app (both selection in list and form entry.  one or both of these should be kept behind dev-mode toggle)
 
-  const logIn = async (mnemonic: string, walletName: string, accountID: string) => {
+  const logIn = async (mnemonic: string, walletName: string, accountId: string) => {
     const { wallet } = await createWallet(mnemonic, password, walletName);
-    await saveSessionData(wallet, accountID, false);
+    await saveSessionData(wallet, accountId, false);
     setIsLoggedIn(true);
   };
 

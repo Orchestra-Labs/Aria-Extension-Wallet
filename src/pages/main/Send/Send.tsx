@@ -44,8 +44,8 @@ export const Send = () => {
   // const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const defaultAsset = useAtomValue(defaultAssetAtom);
   const resetTransactionStates = useSetAtom(resetTransactionStatesAtom);
-  console.log("[Send] selected asset's network id", selectedAsset.networkID);
-  const walletState = useAtomValue(chainWalletAtom(selectedAsset.networkID));
+  console.log("[Send] selected asset's network id", selectedAsset.chainId);
+  const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   console.log('[Send] initial wallet state', walletState);
   const transactionType = useAtomValue(transactionTypeAtom);
   const [transactionStatus, setTransactionStatus] = useAtom(transactionStatusAtom);

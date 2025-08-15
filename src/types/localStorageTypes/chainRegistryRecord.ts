@@ -28,7 +28,7 @@ export interface Asset {
   exponent: number;
   isFeeToken?: boolean;
   networkName: string;
-  networkID: string;
+  chainId: string;
   coinGeckoId?: string;
   price: number;
 }

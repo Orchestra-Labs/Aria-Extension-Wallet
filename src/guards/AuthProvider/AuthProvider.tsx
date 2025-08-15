@@ -4,8 +4,7 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { userAccountAtom } from '@/atoms/accountAtom';
 import { isLoggedInAtom } from '@/atoms/isLoggedInAtom';
 import { ScreenLoader } from '@/components';
-import { getSessionToken, userCanLogIn } from '@/helpers';
-import { getAccountByID } from '@/helpers/dataHelpers/account';
+import { getSessionToken, userCanLogIn, getAccountById } from '@/helpers';
 
 interface AuthContextType {
   canLogIn: boolean;
@@ -36,7 +35,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!sessionToken?.mnemonic) return;
 
     try {
-      const accountData = getAccountByID(sessionToken.accountID);
+      const accountData = getAccountById(sessionToken.accountId);
       setUserAccount(accountData);
     } catch (error) {
       console.error('Error initializing wallet address:', error);

@@ -91,7 +91,7 @@ export const selectedCoinListAtom = atom<Asset[]>(get => {
   const allAssets = get(allAssetsFromSubscribedChainsAtom);
 
   return allAssets.filter(asset => {
-    const chainSelection = subscriptionSelections[asset.networkID];
+    const chainSelection = subscriptionSelections[asset.chainId];
     // Include asset if either:
     // 1. viewAll is true for the chain, OR
     // 2. the asset's denom is in the subscribedDenoms list
@@ -111,7 +111,7 @@ export const filteredChainAssetsAtom = atom(get => {
   const filteredAssets = testnetAccessEnabled
     ? allAssets
     : allAssets.filter(asset => {
-        const chain = get(fullChainRegistryAtom).mainnet[asset.networkID];
+        const chain = get(fullChainRegistryAtom).mainnet[asset.chainId];
         return chain !== undefined; // Only include assets from mainnet chains
       });
 
@@ -129,7 +129,7 @@ export const filteredChainRegistryAtom = atom(get => {
   console.log('[filteredChainRegistryAtom] networkLevel:', networkLevel);
   console.log('[filteredChainRegistryAtom] subscriptionSelections:', subscriptionSelections);
 
-  // Get subscribed chain IDs for the current network level
+  // Get subscribed chainIds for the current network level
   const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
   console.log('[filteredChainRegistryAtom] subscribedChainIds:', subscribedChainIds);
 
@@ -160,7 +160,7 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
 
     const subscribedChainIds = subscribedChains.map(chain => chain.chain_id);
 
-    // Priority 1: User's default chain ID (if subscribed)
+    // Priority 1: User's default chain id (if subscribed)
     const userDefaultChain = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
     if (userDefaultChain && subscribedChainIds.includes(userDefaultChain)) {
       return userDefaultChain;
@@ -212,11 +212,7 @@ export const skipChainsAtom = atom<string[]>([]);
 export const loadSkipChainsAtom = atom(null, async (_, set) => {
   try {
     const chains = await getSupportedChains();
-    console.log('[loadSkipChainsAtom] Raw Skip API response:', chains);
-
     const parsedChains = chains.map(chain => chain.chain_id);
-    console.log('[loadSkipChainsAtom] Parsed chain IDs:', parsedChains);
-
     set(skipChainsAtom, parsedChains);
   } catch (error) {
     console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);

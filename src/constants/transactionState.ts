@@ -16,7 +16,7 @@ export const DEFAULT_RECEIVE_STATE = {
 export const DEFAULT_FEE_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
-  chainId: DEFAULT_MAINNET_ASSET.networkID,
+  chainId: DEFAULT_MAINNET_ASSET.chainId,
   feeToken: DEFAULT_FEE_TOKEN,
   gasWanted: 0,
   gasPrice: 0,

@@ -56,11 +56,10 @@ export const subscribedAssetsAtom = atom(get => {
 
   // Process regular assets first
   for (const asset of regularAssets) {
-    const chainSubscription = chainSubscriptions[asset.networkID];
+    const chainSubscription = chainSubscriptions[asset.chainId];
     if (!chainSubscription) continue;
 
-    const chainInfo =
-      currentSubscribedChains[asset.networkID] || currentFullChains[asset.networkID];
+    const chainInfo = currentSubscribedChains[asset.chainId] || currentFullChains[asset.chainId];
     if (!chainInfo) continue;
 
     // Check if viewAll is true or if the denom is in the subscription list
@@ -71,11 +70,10 @@ export const subscribedAssetsAtom = atom(get => {
 
   // Process IBC assets
   for (const asset of ibcAssets) {
-    const chainSubscription = chainSubscriptions[asset.networkID];
+    const chainSubscription = chainSubscriptions[asset.chainId];
     if (!chainSubscription) continue;
 
-    const chainInfo =
-      currentSubscribedChains[asset.networkID] || currentFullChains[asset.networkID];
+    const chainInfo = currentSubscribedChains[asset.chainId] || currentFullChains[asset.chainId];
     if (!chainInfo) continue;
 
     // Check if viewAll is true for this chain OR
@@ -91,15 +89,15 @@ export const subscribedAssetsAtom = atom(get => {
   }
 
   // Process registry assets for zero-balance native assets
-  for (const [networkID, denomSubscriptions] of Object.entries(chainSubscriptions)) {
+  for (const [chainId, denomSubscriptions] of Object.entries(chainSubscriptions)) {
     const viewAll = denomSubscriptions.viewAll;
-    const chainInfo = viewAll ? currentFullChains[networkID] : currentSubscribedChains[networkID];
+    const chainInfo = viewAll ? currentFullChains[chainId] : currentSubscribedChains[chainId];
     if (!chainInfo) continue;
 
     const chainAssets = Object.values(chainInfo.assets || {});
     for (const asset of chainAssets) {
       // Skip if already included from wallet assets processing
-      if (subscribedAssets.some(a => a.denom === asset.denom && a.networkID === networkID)) {
+      if (subscribedAssets.some(a => a.denom === asset.denom && a.chainId === chainId)) {
         continue;
       }
 
@@ -108,7 +106,7 @@ export const subscribedAssetsAtom = atom(get => {
         subscribedAssets.push({
           ...asset,
           amount: '0',
-          networkID: chainInfo.chain_id,
+          chainId: chainInfo.chain_id,
           networkName: chainInfo.chain_name,
           isIbc: false,
         });

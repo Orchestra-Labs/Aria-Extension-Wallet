@@ -23,12 +23,12 @@ const saveAccounts = (accounts: AccountRecord[]): void => {
   console.log('Accounts saved successfully.');
 };
 
-export const getAccountByID = (id: string): AccountRecord | null => {
+export const getAccountById = (id: string): AccountRecord | null => {
   const accounts = getAccounts();
   return accounts.find(acc => acc.id === id) || null;
 };
 
-export const getAccountIDByPassword = (inputPassword: string): string | null => {
+export const getAccountIdByPassword = (inputPassword: string): string | null => {
   console.log('Searching for password hash in records');
   const passwords = getPasswordRecords();
   const index = passwords.findIndex(
@@ -38,7 +38,7 @@ export const getAccountIDByPassword = (inputPassword: string): string | null => 
   return index !== -1 ? passwords[index].id : null;
 };
 
-export const saveAccountByID = (updatedAccount: AccountRecord): boolean => {
+export const saveAccountById = (updatedAccount: AccountRecord): boolean => {
   const accounts = getAccounts();
   const accountIndex = accounts.findIndex(acc => acc.id === updatedAccount.id);
 
@@ -52,7 +52,7 @@ export const saveAccountByID = (updatedAccount: AccountRecord): boolean => {
   return true;
 };
 
-export const removeAccountByID = (id: string): boolean => {
+export const removeAccountById = (id: string): boolean => {
   console.log(`Removing account by ID: ${id}`);
   const accounts = getAccounts();
   const filteredAccounts = accounts.filter(acc => acc.id === id);
@@ -76,8 +76,8 @@ export const createAccount = async (
 ): Promise<AccountRecord> => {
   console.log('Creating new account with walletName:', walletName);
 
-  const accountID = generateUUID();
-  const passwordHash = savePasswordHash(accountID, password);
+  const accountId = generateUUID();
+  const passwordHash = savePasswordHash(accountId, password);
   console.log('Password hash generated:', passwordHash);
 
   const walletInfo = await createWallet(mnemonic, password, walletName);
@@ -86,12 +86,12 @@ export const createAccount = async (
   console.log('Wallet created and wallet record generated:', walletRecord);
 
   const newAccount: AccountRecord = {
-    id: accountID,
+    id: accountId,
     // TODO: move settings to defaults.  grab from there and add wallet id
     settings: {
       defaultSelections: DEFAULT_SELECTIONS,
       chainSubscriptions: DEFAULT_SUBSCRIPTION,
-      activeWalletID: walletRecord.id,
+      activeWalletId: walletRecord.id,
 
       // feature access settings
       [SettingsOption.STABLECOIN_FEE]: false,
@@ -122,16 +122,16 @@ export const createAccount = async (
   return newAccount;
 };
 
-export const getWalletByID = (account: AccountRecord, walletID: string): WalletRecord | null => {
-  const walletRecord = account.wallets.find(wallet => wallet.id === walletID);
+export const getWalletById = (account: AccountRecord, walletId: string): WalletRecord | null => {
+  const walletRecord = account.wallets.find(wallet => wallet.id === walletId);
   return walletRecord ? walletRecord : null;
 };
 
 export const addWalletToAccount = async (
-  accountID: string,
+  accountId: string,
   wallet: WalletRecord,
 ): Promise<boolean> => {
-  const account = getAccountByID(accountID);
+  const account = getAccountById(accountId);
   if (!account) return false;
 
   const walletExists = account.wallets.some(existingWallet => existingWallet.id === wallet.id);
@@ -141,25 +141,25 @@ export const addWalletToAccount = async (
   }
 
   account.wallets.push(wallet);
-  saveAccountByID(account);
+  saveAccountById(account);
   console.log('Wallet added to account successfully.');
 
   return true;
 };
 
-export const removeWalletFromAccount = (accountID: string, walletID: string): boolean => {
-  console.log(`Removing wallet with ID ${walletID} from account with ID ${accountID}`);
+export const removeWalletFromAccount = (accountId: string, walletId: string): boolean => {
+  console.log(`Removing wallet with ID ${walletId} from account with ID ${accountId}`);
 
-  const account = getAccountByID(accountID);
+  const account = getAccountById(accountId);
   if (!account) {
-    console.warn(`Account with ID ${accountID} not found.`);
+    console.warn(`Account with ID ${accountId} not found.`);
     return false;
   }
 
-  const walletIndex = account.wallets.findIndex(wallet => wallet.id === walletID);
+  const walletIndex = account.wallets.findIndex(wallet => wallet.id === walletId);
 
   if (walletIndex === -1) {
-    console.warn(`Wallet with ID ${walletID} not found in account.`);
+    console.warn(`Wallet with ID ${walletId} not found in account.`);
     return false;
   }
 
@@ -169,32 +169,32 @@ export const removeWalletFromAccount = (accountID: string, walletID: string): bo
   }
 
   account.wallets.splice(walletIndex, 1);
-  console.log(`Wallet with ID ${walletID} removed. Remaining wallets:`, account.wallets);
+  console.log(`Wallet with ID ${walletId} removed. Remaining wallets:`, account.wallets);
 
-  if (account.settings.activeWalletID === walletID) {
-    account.settings.activeWalletID = account.wallets[0].id;
-    console.log('Active wallet ID updated to:', account.settings.activeWalletID);
+  if (account.settings.activeWalletId === walletId) {
+    account.settings.activeWalletId = account.wallets[0].id;
+    console.log('Active wallet ID updated to:', account.settings.activeWalletId);
   }
 
-  saveAccountByID(account);
+  saveAccountById(account);
   console.log('Account updated successfully after wallet removal.');
   return true;
 };
 
 export const updateWallet = (
-  accountID: string,
-  walletID: string,
+  accountId: string,
+  walletId: string,
   updatedFields: Partial<WalletRecord>,
 ): boolean => {
-  const account = getAccountByID(accountID);
+  const account = getAccountById(accountId);
   if (!account) {
-    console.warn(`Account with ID ${accountID} not found.`);
+    console.warn(`Account with ID ${accountId} not found.`);
     return false;
   }
 
-  const walletIndex = account.wallets.findIndex(wallet => wallet.id === walletID);
+  const walletIndex = account.wallets.findIndex(wallet => wallet.id === walletId);
   if (walletIndex === -1) {
-    console.warn(`Wallet with ID ${walletID} not found in account.`);
+    console.warn(`Wallet with ID ${walletId} not found in account.`);
     return false;
   }
 
@@ -203,27 +203,27 @@ export const updateWallet = (
     ...updatedFields,
   };
 
-  saveAccountByID(account);
+  saveAccountById(account);
   return true;
 };
 
 export const updateAccountPassword = ({
-  accountID,
+  accountId,
   newPassword,
   oldPassword,
 }: {
-  accountID: string;
+  accountId: string;
   newPassword: string;
   oldPassword: string;
 }): boolean => {
-  const account = getAccountByID(accountID);
+  const account = getAccountById(accountId);
   if (!account) {
-    console.warn(`Account with ID ${accountID} not found.`);
+    console.warn(`Account with ID ${accountId} not found.`);
     return false;
   }
 
   // Validate the old password
-  const newHash = updatePassword(accountID, oldPassword, newPassword);
+  const newHash = updatePassword(accountId, oldPassword, newPassword);
   if (!newHash) {
     console.warn('Old password does not match.');
     return false;
@@ -241,6 +241,6 @@ export const updateAccountPassword = ({
 
   // Save updated wallet records to the account
   account.wallets = updatedWallets;
-  saveAccountByID(account);
+  saveAccountById(account);
   return true;
 };

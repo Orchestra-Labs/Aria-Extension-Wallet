@@ -1,4 +1,4 @@
-import { getAccountByID, getAccountIDByPassword, getAccounts, getWalletByID } from './account';
+import { getAccountById, getAccountIdByPassword, getAccounts, getWalletById } from './account';
 import { decryptMnemonic } from './crypto';
 import { clearLocalStorage } from './localStorage';
 import { getPasswordRecords } from './password';
@@ -48,20 +48,20 @@ export const tryAuthorizeAccess = async (
   const loginEnabled = userCanLogIn();
   if (!loginEnabled) return 'no_wallet';
 
-  const accountID = getAccountIDByPassword(password);
-  if (!accountID) {
+  const accountId = getAccountIdByPassword(password);
+  if (!accountId) {
     console.log('No matching account found in local storage.');
     return 'error';
   }
-  console.log('Account found:', accountID);
+  console.log('Account found:', accountId);
 
   try {
     console.log('Retrieving wallet');
-    const account = getAccountByID(accountID);
+    const account = getAccountById(accountId);
     if (!account) return 'error';
 
-    const walletID = account?.settings.activeWalletID;
-    const wallet = getWalletByID(account, walletID);
+    const walletId = account?.settings.activeWalletId;
+    const wallet = getWalletById(account, walletId);
     if (!wallet) return 'error';
 
     const mnemonic = decryptMnemonic(wallet.encryptedMnemonic, password);
@@ -69,7 +69,7 @@ export const tryAuthorizeAccess = async (
     console.log('Wallet retrieved:', decryptedWallet);
 
     console.log('Saving session data...');
-    await saveSessionData(decryptedWallet, accountID, persist);
+    await saveSessionData(decryptedWallet, accountId, persist);
 
     console.log('Authorization successful');
     return 'success';

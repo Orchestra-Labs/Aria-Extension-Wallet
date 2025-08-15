@@ -48,10 +48,10 @@ export const processIbcData = (
       const chain1Id = resolveChainId(fileData.chain_1.chain_name, chainRegistry);
       const chain2Id = resolveChainId(fileData.chain_2.chain_name, chainRegistry);
 
-      // Skip if chain IDs not found
+      // Skip if chain ds not found
       if (!chain1Id || !chain2Id) {
         // console.warn(
-        //   `Skipping - Could not resolve chain IDs for: ${fileData.chain_1.chain_name} or ${fileData.chain_2.chain_name}`,
+        //   `Skipping - Could not resolve chain Ids for: ${fileData.chain_1.chain_name} or ${fileData.chain_2.chain_name}`,
         // );
         continue;
       }

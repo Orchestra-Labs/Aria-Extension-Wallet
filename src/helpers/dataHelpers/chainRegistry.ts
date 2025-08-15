@@ -328,7 +328,7 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       [],
   );
   const networkName = chain.pretty_name || chain.chainName || 'Unknown';
-  const networkID = chain.chain_id || chain.chainId || 'Unknown';
+  const chainId = chain.chain_id || chain.chainId || 'Unknown';
 
   const result: Record<string, Asset> = {};
   for (const asset of assetlist.assets || []) {
@@ -353,7 +353,7 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       exponent,
       isFeeToken: feeTokens.has(base),
       networkName,
-      networkID,
+      chainId,
       coinGeckoId: asset.coingecko_id || undefined,
       price: 0,
     };
@@ -547,10 +547,10 @@ export const filterChainRegistryToSubscriptions = (
 
   const result: LocalChainRegistry = {};
 
-  for (const chainID in subscriptions) {
-    const viewAll = subscriptions[chainID].viewAll;
-    const wantedDenoms = subscriptions[chainID].subscribedDenoms;
-    const match = registry[chainID];
+  for (const chainId in subscriptions) {
+    const viewAll = subscriptions[chainId].viewAll;
+    const wantedDenoms = subscriptions[chainId].subscribedDenoms;
+    const match = registry[chainId];
 
     if (!match) continue;
 
@@ -560,7 +560,7 @@ export const filterChainRegistryToSubscriptions = (
           Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
         );
 
-    result[chainID] = {
+    result[chainId] = {
       ...match,
       assets: filteredAssets,
     };

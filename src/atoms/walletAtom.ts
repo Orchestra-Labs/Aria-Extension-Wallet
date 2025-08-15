@@ -69,10 +69,10 @@ export const hasNonZeroAssetsAtom = atom(get => {
   const allAssets = get(allWalletAssetsAtom);
   const networkLevel = get(networkLevelAtom);
   const chainRegistry = get(subscribedChainRegistryAtom);
-  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
+  const validChainIds = Object.keys(chainRegistry[networkLevel] || {});
 
   return allAssets.some(asset => {
-    if (!validChainIDs.includes(asset.networkID)) return false;
+    if (!validChainIds.includes(asset.chainId)) return false;
     const amountStr = asset.amount?.trim() || '0';
     const amount = Number(amountStr);
     return !isNaN(amount) && amount > 0;

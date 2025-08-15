@@ -12,15 +12,15 @@ type BalancesResponseDto = {
 
 export type RequestParams = {
   walletAddress: string;
-  chainID: string;
+  chainId: string;
 };
 
-const getBalancesRequest = async ({ walletAddress, chainID }: RequestParams) => {
+const getBalancesRequest = async ({ walletAddress, chainId }: RequestParams) => {
   console.log('[getBalancesRequest] walletAddress:', walletAddress);
-  console.log('[getBalancesRequest] chainID:', chainID);
+  console.log('[getBalancesRequest] chainId:', chainId);
 
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
-  const chain = chainRegistry.mainnet[chainID];
+  const chain = chainRegistry.mainnet[chainId];
   const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;
 

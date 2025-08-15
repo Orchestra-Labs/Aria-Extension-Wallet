@@ -34,6 +34,50 @@ export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   }
 };
 
+export const getRoute = async (
+  source_chain_id: string,
+  source_asset_denom: string,
+  dest_chain_id: string,
+  dest_asset_denom: string,
+  amount_in: string,
+  additionalParams?: Record<string, any>,
+): Promise<any> => {
+  try {
+    const requestBody = {
+      source_asset_denom,
+      source_asset_chain_id: source_chain_id,
+      dest_asset_denom,
+      dest_asset_chain_id: dest_chain_id,
+      amount_in,
+      allow_multi_tx: true,
+      allow_swaps: true,
+      smart_relay: true,
+      ...additionalParams,
+    };
+
+    console.log('[Skip API] Route Request:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(`${SKIP_GO_API_BASE}/fungible/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Skip API] Route Error:', response.status, errorData);
+      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const responseData = await response.json();
+    console.log('[Skip API] Route Success:', JSON.stringify(responseData, null, 2));
+    return responseData;
+  } catch (error) {
+    console.error('Skip Route API Error:', error);
+    throw error;
+  }
+};
+
 export const getMessagesDirect = async (
   source_chain_id: string,
   source_asset_denom: string,
@@ -107,15 +151,44 @@ export const executeSkipTransaction = async (
     const amountIn = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
     console.log('Amount in base denom:', amountIn);
 
-    const response = await getMessagesDirect(
-      sendState.chainID,
+    // First get the route
+    const routeResponse = await getRoute(
+      sendState.chainId,
       sendState.asset.denom,
-      receiveState.chainID,
+      receiveState.chainId,
+      receiveState.asset.denom,
+      amountIn,
+    );
+
+    if (!routeResponse.operations || routeResponse.operations.length === 0) {
+      throw new Error('No valid route found');
+    }
+
+    // If just simulating, return the route info
+    if (simulateTransaction) {
+      return {
+        success: true,
+        message: 'Route simulation successful',
+        data: {
+          code: 0,
+          txHash: 'simulated',
+          gasWanted: '0', // Will be updated after actual simulation
+          route: routeResponse,
+        },
+      };
+    }
+
+    // If actual transaction, proceed with getting messages
+    const response = await getMessagesDirect(
+      sendState.chainId,
+      sendState.asset.denom,
+      receiveState.chainId,
       receiveState.asset.denom,
       amountIn,
       walletState.address,
       recipientAddress || walletState.address,
-      '0.25', // 0.5% slippage
+      '0.25', // 0.25% slippage
+      { route: routeResponse }, // Pass the route info to msgs_direct
     );
 
     if (!response.msgs || response.msgs.length === 0) {
@@ -127,7 +200,7 @@ export const executeSkipTransaction = async (
       message: 'Transaction prepared',
       data: {
         code: 0,
-        txHash: simulateTransaction ? 'simulated' : '',
+        txHash: '',
         gasWanted: response.route?.estimated_gas_used?.toString() || '0',
         msgs: response.msgs,
         estimatedAmountOut: response.route?.estimated_amount_out,

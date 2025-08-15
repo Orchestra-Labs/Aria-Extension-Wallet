@@ -88,7 +88,7 @@ const performRpcQuery = async (
 
   try {
     let calculatedFee = fee;
-    let gasPrice = feeToken.gasPriceStep.average; // Start with average
+    let gasPrice = feeToken.gasPriceStep.low; // Start with low
     let attempts = 0;
     const maxAttempts = 2; // Try average first, then high if needed
 
@@ -166,7 +166,7 @@ const performRpcQuery = async (
           (error.message.includes('insufficient fee') || error.code === 13)
         ) {
           attempts++;
-          gasPrice = feeToken.gasPriceStep.high; // Switch to high gas price
+          gasPrice = feeToken.gasPriceStep.average; // Switch to average gas price
           calculatedFee = undefined; // Force recalculation
           console.log(`[queryNodes] Retrying with higher gas price: ${gasPrice}`);
           continue;

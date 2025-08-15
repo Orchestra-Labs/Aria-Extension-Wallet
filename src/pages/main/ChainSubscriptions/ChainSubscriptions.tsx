@@ -34,7 +34,7 @@ import {
 } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
 import { Asset, DenomSubscriptionRecord, LocalChainRegistry, SimplifiedChainInfo } from '@/types';
-import { saveAccountByID, getPrimaryFeeToken, getSymphonyChainId } from '@/helpers';
+import { saveAccountById, getPrimaryFeeToken, getSymphonyChainId } from '@/helpers';
 import { useDataProviderControls } from '@/data';
 import { useRefreshData } from '@/hooks';
 
@@ -214,7 +214,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     const updated = { ...current };
 
     for (const asset of chainAssets) {
-      const chainId = asset.networkID;
+      const chainId = asset.chainId;
       const denoms = updated[chainId].subscribedDenoms || [];
       const filtered = denoms.filter(d => d !== asset.denom);
       if (filtered.length === 0) {
@@ -262,10 +262,10 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
   };
 
   const handleSelectCoin = (coin: Asset) => {
-    const currentSelection = subscriptionSelections[networkLevel][coin.networkID] || {
+    const currentSelection = subscriptionSelections[networkLevel][coin.chainId] || {
       ...DEFAULT_DENOM_SUBSCRIPTION_RECORD,
     };
-    const chainId = coin.networkID;
+    const chainId = coin.chainId;
 
     if (currentSelection.subscribedDenoms.includes(coin.denom)) {
       // Coin is currently selected - deselect it
@@ -454,7 +454,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
       };
 
       setUserAccount(updatedUserAccount);
-      saveAccountByID(updatedUserAccount);
+      saveAccountById(updatedUserAccount);
     }
   };
 
@@ -505,7 +505,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     if (userAccount) {
       userAccount.settings.hasSetCoinList = initialSettings.hasSetCoinList;
       userAccount.settings.chainSubscriptions = initialSettings.chainSubscriptions;
-      saveAccountByID(userAccount);
+      saveAccountById(userAccount);
     }
 
     closeAndReturn();

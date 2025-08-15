@@ -3,7 +3,7 @@ import { useAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES, SettingsOption } from '@/constants';
 import { Button, Separator } from '@/ui-kit';
-import { saveAccountByID } from '@/helpers';
+import { saveAccountById } from '@/helpers';
 import { userAccountAtom } from '@/atoms';
 import { Header } from '@/components';
 
@@ -49,7 +49,7 @@ export const Settings: React.FC<SettingsProps> = () => {
       };
 
       setUserAccount(updatedAccount);
-      saveAccountByID(updatedAccount);
+      saveAccountById(updatedAccount);
     } else {
       console.warn('Settings or userAccount is undefined:', { config: tempSettings, userAccount });
     }

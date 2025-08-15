@@ -138,7 +138,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     slideTrayRef.current?.isOpen() && !noValidatorsSelected && !isTransactionInProgress;
 
   useEffect(() => {
-    // Use a ref to track the timeout ID
+    // Use a ref to track the timeout id
     const timeoutRef = { current: null as NodeJS.Timeout | null };
 
     const runSimulation = () => {

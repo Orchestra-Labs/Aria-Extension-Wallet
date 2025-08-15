@@ -63,7 +63,7 @@ export const defaultAssetAtom = atom(get => {
           return {
             ...registryAsset,
             amount: '0', // Default to zero if not in wallet
-            networkID: chain.chain_id,
+            chainId: chain.chain_id,
             networkName: chain.chain_name,
           };
         }
@@ -83,28 +83,13 @@ export const allReceivableAssetsAtom = atom(get => {
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
   const skipChains = get(skipChainsAtom);
 
-  console.log('[allReceivableAssetsAtom] Network level:', networkLevel);
-  console.log('[allReceivableAssetsAtom] Full registry chains:', Object.keys(fullRegistry));
-  console.log('[allReceivableAssetsAtom] Subscribed registry:', subscribedRegistry);
-  console.log('[allReceivableAssetsAtom] Skip chains:', skipChains);
-
   const allAssets: Asset[] = [];
   const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
-
-  console.log('[allReceivableAssetsAtom] Subscribed chain IDs:', Array.from(subscribedChainIds));
 
   // Process all chains in the full registry
   for (const [chainId, chainInfo] of Object.entries(fullRegistry)) {
     const isSkipSupported = skipChains.includes(chainId);
     const isSubscribed = subscribedChainIds.has(chainId);
-
-    console.log(`[allReceivableAssetsAtom] Processing chain ${chainId}`);
-    console.log('[allReceivableAssetsAtom] isSkipSupported:', isSkipSupported);
-    console.log('[allReceivableAssetsAtom] isSubscribed:', isSubscribed);
-    console.log(
-      '[allReceivableAssetsAtom] Chain assets:',
-      chainInfo.assets ? Object.keys(chainInfo.assets) : 'No assets',
-    );
 
     if (!isSkipSupported && !isSubscribed) {
       console.log('[allReceivableAssetsAtom] Skipping - neither Skip-supported nor subscribed');
@@ -117,7 +102,7 @@ export const allReceivableAssetsAtom = atom(get => {
       allAssets.push({
         ...asset,
         amount: '0', // Default to 0 since we don't need balances
-        networkID: chainInfo.chain_id,
+        chainId: chainInfo.chain_id,
         networkName: chainInfo.chain_name,
         isIbc: false, // Default false unless we have IBC info from registry
       });

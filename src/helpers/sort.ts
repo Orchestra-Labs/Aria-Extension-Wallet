@@ -40,8 +40,8 @@ function sortAssets(
     const valueB = getSortValue(b, sortType);
 
     if (sortType === AssetSortType.NAME && lowercasedSearchTerm) {
-      const aFields = [a.name, a.networkName, a.networkID].map(f => safeTrimLowerCase(f));
-      const bFields = [b.name, b.networkName, b.networkID].map(f => safeTrimLowerCase(f));
+      const aFields = [a.name, a.networkName, a.chainId].map(f => safeTrimLowerCase(f));
+      const bFields = [b.name, b.networkName, b.chainId].map(f => safeTrimLowerCase(f));
 
       const aMatches = aFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
       const bMatches = bFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
@@ -54,7 +54,7 @@ function sortAssets(
         return bTotalMatches - aTotalMatches;
       }
 
-      // Then sort by individual field matches in order: name, networkName, networkID
+      // Then sort by individual field matches in order: name, networkName, chainId
       for (let i = 0; i < aMatches.length; i++) {
         if (aMatches[i] !== bMatches[i]) {
           return bMatches[i] - aMatches[i];
@@ -69,10 +69,8 @@ function sortAssets(
       }
 
       // If still tied, prioritize Symphony assets
-      const aIsSymphony =
-        a.networkID === SYMPHONY_MAINNET_ID || a.networkID === SYMPHONY_TESTNET_ID;
-      const bIsSymphony =
-        b.networkID === SYMPHONY_MAINNET_ID || b.networkID === SYMPHONY_TESTNET_ID;
+      const aIsSymphony = a.chainId === SYMPHONY_MAINNET_ID || a.chainId === SYMPHONY_TESTNET_ID;
+      const bIsSymphony = b.chainId === SYMPHONY_MAINNET_ID || b.chainId === SYMPHONY_TESTNET_ID;
       if (aIsSymphony !== bIsSymphony) {
         return aIsSymphony ? -1 : 1;
       }
@@ -104,7 +102,7 @@ export function filterAndSortAssets(
         safeTrimLowerCase(asset.symbol).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.denom).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.networkName).includes(lowercasedSearchTerm) ||
-        safeTrimLowerCase(asset.networkID).includes(lowercasedSearchTerm)
+        safeTrimLowerCase(asset.chainId).includes(lowercasedSearchTerm)
       );
     }
     return true;

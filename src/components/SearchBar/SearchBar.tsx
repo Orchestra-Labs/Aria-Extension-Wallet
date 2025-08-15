@@ -10,7 +10,7 @@ interface SearchBarProps {
 }
 
 const PLACEHOLDERS = {
-  chain: 'Search by chain name, ID, or supported coins...',
+  chain: 'Search by chain name, id, or supported coins...',
   asset: 'Search by asset name or symbol...',
   validator: 'Search by validator name...',
 };

@@ -77,7 +77,7 @@ const useAssetKeys = (assets: Asset[]) => {
       // Stringify all identifiable properties as a base key
       const propertiesKey = JSON.stringify({
         denom: asset.denom,
-        networkID: asset.networkID,
+        chainId: asset.chainId,
         amount: asset.amount,
         isIbc: asset.isIbc,
         symbol: asset.symbol,

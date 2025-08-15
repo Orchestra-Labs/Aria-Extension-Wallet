@@ -72,8 +72,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;
 
-  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
-  const networkWalletAssets = walletAssets.filter(asset => validChainIDs.includes(asset.networkID));
+  const validChainIds = Object.keys(chainRegistry[networkLevel] || {});
+  const networkWalletAssets = walletAssets.filter(asset => validChainIds.includes(asset.chainId));
 
   // Check if Symphony chain is subscribed
   const isSymphonySubscribed = useMemo(() => {
