@@ -8,6 +8,7 @@ import {
   skipChainsAtom,
   subscribedChainRegistryAtom,
 } from './chainRegistryAtom';
+import { receiveStateAtom } from './transactionStateAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
 
@@ -82,6 +83,9 @@ export const allReceivableAssetsAtom = atom(get => {
   const fullRegistry = get(fullChainRegistryAtom)[networkLevel];
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
   const skipChains = get(skipChainsAtom);
+  const receiveState = get(receiveStateAtom);
+
+  const receiveChainId = receiveState.chainId;
 
   // We'll track both by denom and symbol for uniqueness
   const assetsByDenom = new Map<string, Asset>();
@@ -141,7 +145,7 @@ export const allReceivableAssetsAtom = atom(get => {
           finalAssets.push({
             ...asset,
             amount: '0',
-            chainId: chainInfo.chain_id,
+            chainId: receiveChainId || chainInfo.chain_id,
             networkName: chainInfo.chain_name,
             isIbc: false,
           });
