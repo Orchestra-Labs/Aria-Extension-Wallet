@@ -83,7 +83,8 @@ export const allReceivableAssetsAtom = atom(get => {
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
   const skipChains = get(skipChainsAtom);
 
-  const allAssets: Asset[] = [];
+  const uniqueAssets = new Map<string, Asset>(); // Using denom as key to ensure uniqueness
+
   const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
 
   // Process all chains in the full registry
@@ -99,15 +100,20 @@ export const allReceivableAssetsAtom = atom(get => {
     const chainAssets = Object.values(chainInfo.assets || {});
 
     for (const asset of chainAssets) {
-      allAssets.push({
-        ...asset,
-        amount: '0', // Default to 0 since we don't need balances
-        chainId: chainInfo.chain_id,
-        networkName: chainInfo.chain_name,
-        isIbc: false, // Default false unless we have IBC info from registry
-      });
+      // Only add the asset if we haven't seen this denom before
+      if (!uniqueAssets.has(asset.denom)) {
+        uniqueAssets.set(asset.denom, {
+          ...asset,
+          amount: '0', // Default to 0 since we don't need balances
+          chainId: chainInfo.chain_id,
+          networkName: chainInfo.chain_name,
+          isIbc: false, // Default false unless we have IBC info from registry
+        });
+      }
     }
   }
 
-  return allAssets;
+  const uniqueDenomArray = Array.from(uniqueAssets.values());
+  console.log('[allReceivableAssetsAtom] Unique denoms returned:', uniqueDenomArray);
+  return uniqueDenomArray;
 });
