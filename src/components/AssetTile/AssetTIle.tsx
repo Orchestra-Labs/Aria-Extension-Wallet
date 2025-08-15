@@ -42,6 +42,7 @@ export const AssetTile = ({
   const navigate = useNavigate();
   const pathname = useLocation().pathname;
 
+  // TODO: dialogSelectedAssetAtom only used here.  make state instead of atom
   const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);

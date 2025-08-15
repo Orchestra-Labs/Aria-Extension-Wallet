@@ -104,13 +104,12 @@ export const CreateWallet = () => {
     setRandomHiddenIndexes(getRandomIndexes());
   }, [use24Words]);
 
-  // TODO: add error message to send page to show why button is disabled
   // TODO: add saved addresses (name and address)
 
   // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
 
-  // TODO: Add first level of routing (swap to IBC send or IBC to swap)
+  // TODO: Add first level of transaction routing (swap to IBC send or IBC to swap)
   // TODO: fix copytextfield issue of enlarged border on click
   // TODO: Add remember me
 
@@ -142,8 +141,6 @@ export const CreateWallet = () => {
   // TODO: add link to github repo for registry
   // TODO: Add routing
   // TODO: modify claim, restake, and unstake functions to withdraw from all unique delegator addresses
-  // TODO: enable search function for wallet asset list by chain (on top of current functionality)
-  // TODO: enable search function to validator list by chain (on top of current functionality)
   // TODO: add show/hide function to validator list (by chain)
 
   /* dApp TODOs */
@@ -156,8 +153,6 @@ export const CreateWallet = () => {
 
   /* Nice to have TODOs */
   // TODO: get google analytics going
-  // TODO: fix issue with gas on 'all' button for validator selections (bundle transactions)
-  // TODO: clean up helper functions and hooks
   // TODO: keep track of current page for case of re-open before timeout and for close of options pages
   // TODO: make data text in asset and validator tiles scrollable
   // TODO: ensure logout after blur + timeout (blur is click outside application to close).  to remove sensitive data after time period
