@@ -371,8 +371,9 @@ const ValidatorTileComponent = ({
                     {theoreticalApr
                       ? parseFloat(theoreticalApr) == 0
                         ? 'Not found'
-                        : parseFloat(theoreticalApr)
-                      : 'Not Found'}
+                        : `${parseFloat(theoreticalApr)}%`
+                      : 'Not Found'}{' '}
+                    p.a.
                   </span>
                 }
               />
@@ -383,7 +384,7 @@ const ValidatorTileComponent = ({
                     {uptime
                       ? parseFloat(uptime) == 0
                         ? 'Not Found'
-                        : parseFloat(uptime)
+                        : `${parseFloat(uptime)}% uptime`
                       : 'Not Found'}
                   </span>
                 }
