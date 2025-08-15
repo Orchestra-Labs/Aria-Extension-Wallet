@@ -60,7 +60,6 @@ export const AssetTile = ({
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  // TODO: some IBC assets come through with no name.  need to parse those based on others that match on denom
   const title = asset?.name || asset?.denom || 'Unknown Asset';
   const symbol = asset?.symbol || asset?.denom || '???';
   const denom = asset?.denom || 'unknown';

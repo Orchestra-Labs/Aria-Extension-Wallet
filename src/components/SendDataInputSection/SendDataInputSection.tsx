@@ -143,6 +143,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         ...prev,
         amount: newState.receiveAmount,
         asset: newState.receiveAsset,
+        chainId: receiveState.chainId, // receive chain id only changes via address
       }));
     }
 
