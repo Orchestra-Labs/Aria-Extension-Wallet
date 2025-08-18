@@ -12,7 +12,10 @@ export const isValidSwap = ({
   sendAsset: Asset;
   receiveAsset: Asset;
 }) => {
-  const result = !sendAsset.isIbc && !receiveAsset.isIbc && sendAsset.denom !== receiveAsset.denom;
+  const result =
+    !sendAsset.isIbc &&
+    !receiveAsset.isIbc &&
+    (sendAsset.originDenom || sendAsset.denom) !== (receiveAsset.originDenom || receiveAsset.denom);
 
   return result;
 };
@@ -93,21 +96,22 @@ export const swapTransaction = async (
 ): Promise<TransactionResult> => {
   console.log('Attempting swap with object:', swapObject);
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
+  const sendObject = swapObject.sendObject;
 
   const messages = [
     swapSend({
       fromAddress,
-      toAddress: swapObject.sendObject.recipientAddress,
+      toAddress: sendObject.recipientAddress,
       offerCoin: {
-        denom: swapObject.sendObject.denom,
-        amount: swapObject.sendObject.amount,
+        denom: sendObject.denom,
+        amount: sendObject.amount,
       },
       askDenom: swapObject.resultDenom,
     }),
   ];
 
   try {
-    const feeToken = swapObject.sendObject.feeToken;
+    const feeToken = sendObject.feeToken;
     console.log('Swap fee token:', feeToken);
     const response = await queryRpcNode({
       endpoint,

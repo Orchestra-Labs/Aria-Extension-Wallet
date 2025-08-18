@@ -35,8 +35,8 @@ export function useExchangeRate() {
 
   const sendAsset = sendState.asset;
   const receiveAsset = receiveState.asset;
-  const sendDenom = sendState.asset.denom;
-  const receiveDenom = receiveState.asset.denom;
+  const sendDenom = sendAsset.originDenom || sendAsset.denom;
+  const receiveDenom = receiveAsset.originDenom || receiveAsset.denom;
 
   // Check if swap is valid
   const validSwap = isValidSwap({ sendAsset, receiveAsset });

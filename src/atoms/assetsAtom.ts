@@ -1,14 +1,17 @@
 import { DEFAULT_MAINNET_ASSET, DEFAULT_TESTNET_ASSET } from '@/constants';
-import { Asset } from '@/types';
+import { Asset, AssetRegistry, SimplifiedChainInfo } from '@/types';
 import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import {
+  chainInfoAtom,
   fullChainRegistryAtom,
   skipChainsAtom,
   subscribedChainRegistryAtom,
 } from './chainRegistryAtom';
 import { receiveStateAtom } from './transactionStateAtom';
+import { getSkipSupportedAssets } from '@/helpers';
+import { sessionWalletAtom } from './walletAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
 
@@ -76,6 +79,16 @@ export const defaultAssetAtom = atom(get => {
   return networkLevel === 'mainnet' ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 });
 
+export const skipAssetsAtom = atom<AssetRegistry>({});
+export const loadSkipAssetsAtom = atom(null, async (_, set) => {
+  try {
+    const assetRegistry = await getSkipSupportedAssets();
+    set(skipAssetsAtom, assetRegistry);
+  } catch (error) {
+    console.error('[loadSkipAssetsAtom] Failed to load Skip assets:', error);
+  }
+});
+
 // TODO: add Symphony's stablecoins
 // NOTE: Pure registry assets without wallet balances (for receive context)
 export const allReceivableAssetsAtom = atom(get => {
@@ -84,10 +97,22 @@ export const allReceivableAssetsAtom = atom(get => {
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
   const skipChains = get(skipChainsAtom);
   const receiveState = get(receiveStateAtom);
+  const getChainInfo = get(chainInfoAtom);
+  const { chainWallets } = get(sessionWalletAtom);
 
   const receiveChainId = receiveState.chainId;
+  const receiveChain = getChainInfo(receiveChainId);
+  const allWalletAssets = Object.values(chainWallets).flatMap(wallet => wallet.assets);
 
-  // We'll track both by denom and symbol for uniqueness
+  // Create a map of wallet assets by denom for quick lookup
+  const walletAssetsByDenom = new Map<string, Asset>();
+  for (const walletAsset of allWalletAssets) {
+    walletAssetsByDenom.set(walletAsset.denom, walletAsset);
+    if (walletAsset.originDenom) {
+      walletAssetsByDenom.set(walletAsset.originDenom, walletAsset);
+    }
+  }
+
   const assetsByDenom = new Map<string, Asset>();
   const assetsBySymbol = new Map<string, Asset>();
   let finalAssets: Asset[] = [];
@@ -95,35 +120,53 @@ export const allReceivableAssetsAtom = atom(get => {
   const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
 
   // Process all chains in the full registry
+  const createAssetEntry = (asset: any, chainInfo: SimplifiedChainInfo): Asset => {
+    // Try to find matching wallet asset to enhance with IBC info
+    const walletAsset =
+      walletAssetsByDenom.get(asset.denom) || walletAssetsByDenom.get(asset.originDenom || '');
+
+    return {
+      denom: asset.denom,
+      amount: '0',
+      exchangeRate: asset.exchangeRate || '-',
+      isIbc: walletAsset?.isIbc || false,
+      logo: asset.logo,
+      symbol: asset.symbol,
+      name: asset.name,
+      exponent: asset.exponent,
+      isFeeToken: asset.isFeeToken,
+      networkName: receiveChain.chain_name,
+      chainId: receiveChain.chain_id,
+      coinGeckoId: asset.coinGeckoId,
+      price: asset.price || 0,
+      originDenom: walletAsset?.originDenom || asset.originDenom || asset.denom,
+      originChainId: walletAsset?.originChainId || asset.originChainId || chainInfo.chain_id,
+      trace: walletAsset?.trace || asset.trace,
+    };
+  };
+
   for (const [chainId, chainInfo] of Object.entries(fullRegistry)) {
-    const isSkipSupported = skipChains.includes(chainId);
+    const isSkipSupportedChain = skipChains.includes(chainId);
     const isSubscribed = subscribedChainIds.has(chainId);
 
-    if (!isSkipSupported && !isSubscribed) {
+    if (!isSkipSupportedChain && !isSubscribed) {
       console.log('[allReceivableAssetsAtom] Skipping - neither Skip-supported nor subscribed');
       continue;
     }
 
     const chainAssets = Object.values(chainInfo.assets || {});
-
     for (const asset of chainAssets) {
-      const existingByDenom = assetsByDenom.get(asset.denom);
+      const assetDenom = asset.originDenom || asset.denom;
+      const existingByDenom = assetsByDenom.get(assetDenom);
       const existingBySymbol = assetsBySymbol.get(asset.symbol);
-
-      // Check if this asset is preferred over existing ones
-      const isPreferredDenom = asset.denom === `u${asset.symbol.toLowerCase()}`;
+      const isPreferredDenom = assetDenom === `u${asset.symbol.toLowerCase()}`;
 
       // Case 1: Neither denom nor symbol exists yet
       if (!existingByDenom && !existingBySymbol) {
-        assetsByDenom.set(asset.denom, asset);
-        assetsBySymbol.set(asset.symbol, asset);
-        finalAssets.push({
-          ...asset,
-          amount: '0',
-          chainId: chainInfo.chain_id,
-          networkName: chainInfo.chain_name,
-          isIbc: false,
-        });
+        const newAsset = createAssetEntry(asset, chainInfo);
+        assetsByDenom.set(assetDenom, newAsset);
+        assetsBySymbol.set(asset.symbol, newAsset);
+        finalAssets.push(newAsset);
       }
       // Case 2: Only denom exists, but symbol is new
       else if (existingByDenom && !existingBySymbol) {
@@ -137,18 +180,15 @@ export const allReceivableAssetsAtom = atom(get => {
           // Remove old symbol entry
           const oldAsset = existingBySymbol;
           assetsBySymbol.delete(oldAsset.symbol);
-          finalAssets = finalAssets.filter(a => a.denom !== oldAsset.denom);
+          finalAssets = finalAssets.filter(
+            a => (a.originDenom || a.denom) !== (oldAsset.originDenom || oldAsset.denom),
+          );
 
           // Add new preferred asset
-          assetsByDenom.set(asset.denom, asset);
-          assetsBySymbol.set(asset.symbol, asset);
-          finalAssets.push({
-            ...asset,
-            amount: '0',
-            chainId: receiveChainId || chainInfo.chain_id,
-            networkName: chainInfo.chain_name,
-            isIbc: false,
-          });
+          const newAsset = createAssetEntry(asset, chainInfo);
+          assetsByDenom.set(assetDenom, newAsset);
+          assetsBySymbol.set(asset.symbol, newAsset);
+          finalAssets.push(newAsset);
         }
       }
       // Case 4: Both denom and symbol exist (conflict)
@@ -161,22 +201,19 @@ export const allReceivableAssetsAtom = atom(get => {
 
           if (!oldDenomAsset || !oldSymbolAsset) continue;
 
-          assetsByDenom.delete(oldDenomAsset.denom);
+          assetsByDenom.delete(oldDenomAsset.originDenom || oldDenomAsset.denom);
           assetsBySymbol.delete(oldSymbolAsset.symbol);
           finalAssets = finalAssets.filter(
-            a => a.denom !== oldDenomAsset.denom && a.symbol !== oldSymbolAsset.symbol,
+            a =>
+              (a.originDenom || a.denom) !== (oldDenomAsset.originDenom || oldDenomAsset.denom) &&
+              a.symbol !== oldSymbolAsset.symbol,
           );
 
           // Add new preferred asset
-          assetsByDenom.set(asset.denom, asset);
-          assetsBySymbol.set(asset.symbol, asset);
-          finalAssets.push({
-            ...asset,
-            amount: '0',
-            chainId: chainInfo.chain_id,
-            networkName: chainInfo.chain_name,
-            isIbc: false,
-          });
+          const newAsset = createAssetEntry(asset, chainInfo);
+          assetsByDenom.set(assetDenom, newAsset);
+          assetsBySymbol.set(asset.symbol, newAsset);
+          finalAssets.push(newAsset);
         }
       }
     }

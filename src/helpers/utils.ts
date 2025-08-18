@@ -1,8 +1,6 @@
-import { Asset, SimplifiedChainInfo, TransactionState } from '@/types';
+import { Asset, SimplifiedChainInfo, TransactionDetails, TransactionState } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { isValidSwap } from './swapTransactions';
-import { isValidSend } from './sendTransactions';
 import {
   DEFAULT_MAINNET_ASSET,
   DEFAULT_TESTNET_ASSET,
@@ -52,31 +50,6 @@ export const getRegexForDecimals = (exponent: number) => {
   return new RegExp(`^\\d*\\.?\\d{0,${exponent}}$`);
 };
 
-export const isValidTransaction = async ({
-  sendAddress,
-  recipientAddress,
-  sendState,
-  receiveState,
-}: {
-  sendAddress: string;
-  recipientAddress: string;
-  sendState: TransactionState;
-  receiveState: TransactionState;
-}) => {
-  if (!(sendAddress && recipientAddress)) {
-    return false;
-  }
-
-  const sendAsset = sendState.asset;
-  const receiveAsset = receiveState.asset;
-
-  const isSwap = isValidSwap({ sendAsset, receiveAsset });
-  const isSend = isValidSend({ sendAsset, receiveAsset });
-  const result = isSend || isSwap;
-
-  return result;
-};
-
 export const calculateRemainingTime = (completionTime: string): string => {
   const now = new Date();
   const endTime = new Date(completionTime);
@@ -102,7 +75,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   if (chainFeeList.length > 0) {
     const primaryFeeDenom = chainFeeList[0].denom;
     const matchingAsset = Object.values(chain.assets).find(
-      asset => asset.denom === primaryFeeDenom,
+      asset => asset.denom === primaryFeeDenom, // check against current denom
     );
 
     if (matchingAsset) {
@@ -123,7 +96,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   if (firstAsset) {
     console.log(
       `[Utils] Using first asset as fallback for chain ${chain.chain_id}:`,
-      firstAsset.denom,
+      firstAsset.denom, // check against current denom
     );
     return firstAsset;
   }
@@ -140,18 +113,63 @@ export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
 
-export const getTransactionType = (
-  isIBC: boolean,
-  isSwap: boolean,
-  isValid: boolean,
-): TransactionType => {
-  if (!isValid) return TransactionType.INVALID;
+export const categorizeTransaction = async ({
+  sendAddress,
+  recipientAddress,
+  sendState,
+  receiveState,
+  isSend = false,
+  isIBC = false,
+  isSwap = false,
+  isExchange = false,
+}: {
+  sendAddress: string;
+  recipientAddress: string;
+  sendState: TransactionState;
+  receiveState: TransactionState;
+  isSend?: boolean;
+  isIBC?: boolean;
+  isSwap?: boolean;
+  isExchange?: boolean;
+}): Promise<TransactionDetails> => {
+  // Basic validation
+  if (!(sendAddress && recipientAddress)) {
+    return {
+      type: TransactionType.INVALID,
+      isValid: false,
+      isIBC: false,
+      isSwap: false,
+      isExchange: false,
+    };
+  }
 
-  if (isIBC && isSwap) return TransactionType.IBC_SWAP;
+  const sendAsset = sendState.asset;
+  const receiveAsset = receiveState.asset;
 
-  if (isIBC) return TransactionType.IBC_SEND;
+  // Validate the transaction type
+  const isValid = sendAsset && receiveAsset && (isSend || isIBC || isSwap || isExchange);
 
-  if (isSwap) return TransactionType.SWAP;
+  // Determine transaction type
+  let type: TransactionType;
+  if (!isValid) {
+    type = TransactionType.INVALID;
+  } else if (isExchange) {
+    type = TransactionType.EXCHANGE;
+  } else if (isIBC && isSwap) {
+    type = TransactionType.IBC_SWAP;
+  } else if (isIBC) {
+    type = TransactionType.IBC_SEND;
+  } else if (isSwap) {
+    type = TransactionType.SWAP;
+  } else {
+    type = TransactionType.SEND;
+  }
 
-  return TransactionType.SEND;
+  return {
+    type,
+    isValid,
+    isIBC,
+    isSwap,
+    isExchange,
+  };
 };

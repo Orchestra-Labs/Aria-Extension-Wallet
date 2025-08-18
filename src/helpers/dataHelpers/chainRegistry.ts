@@ -356,6 +356,8 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       chainId,
       coinGeckoId: asset.coingecko_id || undefined,
       price: 0,
+      originDenom: base,
+      originChainId: chainId,
     };
   }
 

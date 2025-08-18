@@ -18,7 +18,8 @@ import { TransactionStatus } from '@/constants';
 import { Asset, IBCObject, SendObject, TransactionResult, TransactionState } from '@/types';
 import { handleTransactionError, handleTransactionSuccess } from '@/helpers/transactionHandlers';
 import {
-  executeSkipTransaction,
+  getRoute,
+  getTransactionMessages,
   getValidIBCChannel,
   sendIBCTransaction,
   sendTransaction,
@@ -80,6 +81,31 @@ export const useSendActions = () => {
     }
   };
 
+  const executeStablecoinSwap = async ({
+    sendObject,
+    receiveAsset,
+    simulateTransaction,
+  }: {
+    sendObject: SendObject;
+    receiveAsset: Asset;
+    simulateTransaction: boolean;
+  }): Promise<TransactionResult> => {
+    console.group('[executeSwap] Starting stablecoin swap transaction');
+    try {
+      // Fall back to direct swap if Skip fails or not simulation
+      const swapParams = {
+        sendObject,
+        resultDenom: receiveAsset.denom, // need to use current denom here so it fails if ibc
+      };
+      const sendChain = getChainInfo(sendState.chainId);
+      const restUris = sendChain.rest_uris;
+
+      return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
+    } finally {
+      console.groupEnd();
+    }
+  };
+
   const executeIBC = async ({
     sendObject,
     simulateTransaction,
@@ -89,64 +115,6 @@ export const useSendActions = () => {
   }): Promise<TransactionResult> => {
     console.group('[useSendActions] executeIBC - Starting IBC transaction');
     try {
-      console.log('[useSendActions] Checking if both chains are supported by Skip');
-      const bothChainsSupported =
-        skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
-
-      if (bothChainsSupported) {
-        console.log('[useSendActions] Both chains supported by Skip, using Skip API');
-        console.log('[useSendActions] Calling executeSkipTransaction with params:', {
-          sendState,
-          receiveState,
-          walletState,
-          recipientAddress,
-          simulateTransaction,
-        });
-
-        const skipResult = await executeSkipTransaction(
-          sendState,
-          receiveState,
-          walletState,
-          recipientAddress,
-          simulateTransaction,
-        );
-
-        console.log('[useSendActions] Skip API result:', JSON.stringify(skipResult, null, 2));
-
-        if (skipResult.success) {
-          if (simulateTransaction && skipResult.data?.route) {
-            console.log('[useSendActions] Processing simulation result from Skip route');
-            const routeInfo = skipResult.data.route;
-            const estimatedGas =
-              routeInfo.estimated_fees?.reduce(
-                (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-                0,
-              ) || '0';
-
-            console.log('[useSendActions] Estimated gas from route:', estimatedGas);
-
-            return {
-              ...skipResult,
-              data: {
-                ...skipResult.data,
-                gasWanted: estimatedGas,
-              },
-            };
-          }
-          console.log('[useSendActions] Skip transaction successful');
-          return skipResult;
-        } else {
-          console.log('[useSendActions] Skip API failed, falling back to direct IBC');
-        }
-      } else {
-        console.log('[useSendActions] One or both chains not supported by Skip:', {
-          sendChainSupported: skipChains.includes(sendState.chainId),
-          receiveChainSupported: skipChains.includes(receiveState.chainId),
-        });
-      }
-
-      // Fallback to direct IBC
-      console.log('[useSendActions] Attempting direct IBC fallback');
       const sendChain = getChainInfo(sendState.chainId);
       console.log('[useSendActions] Getting valid IBC channel for:', {
         sendChain: sendChain.chain_id,
@@ -186,37 +154,123 @@ export const useSendActions = () => {
         rpcUris: sendChain.rpc_uris,
         simulateOnly: simulateTransaction,
       });
+    } catch (error) {
+      console.error('IBC transaction failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'IBC transaction failed',
+      };
     } finally {
       console.groupEnd();
     }
   };
 
-  const executeSwap = async ({
+  const executeSkipTx = async ({
     sendObject,
-    receiveAsset,
+    receiveAssetDenom,
     simulateTransaction,
   }: {
     sendObject: SendObject;
-    receiveAsset: Asset;
+    receiveAssetDenom: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[executeSwap] Starting swap transaction');
+    console.group('[executeSkipTx] Starting IBC via Skip');
+    console.log('[executeSkipTx] Send Object', sendObject);
+    console.log('[executeSkipTx] Receive Asset Denom', receiveAssetDenom);
     try {
-      // Fall back to direct swap if Skip fails or not simulation
-      const swapParams = {
-        sendObject,
-        resultDenom: receiveAsset.denom,
-      };
-      const sendChain = getChainInfo(sendState.chainId);
-      const restUris = sendChain.rest_uris;
+      const amountIn = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
 
-      return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
+      // First get the route
+      const routeResponse = await getRoute(
+        sendState.chainId,
+        sendObject.denom, // need to use current denom here whether ibc or original
+        receiveState.chainId,
+        receiveAssetDenom,
+        amountIn,
+        { allow_multi_tx: true, allow_swaps: false },
+      );
+
+      console.log('[executeSkipTx] Route response:', JSON.stringify(routeResponse, null, 2));
+
+      if (!routeResponse.operations?.length) {
+        throw new Error('No valid IBC route found');
+      }
+
+      // Log each operation step
+      routeResponse.operations.forEach((operation: any) => {
+        const operationType = Object.keys(operation)[0]; // e.g. "axelar_transfer", "swap"
+        const operationData = operation[operationType];
+
+        let stepDescription = '';
+        let feeInfo = null;
+
+        if (operationType === 'swap') {
+          stepDescription = `Swap ${sendObject.denom} into ${operationData.denom_out} on ${operationData.chain_id}`;
+        } else {
+          stepDescription = `${operationType} ${operationData.from_chain} to ${operationData.to_chain}`;
+          feeInfo = {
+            amount: operationData.fee_amount as string,
+            denom: (operationData.fee_asset?.symbol || 'unknown') as string,
+          };
+        }
+
+        addLogEntry({
+          description: stepDescription,
+          status: TransactionStatus.LOADING,
+          routeStep: {
+            operationType,
+            fromChain: operationData.from_chain_id || operationData.chain_id,
+            toChain: operationData.to_chain_id || operationData.chain_id,
+            asset: operationData.asset || operationData.denom_in,
+            estimatedFee: feeInfo || undefined,
+          },
+        });
+      });
+
+      const addressList = routeResponse.required_chain_addresses.map(() => walletState.address);
+      const messagesResponse = await getTransactionMessages(
+        sendState.chainId,
+        sendObject.denom, // need to use current denom here whether ibc or original
+        receiveState.chainId,
+        receiveAssetDenom,
+        amountIn,
+        addressList,
+        routeResponse.operations,
+        routeResponse.estimated_amount_out,
+        '0.25',
+      );
+
+      // Calculate total fees
+      const totalFees =
+        routeResponse.estimated_fees?.reduce(
+          (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+          0,
+        ) || 0;
+
+      return {
+        success: true,
+        message: simulateTransaction ? 'Transaction simulation successful' : 'Transaction prepared',
+        data: {
+          code: 0,
+          txHash: simulateTransaction ? 'simulated' : '',
+          gasWanted: totalFees.toString(),
+          route: routeResponse,
+          estimatedAmountOut: routeResponse.estimated_amount_out,
+          fees: routeResponse.estimated_fees,
+          messages: messagesResponse.msgs,
+          minAmountOut: messagesResponse.min_amount_out,
+        },
+      };
+    } catch (error) {
+      console.error('IBC via Skip failed:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'IBC via Skip failed',
+      };
     } finally {
       console.groupEnd();
     }
   };
-
-  // TODO: add executeexchange function to handle coin to coin (not our stablecoins)
 
   const formatTransactionDescription = (
     sendState: TransactionState,
@@ -247,6 +301,7 @@ export const useSendActions = () => {
     const hasExistingEntries = transactionLog.entries.length > 0;
     console.log('[useSendActions] Existing transaction log entries:', hasExistingEntries);
 
+    // TODO: move add log entry lines to the execute functions?  Need to be able to query for them AND update them
     // Log entry handling
     let logIndex = 0;
     if (!hasExistingEntries) {
@@ -283,7 +338,7 @@ export const useSendActions = () => {
       const sendObject = {
         recipientAddress: recipientAddress || walletState.address,
         amount: adjustedAmount,
-        denom: sendState.asset.denom,
+        denom: sendState.asset.denom, // need to use current denom here whether ibc or original
         feeToken: feeState.feeToken,
       };
 
@@ -294,13 +349,30 @@ export const useSendActions = () => {
         isValid: transactionType.isValid,
       });
 
+      // Check Skip support first
+      const bothChainsSupported =
+        skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
+      console.log('[useSendActions] Both chains supported by Skip:', bothChainsSupported);
+
       let result: TransactionResult;
       if (transactionType.isIBC) {
         console.log('[useSendActions] Executing IBC transfer path');
-        result = await executeIBC({ sendObject, simulateTransaction: isSimulation });
+        result = bothChainsSupported
+          ? await executeSkipTx({
+              sendObject,
+              receiveAssetDenom: receiveState.asset.denom, // need to use current denom here regardless of if original chain or ibc
+              simulateTransaction: isSimulation,
+            })
+          : await executeIBC({ sendObject, simulateTransaction: isSimulation });
+      } else if (transactionType.isExchange) {
+        result = await executeSkipTx({
+          sendObject,
+          receiveAssetDenom: receiveState.asset.denom, // need to use current denom here regardless of if original chain or ibc
+          simulateTransaction: isSimulation,
+        });
       } else if (transactionType.isSwap) {
         console.log('[useSendActions] Executing swap path');
-        result = await executeSwap({
+        result = await executeStablecoinSwap({
           sendObject,
           simulateTransaction: isSimulation,
           receiveAsset: receiveState.asset,

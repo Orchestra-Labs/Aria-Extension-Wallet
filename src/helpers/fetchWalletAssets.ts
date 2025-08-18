@@ -74,6 +74,7 @@ const resolveIbcAsset = async (ibcDenom: string, prefix: string, restUris: Uri[]
     return {
       baseDenom: safeTrimLowerCase(response.denom_trace.base_denom),
       path: response.denom_trace.path || '',
+      originChainId: response.denom_trace.path?.split('/')[2] || '',
     };
   } catch (error) {
     console.error(`Error resolving IBC denom ${ibcDenom}:`, error);
@@ -182,22 +183,26 @@ export async function fetchWalletAssets(
       console.log(`[fetchWalletAssets ${chainId}] Processing denom: ${denom}`);
       let baseDenom = denom;
       let isIbc = false;
-      let ibcDenom: string = denom;
+      let originDenom = denom;
+      let originChainId = chainId;
+      let trace = '';
 
       // Handle IBC assets
       if (denom.startsWith(IBC_PREFIX)) {
         console.log(`[fetchWalletAssets ${chainId}] Detected IBC denom: ${denom}`);
         try {
-          const { baseDenom: resolvedDenom } = await resolveIbcAsset(
-            denom,
-            bech32_prefix,
-            rest_uris || [],
-          );
-          baseDenom = resolvedDenom;
+          const {
+            baseDenom: resolvedDenom,
+            path,
+            originChainId: resolvedOriginChainId,
+          } = await resolveIbcAsset(denom, bech32_prefix, rest_uris || []);
+          baseDenom = denom;
           isIbc = true;
-          ibcDenom = denom;
+          originDenom = resolvedDenom;
+          originChainId = resolvedOriginChainId || '';
+          trace = path;
           console.log(
-            `[fetchWalletAssets ${chainId}] Resolved IBC denom ${denom} to ${resolvedDenom}`,
+            `[fetchWalletAssets ${chainId}] Resolved IBC denom ${denom} to ${resolvedDenom} from chain ${originChainId}`,
           );
         } catch (error) {
           console.warn(
@@ -211,7 +216,7 @@ export async function fetchWalletAssets(
       if (denom.startsWith(GAMM_PREFIX)) {
         baseDenom = denom.replace(GAMM_PREFIX, '');
         isIbc = true;
-        ibcDenom = denom;
+        originDenom = denom;
       }
 
       // Find matching asset metadata in full chain registry
@@ -226,7 +231,7 @@ export async function fetchWalletAssets(
         const found = Object.entries(chain.assets).find(
           ([key, asset]) =>
             safeTrimLowerCase(key) === normalizedBaseDenom ||
-            safeTrimLowerCase(asset.denom) === normalizedBaseDenom,
+            safeTrimLowerCase(asset.originDenom || asset.denom) === normalizedBaseDenom,
         )?.[1];
 
         if (found) {
@@ -266,9 +271,11 @@ export async function fetchWalletAssets(
         amount: amountAdjusted,
         price,
         isIbc,
-        ibcDenom,
         chainId: chainId,
         networkName,
+        originDenom,
+        originChainId,
+        trace,
       };
     }),
   );
@@ -278,9 +285,7 @@ export async function fetchWalletAssets(
   const subscribedAssets = processedAssets.filter(asset => {
     // Check if this asset matches any subscribed denom (case-insensitive)
     const isSubscribed = thisChainSubscribedDenoms.some(
-      denom =>
-        safeTrimLowerCase(asset?.denom) === safeTrimLowerCase(denom) ||
-        (asset?.isIbc && safeTrimLowerCase(asset.ibcDenom || '') === safeTrimLowerCase(denom)),
+      denom => safeTrimLowerCase(asset?.originDenom) === safeTrimLowerCase(denom),
     );
 
     if (!isSubscribed && shouldFetchAllAssets) {

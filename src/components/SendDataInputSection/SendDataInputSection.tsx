@@ -68,7 +68,9 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   }) => {
     const currentSendAsset = update.sendAsset || sendState.asset;
     const currentReceiveAsset = update.receiveAsset || receiveState.asset;
-    const isSameAsset = currentSendAsset.denom === currentReceiveAsset.denom;
+    const isSameAsset =
+      (currentSendAsset.originDenom || currentSendAsset.denom) ===
+      (currentReceiveAsset.originDenom || currentReceiveAsset.denom);
     const effectiveRate = isSameAsset ? 1 : exchangeRate;
 
     let sendAmount = update.sendAmount ?? sendState.amount;
@@ -225,7 +227,14 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     if (type === 'send') {
       handleStateUpdate({ sendAmount: maxAvailable });
     } else {
-      const effectiveRate = sendState.asset.denom === receiveState.asset.denom ? 1 : exchangeRate;
+      const sendAsset = sendState.asset;
+      const receiveAsset = receiveState.asset;
+
+      const effectiveRate =
+        (sendAsset.originDenom || sendAsset.denom) ===
+        (receiveAsset.originDenom || receiveAsset.denom)
+          ? 1
+          : exchangeRate;
       handleStateUpdate({ receiveAmount: maxAvailable * effectiveRate });
     }
   };

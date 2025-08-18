@@ -61,7 +61,9 @@ export const useExchangeAssets = () => {
 
     try {
       const defaultAsset = getSymphonyDefaultAsset(networkLevel);
+      const defaultAssetDenom = defaultAsset.originDenom || defaultAsset.denom;
       const sendAsset = sendState.asset;
+      const sendAssetDenom = sendAsset.originDenom || sendAsset.denom;
 
       console.log('[useExchangeAssets] querying for exchange rates for:', symphonyId);
       console.log('[useExchangeAssets] using rest uris:', restUris);
@@ -79,11 +81,11 @@ export const useExchangeAssets = () => {
 
       const mergedExchangeRequirements = [...response.exchange_requirements];
       if (
-        !response.exchange_requirements.some(req => req.base_currency.denom === defaultAsset.denom)
+        !response.exchange_requirements.some(req => req.base_currency.denom === defaultAssetDenom)
       ) {
         mergedExchangeRequirements.push({
           base_currency: {
-            denom: defaultAsset.denom,
+            denom: defaultAssetDenom,
             amount: '0',
           },
           exchange_rate: defaultAsset?.exchangeRate || '0',
@@ -92,9 +94,9 @@ export const useExchangeAssets = () => {
 
       let adjustmentRate = 1;
       // If sendAsset is different from DEFAULT_ASSET, get the exchange rate from sendAsset to DEFAULT_ASSET
-      if (sendAsset.denom !== defaultAsset.denom) {
+      if (sendAssetDenom !== defaultAssetDenom) {
         const exchangeRateResponse = await queryRestNode({
-          endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=1000000${sendAsset.denom}&askDenom=${defaultAsset.denom}`,
+          endpoint: `${SYMPHONY_ENDPOINTS.swap}offerCoin=1000000${sendAssetDenom}&askDenom=${defaultAssetDenom}`,
           queryType: QueryType.GET,
           prefix,
           restUris,
@@ -109,7 +111,7 @@ export const useExchangeAssets = () => {
         const registryAsset =
           SYMPHONY_MAINNET_ASSET_REGISTRY[denom] ||
           Object.values(chainInfo?.assets || {}).find(
-            (a: Asset) => a.denom === denom || a.symbol === denom,
+            (a: Asset) => (a.originDenom || a.denom) === denom || a.symbol === denom,
           );
 
         const symbol =
@@ -123,7 +125,7 @@ export const useExchangeAssets = () => {
         const baseExchangeRate = parseFloat(requirement.exchange_rate || '1');
         let exchangeRate;
 
-        if (denom === sendAsset.denom) {
+        if (denom === sendAssetDenom) {
           exchangeRate = '1';
         } else if (isIbc) {
           exchangeRate = '-';
@@ -148,7 +150,11 @@ export const useExchangeAssets = () => {
 
       const additionalAssets = walletAssets.filter(
         (walletAsset: Asset) =>
-          !exchangeAssets.some(processed => processed.denom === walletAsset.denom),
+          !exchangeAssets.some(
+            processed =>
+              (processed.originDenom || processed.denom) ===
+              (walletAsset.originDenom || walletAsset.denom),
+          ),
       );
 
       console.log('[useExchangeAssets] additional assets', additionalAssets);
@@ -156,10 +162,14 @@ export const useExchangeAssets = () => {
       const mergedAssets = [
         ...exchangeAssets,
         ...additionalAssets.map((walletAsset: Asset) => {
-          const exchangeData = exchangeAssets.find(e => e.denom === walletAsset.denom);
+          const walletAssetDenom = walletAsset.originDenom || walletAsset.denom;
+          const exchangeData = exchangeAssets.find(
+            e => (e.originDenom || e.denom) === walletAssetDenom,
+          );
+
           return {
             ...walletAsset,
-            exchangeRate: walletAsset.denom === sendAsset.denom ? '1' : '-',
+            exchangeRate: walletAssetDenom === sendAssetDenom ? '1' : '-',
             symbol: exchangeData?.symbol ?? walletAsset.symbol,
             logo: exchangeData?.logo ?? walletAsset.logo,
             exponent: exchangeData?.exponent ?? walletAsset.exponent,

@@ -76,7 +76,7 @@ const useAssetKeys = (assets: Asset[]) => {
     return assets.map((asset, index) => {
       // Stringify all identifiable properties as a base key
       const propertiesKey = JSON.stringify({
-        denom: asset.denom,
+        denom: asset.denom, // original denom and ibc code are both fine here
         chainId: asset.chainId,
         amount: asset.amount,
         isIbc: asset.isIbc,

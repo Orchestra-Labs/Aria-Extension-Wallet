@@ -93,7 +93,7 @@ export const sendIBCTransaction = async ({
   const ibcMessageValue = {
     sourcePort: ibcChannel.port_id, // Usually "transfer" for IBC token transfers
     sourceChannel: ibcChannel.channel_id, // Channel ID for the IBC connection
-    token: { denom: sendObject.denom, amount: sendObject.amount },
+    token: { denom: sendObject.denom, amount: sendObject.amount }, // use the ibc denom, not the original
     sender: fromAddress,
     receiver: sendObject.recipientAddress,
     timeoutTimestamp: `${Date.now() + ONE_MINUTE}000000`, // Nanoseconds

@@ -48,7 +48,7 @@ export const chainDenomsAtom = atom(get => {
   return (chainId: string) => {
     const chain = registry[networkLevel][chainId];
     if (!chain?.assets) return [];
-    return Object.values(chain.assets).map(asset => asset.denom);
+    return Object.values(chain.assets).map(asset => asset.originDenom || asset.denom);
   };
 });
 
@@ -95,7 +95,10 @@ export const selectedCoinListAtom = atom<Asset[]>(get => {
     // Include asset if either:
     // 1. viewAll is true for the chain, OR
     // 2. the asset's denom is in the subscribedDenoms list
-    return chainSelection.viewAll || (chainSelection.subscribedDenoms || []).includes(asset.denom);
+    return (
+      chainSelection.viewAll ||
+      (chainSelection.subscribedDenoms || []).includes(asset.originDenom || asset.denom)
+    );
   });
 });
 

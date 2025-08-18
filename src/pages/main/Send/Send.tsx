@@ -21,6 +21,7 @@ import {
   calculatedFeeAtom,
   resetTransactionLogAtom,
   loadSkipChainsAtom,
+  loadSkipAssetsAtom,
 } from '@/atoms';
 import {
   WalletSuccessScreen,
@@ -57,6 +58,7 @@ export const Send = () => {
   const calculatedFee = useAtomValue(calculatedFeeAtom);
   const resetLogs = useSetAtom(resetTransactionLogAtom);
   const loadSkipChains = useSetAtom(loadSkipChainsAtom);
+  const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
 
   const resetStates = () => {
     console.log('[Send] Resetting transaction states');
@@ -96,6 +98,7 @@ export const Send = () => {
     setRecipientAddress(walletState.address);
     loadFullRegistry();
     loadSkipChains();
+    loadSkipAssets();
     resetLogs();
 
     return () => {

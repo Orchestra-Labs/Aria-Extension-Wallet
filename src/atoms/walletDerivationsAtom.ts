@@ -63,7 +63,10 @@ export const subscribedAssetsAtom = atom(get => {
     if (!chainInfo) continue;
 
     // Check if viewAll is true or if the denom is in the subscription list
-    if (chainSubscription.viewAll || chainSubscription.subscribedDenoms.includes(asset.denom)) {
+    if (
+      chainSubscription.viewAll ||
+      chainSubscription.subscribedDenoms.includes(asset.originDenom || asset.denom)
+    ) {
       subscribedAssets.push(asset);
     }
   }
@@ -80,8 +83,8 @@ export const subscribedAssetsAtom = atom(get => {
     // if any chain's subscription list has this denom or ibc denom
     const isSubscribed =
       chainSubscription.viewAll ||
-      allSubscribedDenoms.has(asset.denom) ||
-      (asset.ibcDenom && allSubscribedDenoms.has(asset.ibcDenom));
+      allSubscribedDenoms.has(asset.originDenom || asset.denom) ||
+      (asset.isIbc && allSubscribedDenoms.has(asset.originDenom || asset.denom));
 
     if (isSubscribed) {
       subscribedAssets.push(asset);
@@ -97,12 +100,21 @@ export const subscribedAssetsAtom = atom(get => {
     const chainAssets = Object.values(chainInfo.assets || {});
     for (const asset of chainAssets) {
       // Skip if already included from wallet assets processing
-      if (subscribedAssets.some(a => a.denom === asset.denom && a.chainId === chainId)) {
+      if (
+        subscribedAssets.some(
+          a =>
+            (a.originDenom || a.denom) === (asset.originDenom || asset.denom) &&
+            a.chainId === chainId,
+        )
+      ) {
         continue;
       }
 
       // Only include if viewAll is true or denom is in subscription list
-      if (viewAll || denomSubscriptions.subscribedDenoms.includes(asset.denom)) {
+      if (
+        viewAll ||
+        denomSubscriptions.subscribedDenoms.includes(asset.originDenom || asset.denom)
+      ) {
         subscribedAssets.push({
           ...asset,
           amount: '0',
@@ -155,6 +167,7 @@ export const filteredDialogAssetsAtom = atom(get => {
   return filterAndSortAssets(nonZeroAssets, searchTerm, sortType, sortOrder);
 });
 
+// TODO: ensure these assets have the proper typing for originDenom and originChainID
 // NOTE: for the asset select dialog for receivable assets (send page)
 export const filteredReceiveAssetsAtom = atom(get => {
   const reachableAssets = get(allReceivableAssetsAtom);

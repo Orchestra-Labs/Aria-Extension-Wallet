@@ -114,7 +114,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           if (rewardAmount.isZero()) return;
 
           // Find the asset to get price and decimals
-          const asset = networkWalletAssets.find(a => a.denom === reward.denom);
+          const asset = networkWalletAssets.find(a => (a.originDenom || a.denom) === reward.denom);
           const decimals = asset?.exponent || 6;
           const price = asset?.price || 0;
 
@@ -137,7 +137,10 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
     // Calculate staked balance (secondary text)
     const totalStakedMLD = validatorData
-      .filter(item => item.balance?.denom === balanceDisplayUnit?.denom)
+      .filter(
+        item =>
+          item.balance?.denom === (balanceDisplayUnit?.originDenom || balanceDisplayUnit?.denom),
+      )
       .reduce((sum, item) => {
         const amount = new BigNumber(item.balance?.amount || '0');
         // Convert from base units to human-readable units using the exponent
@@ -146,7 +149,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
       }, new BigNumber(0));
 
     // Find the primary asset to get its price
-    const primaryAsset = networkWalletAssets.find(a => a.denom === balanceDisplayUnit?.denom);
+    const primaryAsset = networkWalletAssets.find(
+      a =>
+        (a.originDenom || a.denom) ===
+        (balanceDisplayUnit?.originDenom || balanceDisplayUnit?.denom),
+    );
     const stakedValue = totalStakedMLD.multipliedBy(primaryAsset?.price || 0);
 
     secondaryText = formatValueWithFallback(

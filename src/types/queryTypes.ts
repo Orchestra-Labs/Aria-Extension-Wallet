@@ -28,6 +28,11 @@ export interface TransactionRPCResponse extends BaseRPCResponse {
   txHash?: string;
   gasUsed?: string;
   gasWanted?: string;
+  route?: any;
+  estimatedAmountOut?: string;
+  fees?: any[];
+  messages?: any[];
+  minAmountOut?: string;
   height?: number;
 }
 

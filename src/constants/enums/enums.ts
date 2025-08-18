@@ -1,5 +1,6 @@
 export enum TransactionType {
   SEND = 'Send',
+  EXCHANGE = 'Exchange',
   SWAP = 'Swap',
   IBC_SEND = 'IBC Send',
   IBC_SWAP = 'IBC Swap',

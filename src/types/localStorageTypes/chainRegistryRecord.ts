@@ -21,16 +21,19 @@ export interface Asset {
   amount: string;
   exchangeRate?: string;
   isIbc: boolean;
-  ibcDenom?: string;
   logo: string;
   symbol: string;
   name: string;
   exponent: number;
-  isFeeToken?: boolean;
+  isFeeToken: boolean;
   networkName: string;
   chainId: string;
   coinGeckoId?: string;
   price: number;
+  // TODO: mark 'original' not 'origin'.  change after full testing so uses are easy to find
+  originDenom: string;
+  originChainId: string;
+  trace?: string;
 }
 
 export interface AssetRegistry {

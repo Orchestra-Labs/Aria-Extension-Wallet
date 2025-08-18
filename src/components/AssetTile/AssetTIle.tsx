@@ -61,9 +61,9 @@ export const AssetTile = ({
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  const title = asset?.name || asset?.denom || 'Unknown Asset';
-  const symbol = asset?.symbol || asset?.denom || '???';
-  const denom = asset?.denom || 'unknown';
+  const title = asset?.name || asset?.originDenom || asset?.denom || 'Unknown Asset';
+  const symbol = asset?.symbol || asset?.originDenom || asset?.denom || '???';
+  const denom = asset?.originDenom || asset?.denom || 'unknown';
   const logo = asset?.logo || '';
 
   const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);

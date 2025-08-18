@@ -9,7 +9,8 @@ export const isValidSend = ({
   sendAsset: Asset;
   receiveAsset: Asset;
 }) => {
-  const result = sendAsset.denom === receiveAsset.denom;
+  const result =
+    (sendAsset.originDenom || sendAsset.denom) === (receiveAsset.originDenom || receiveAsset.denom);
   return result;
 };
 

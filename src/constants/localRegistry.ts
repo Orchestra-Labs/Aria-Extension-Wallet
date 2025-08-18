@@ -26,9 +26,12 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     symbol: 'HUSD',
     name: 'US Dollar',
     exponent: GREATER_EXPONENT_DEFAULT,
+    isFeeToken: false,
     networkName: 'Symphony Testnet',
     chainId: SYMPHONY_MAINNET_ID,
     price: 0,
+    originDenom: 'uusd',
+    originChainId: SYMPHONY_MAINNET_ID,
   },
   ukhd: {
     denom: 'uhkd',
@@ -39,9 +42,12 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     symbol: 'HHKD',
     name: 'Hong Kong Dollar',
     exponent: GREATER_EXPONENT_DEFAULT,
+    isFeeToken: false,
     networkName: 'Symphony Testnet',
     chainId: SYMPHONY_MAINNET_ID,
     price: 0,
+    originDenom: 'uhkd',
+    originChainId: SYMPHONY_MAINNET_ID,
   },
   uvnd: {
     denom: 'uaux',
@@ -52,9 +58,12 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     symbol: 'HAUX',
     name: 'Gold',
     exponent: GREATER_EXPONENT_DEFAULT,
+    isFeeToken: false,
     networkName: 'Symphony Testnet',
     chainId: SYMPHONY_MAINNET_ID,
     price: 0,
+    originDenom: 'uaux',
+    originChainId: SYMPHONY_MAINNET_ID,
   },
   [DEFAULT_DENOM]: {
     denom: DEFAULT_DENOM,
@@ -69,6 +78,8 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     networkName: 'Symphony Testnet',
     chainId: SYMPHONY_MAINNET_ID,
     price: 0,
+    originDenom: DEFAULT_DENOM,
+    originChainId: SYMPHONY_MAINNET_ID,
   },
 };
 
@@ -86,6 +97,8 @@ export const SYMPHONY_TESTNET_ASSET_REGISTRY: AssetRegistry = {
     networkName: 'Symphony Testnet',
     chainId: SYMPHONY_TESTNET_ID,
     price: 0,
+    originDenom: DEFAULT_DENOM,
+    originChainId: SYMPHONY_TESTNET_ID,
   },
 };
 
@@ -175,57 +188,6 @@ export const DEFAULT_MAINNET_REGISTRY: LocalChainRegistry = {
       'https://raw.githubusercontent.com/cosmos/chain-registry/master/symphony/images/symphony_logo.png',
     assets: SYMPHONY_MAINNET_ASSET_REGISTRY,
   },
-  'stargaze-1': {
-    chain_name: 'local stargaze',
-    status: 'live',
-    website: '',
-    network_level: NetworkLevel.MAINNET,
-    pretty_name: 'Stargaze',
-    chain_type: 'cosmos',
-    chain_id: 'stargaze-1',
-    bech32_prefix: 'stars',
-    fees: [
-      {
-        denom: 'ustars',
-        gasPriceStep: {
-          low: 1,
-          average: 1.1,
-          high: 1.2,
-        },
-      },
-    ],
-    staking_denoms: ['ustars'],
-    rpc_uris: [
-      {
-        address: 'https://rpc-stargaze.keplr.app/',
-        provider: 'Keplr',
-      },
-    ],
-    rest_uris: [
-      {
-        address: 'https://lcd-stargaze.keplr.app/',
-        provider: 'Keplr',
-      },
-    ],
-    logo_uri:
-      'https://raw.githubusercontent.com/cosmos/chain-registry/master/stargaze/images/stars.png',
-    assets: {
-      ustars: {
-        denom: 'ustars',
-        amount: '0',
-        exchangeRate: '-',
-        isIbc: false,
-        logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/stargaze/images/stars.png',
-        symbol: 'STARS',
-        name: 'Stargaze',
-        exponent: 6,
-        isFeeToken: true,
-        networkName: 'Stargaze',
-        chainId: 'stargaze-1',
-        price: 0,
-      },
-    },
-  },
 };
 
 export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
@@ -254,90 +216,6 @@ export const DEFAULT_TESTNET_REGISTRY: LocalChainRegistry = {
     logo_uri:
       'https://raw.githubusercontent.com/cosmos/chain-registry/master/symphony/images/symphony_logo.png',
     assets: SYMPHONY_MAINNET_ASSET_REGISTRY,
-  },
-  ['osmo-test-5']: {
-    chain_name: 'local osmosistestnet',
-    status: 'live',
-    website: '',
-    network_level: NetworkLevel.TESTNET,
-    pretty_name: 'Osmosis Testnet',
-    chain_type: 'cosmos',
-    chain_id: 'osmo-test-5',
-    bech32_prefix: 'osmo',
-    fees: [
-      {
-        denom: 'uosmo',
-        gasPriceStep: {
-          low: 0.0025,
-          average: 0.025,
-          high: 0.04,
-        },
-      },
-    ],
-    staking_denoms: ['uosmo'],
-    rpc_uris: [{ address: 'https://rpc.testnet.osmosis.zone/', provider: 'Osmosis' }],
-    rest_uris: [{ address: 'https://lcd.testnet.osmosis.zone/', provider: 'Osmosis' }],
-    logo_uri:
-      'https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmosis-chain-logo.png',
-    assets: {
-      uosmo: {
-        denom: 'uosmo',
-        amount: '0',
-        isIbc: false,
-        symbol: 'OSMO',
-        name: 'Osmosis',
-        exponent: 6,
-        logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/osmosis/images/osmo.png',
-        networkName: 'Osmosis Testnet',
-        chainId: 'osmo-test-5',
-        price: 0,
-      },
-    },
-  },
-  ['elgafar-1']: {
-    chain_name: 'local stargazetestnet',
-    status: 'live',
-    website: '',
-    network_level: NetworkLevel.TESTNET,
-    pretty_name: 'Stargaze Testnet',
-    chain_type: 'cosmos',
-    chain_id: 'elgafar-1',
-    bech32_prefix: 'stars',
-    fees: [
-      {
-        denom: 'ustars',
-        gasPriceStep: {
-          low: 0.03,
-          average: 0.04,
-          high: 0.05,
-        },
-      },
-    ],
-    staking_denoms: ['ustars'],
-    rpc_uris: [
-      { address: 'https://rpc.elgafar-1.stargaze-apis.com', provider: 'Stargaze Foundation' },
-    ],
-    rest_uris: [
-      { address: 'https://rest.elgafar-1.stargaze-apis.com', provider: 'Stargaze Foundation' },
-    ],
-    logo_uri:
-      'https://raw.githubusercontent.com/cosmos/chain-registry/master/stargaze/images/stars.png',
-    assets: {
-      ustars: {
-        denom: 'ustars',
-        amount: '0',
-        exchangeRate: '-',
-        isIbc: false,
-        logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/stargaze/images/stars.png',
-        symbol: 'STARS',
-        name: 'Stargaze Testnet',
-        exponent: 6,
-        isFeeToken: true,
-        networkName: 'Stargaze Testnet',
-        chainId: 'elgafar-1',
-        price: 0,
-      },
-    },
   },
 };
 

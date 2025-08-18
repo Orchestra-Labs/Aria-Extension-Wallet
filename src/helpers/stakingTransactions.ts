@@ -35,7 +35,7 @@ export const buildMessageBundle = ({
       if (endpoint === COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator) {
         // NOTE: If no amount is provided, Cosmos will unstake all
         messageValue.amount = {
-          denom: validatorInfo.balance.denom,
+          denom: validatorInfo.balance.denom, // need to use current denom here, whether ibc or original
           amount: amount || validatorInfo.balance.amount,
         };
       } else if (amount && denom) {
@@ -186,7 +186,7 @@ export const claimRewards = async (
         feeToken,
         simulateOnly: false,
         fee: {
-          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }],
+          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
       });
@@ -270,7 +270,7 @@ export const claimAndRestake = async (
   const delegateMessages = validatorInfoArray.flatMap(validatorInfo => {
     return (validatorInfo.rewards || [])
       .map(rewardItem => {
-        if (!rewardItem.denom || !rewardItem.amount) return null;
+        if (!rewardItem.denom || !rewardItem.amount) return null; // need to use current denom here, whether ibc or original
 
         // Remove decimal portion if present
         const amount = rewardItem.amount.includes('.')
@@ -285,7 +285,7 @@ export const claimAndRestake = async (
             delegatorAddress: validatorInfo.delegation.delegator_address,
             validatorAddress: validatorInfo.delegation.validator_address,
             amount: {
-              denom: rewardItem.denom,
+              denom: rewardItem.denom, // need to use current denom here, whether ibc or original
               amount,
             },
           },
@@ -349,7 +349,7 @@ export const claimAndRestake = async (
       feeToken,
       simulateOnly: false,
       fee: {
-        amount: [{ denom: feeToken?.denom || 'uatom', amount: feeAmount.toString() }],
+        amount: [{ denom: feeToken?.denom || 'note', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
         gas: estimatedGas.toString(),
       },
     });
@@ -420,7 +420,7 @@ export const claimAndUnstake = async ({
   const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
   const prefix = chain.bech32_prefix;
   const rpcUris = chain.rpc_uris;
-  const denom = validatorInfoArray[0].balance.denom;
+  const denom = validatorInfoArray[0].balance.denom; // need to use current denom here, whether ibc or original
 
   // For partial unstaking, format the amount
   let formattedAmount: string | undefined = undefined;
@@ -502,7 +502,7 @@ export const claimAndUnstake = async ({
         feeToken,
         simulateOnly: false,
         fee: {
-          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }],
+          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
       });

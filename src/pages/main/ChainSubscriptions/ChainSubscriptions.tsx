@@ -147,7 +147,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     );
 
     // Check if all assets from subscribed chains are selected
-    return allAssetsFromChains.every(asset => selectedDenoms.has(asset.denom));
+    return allAssetsFromChains.every(asset => selectedDenoms.has(asset.originDenom || asset.denom));
   }, [chainAssets, subscriptionSelections, chainRegistry, networkLevelTab]);
 
   const noCoinsSelected = React.useMemo(() => {
@@ -216,7 +216,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     for (const asset of chainAssets) {
       const chainId = asset.chainId;
       const denoms = updated[chainId].subscribedDenoms || [];
-      const filtered = denoms.filter(d => d !== asset.denom);
+      const filtered = denoms.filter(d => d !== (asset.originDenom || asset.denom));
       if (filtered.length === 0) {
         delete updated[chainId];
       } else {
@@ -267,11 +267,13 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
     };
     const chainId = coin.chainId;
 
-    if (currentSelection.subscribedDenoms.includes(coin.denom)) {
+    if (currentSelection.subscribedDenoms.includes(coin.originDenom || coin.denom)) {
       // Coin is currently selected - deselect it
       setSubscriptionSelections(prev => {
         const updatedNetworkSelections = { ...prev[networkLevel] };
-        const updatedDenoms = currentSelection.subscribedDenoms.filter(d => d !== coin.denom);
+        const updatedDenoms = currentSelection.subscribedDenoms.filter(
+          d => d !== coin.originDenom || coin.denom,
+        );
 
         console.log('[ChainSubscriptions handleSelection] checking value of viewAll');
         console.log('[ChainSubscriptions handleSelection]', currentSelection.viewAll);
@@ -303,7 +305,7 @@ export const ChainSubscriptions: React.FC<ChainSubscriptionsProps> = ({}) => {
         const denomSubscription = subscribeOrSetViewAll(
           chainId,
           currentSelection.subscribedDenoms,
-          coin.denom,
+          coin.originDenom || coin.denom,
         );
 
         return {

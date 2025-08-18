@@ -6,6 +6,7 @@ export interface TransactionDetails {
   isValid: boolean;
   isIBC: boolean;
   isSwap: boolean;
+  isExchange: boolean;
 }
 
 export interface FeeState {
@@ -35,6 +36,16 @@ export interface TransactionLogEntry {
   };
   status: TransactionStatus;
   error?: string;
+  routeStep?: {
+    operationType: string;
+    fromChain: string;
+    toChain: string;
+    asset: string;
+    estimatedFee?: {
+      amount: string;
+      denom: string;
+    };
+  };
 }
 
 export interface TransactionLog {

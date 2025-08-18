@@ -73,7 +73,9 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
 
     try {
       const parsed = JSON.parse(result);
-      const preferredAsset = allAssets.find(asset => asset.denom === parsed.denom);
+      const preferredAsset = allAssets.find(
+        asset => (asset.originDenom || asset.denom) === parsed.denom,
+      );
       setAddress(parsed.address);
       if (preferredAsset) updateReceiveAsset(preferredAsset, true);
     } catch {

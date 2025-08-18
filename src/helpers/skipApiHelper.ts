@@ -1,3 +1,5 @@
+import { AssetRegistry } from '@/types';
+
 const SKIP_GO_API_BASE = 'https://api.skip.build/v2';
 
 type ChainInfo = {
@@ -6,22 +8,152 @@ type ChainInfo = {
   logo_uri?: string;
 };
 
-type TransactionResult = {
-  success: boolean;
-  message: string;
-  data?: {
-    code: number;
-    txHash: string;
-    gasWanted: string;
-    msgs?: any[];
-    estimatedAmountOut?: string;
-    route?: any;
+type TransferEvent = {
+  from_chain_id: string;
+  to_chain_id: string;
+  type?: string;
+  state: string;
+  packet_txs?: {
+    send_tx?: {
+      chain_id: string;
+      tx_hash: string;
+      explorer_link: string;
+      on_chain_at?: string;
+    };
+    receive_tx?: {
+      chain_id: string;
+      tx_hash: string;
+      explorer_link: string;
+      on_chain_at?: string;
+    };
+    acknowledge_tx?: {
+      chain_id: string;
+      tx_hash: string;
+      explorer_link: string;
+      on_chain_at?: string;
+    };
+    timeout_tx?: any;
+    error?: any;
   };
+  txs?: {
+    send_token_txs?: {
+      send_tx?: {
+        chain_id: string;
+        tx_hash: string;
+        explorer_link: string;
+      };
+      confirm_tx?: any;
+      execute_tx?: {
+        chain_id: string;
+        tx_hash: string;
+        explorer_link: string;
+      };
+      error?: any;
+    };
+  };
+  axelar_scan_link?: string;
 };
 
-/**
- * Fetches supported chains from /info/chains endpoint
- */
+type TransferStatus = {
+  state: string;
+  transfer_sequence: Array<{
+    [key: string]: TransferEvent;
+  }>;
+  next_blocking_transfer: any | null;
+  transfer_asset_release?: {
+    chain_id: string;
+    denom: string;
+    released: boolean;
+  };
+  error?: any;
+};
+
+type TransactionStatusResponse = {
+  state: string;
+  transfers: TransferStatus[];
+  error?: any;
+};
+
+export interface SkipAsset {
+  denom: string;
+  chain_id: string;
+  origin_denom: string;
+  origin_chain_id: string;
+  trace: string;
+  symbol: string;
+  name: string;
+  logo_uri?: string;
+  decimals: number;
+  coingecko_id?: string;
+  description?: string;
+  recommended_symbol?: string;
+}
+
+export interface SkipAssetsResponse {
+  chain_to_assets_map: Record<string, { assets: SkipAsset[] }>;
+}
+
+export const getSkipSupportedAssets = async (
+  chainIds?: string[],
+  nativeOnly = false,
+): Promise<AssetRegistry> => {
+  try {
+    const params = new URLSearchParams();
+
+    if (chainIds?.length) {
+      params.append('chain_ids', chainIds.join(','));
+    }
+
+    if (nativeOnly) {
+      params.append('native_only', 'true');
+    }
+
+    const url = `${SKIP_GO_API_BASE}/fungible/assets?${params.toString()}`;
+    console.log('[Skip API] Fetching supported assets from:', url);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Skip API] Assets Error:', response.status, errorData);
+      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const responseData = (await response.json()) as SkipAssetsResponse;
+    console.log('[Skip API] Assets Success:', JSON.stringify(responseData, null, 2));
+
+    // Convert Skip assets to our Asset type
+    const convertedAssets: AssetRegistry = {};
+    for (const [chainId, chainData] of Object.entries(responseData.chain_to_assets_map)) {
+      for (const skipAsset of chainData.assets) {
+        convertedAssets[skipAsset.denom] = {
+          denom: skipAsset.denom,
+          amount: '0',
+          exchangeRate: undefined,
+          isIbc: skipAsset.origin_chain_id !== chainId || !!skipAsset.trace,
+          logo: skipAsset.logo_uri || '',
+          symbol: skipAsset.symbol,
+          name: skipAsset.name,
+          exponent: skipAsset.decimals,
+          isFeeToken: false,
+          networkName: '', // Will need to be populated from chain registry
+          chainId: chainId,
+          coinGeckoId: skipAsset.coingecko_id,
+          price: 0,
+          originDenom: skipAsset.origin_denom,
+          originChainId: skipAsset.origin_chain_id,
+          trace: skipAsset.trace,
+        };
+      }
+    }
+
+    return convertedAssets;
+  } catch (error) {
+    console.error('Skip Assets API Error:', error);
+    throw error;
+  }
+};
+
+// TODO: remove? may not be necessary, given chain ids in function above
 export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   try {
     const response = await fetch(`${SKIP_GO_API_BASE}/info/chains`);
@@ -78,40 +210,38 @@ export const getRoute = async (
   }
 };
 
-export const getMessagesDirect = async (
+export const getTransactionMessages = async (
   source_chain_id: string,
   source_asset_denom: string,
   dest_chain_id: string,
   dest_asset_denom: string,
   amount_in: string,
-  source_address: string,
-  dest_address: string,
+  address_list: string[],
+  operations: any[],
+  estimated_amount_out: string,
   slippage_tolerance_percent: string = '0.25',
   additionalParams?: Record<string, any>,
 ): Promise<any> => {
   try {
-    // Prepare addresses mapping as required by the API
-    const chain_ids_to_addresses = {
-      [source_chain_id]: source_address,
-      [dest_chain_id]: dest_address,
-    };
-
     const requestBody = {
       source_asset_denom,
       source_asset_chain_id: source_chain_id,
       dest_asset_denom,
       dest_asset_chain_id: dest_chain_id,
       amount_in,
-      chain_ids_to_addresses,
+      amount_out: estimated_amount_out,
+      address_list,
+      operations,
+      estimated_amount_out,
       slippage_tolerance_percent,
-      allow_multi_tx: true,
-      allow_swaps: true,
+      timeout_seconds: '5',
+      enable_gas_warnings: false,
       ...additionalParams,
     };
 
-    console.log('[Skip API] Request:', JSON.stringify(requestBody, null, 2));
+    console.log('[Skip API] Messages Request:', JSON.stringify(requestBody, null, 2));
 
-    const response = await fetch(`${SKIP_GO_API_BASE}/fungible/msgs_direct`, {
+    const response = await fetch(`${SKIP_GO_API_BASE}/fungible/msgs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -119,101 +249,173 @@ export const getMessagesDirect = async (
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('[Skip API] Error:', response.status, errorData);
+      console.error('[Skip API] Messages Error:', response.status, errorData);
       throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
     const responseData = await response.json();
-    console.log('[Skip API] Success:', JSON.stringify(responseData, null, 2));
+    console.log('[Skip API] Messages Success:', JSON.stringify(responseData, null, 2));
     return responseData;
   } catch (error) {
-    console.error('Skip API Error:', error);
+    console.error('Skip Messages API Error:', error);
     throw error;
   }
 };
 
-export const executeSkipTransaction = async (
-  sendState: {
-    amount: number;
-    asset: { denom: string; exponent: number };
-    chainId: string;
-  },
-  receiveState: {
-    asset: { denom: string };
-    chainId: string;
-  },
-  walletState: { address: string },
-  recipientAddress: string | undefined,
-  simulateTransaction: boolean,
-): Promise<TransactionResult> => {
-  console.group('[executeSkip] Starting transaction');
+export const submitTransaction = async (
+  chain_id: string,
+  tx: string, // Base64 encoded signed transaction
+  additionalParams?: Record<string, any>,
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    txHash: string;
+    explorerLink: string;
+  };
+}> => {
   try {
-    const amountIn = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
-    console.log('Amount in base denom:', amountIn);
+    const requestBody = {
+      tx,
+      chain_id,
+      ...additionalParams,
+    };
 
-    // First get the route
-    const routeResponse = await getRoute(
-      sendState.chainId,
-      sendState.asset.denom,
-      receiveState.chainId,
-      receiveState.asset.denom,
-      amountIn,
-    );
+    console.log('[Skip API] Submit Request:', JSON.stringify(requestBody, null, 2));
 
-    if (!routeResponse.operations || routeResponse.operations.length === 0) {
-      throw new Error('No valid route found');
+    const response = await fetch(`${SKIP_GO_API_BASE}/tx/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Skip API] Submit Error:', response.status, errorData);
+      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
-    // If just simulating, return the route info
-    if (simulateTransaction) {
-      return {
-        success: true,
-        message: 'Route simulation successful',
-        data: {
-          code: 0,
-          txHash: 'simulated',
-          gasWanted: '0', // Will be updated after actual simulation
-          route: routeResponse,
-        },
-      };
-    }
-
-    // If actual transaction, proceed with getting messages
-    const response = await getMessagesDirect(
-      sendState.chainId,
-      sendState.asset.denom,
-      receiveState.chainId,
-      receiveState.asset.denom,
-      amountIn,
-      walletState.address,
-      recipientAddress || walletState.address,
-      '0.25', // 0.25% slippage
-      { route: routeResponse }, // Pass the route info to msgs_direct
-    );
-
-    if (!response.msgs || response.msgs.length === 0) {
-      throw new Error('No valid route found');
-    }
+    const responseData = await response.json();
+    console.log('[Skip API] Submit Success:', JSON.stringify(responseData, null, 2));
 
     return {
       success: true,
-      message: 'Transaction prepared',
+      message: 'Transaction submitted successfully',
       data: {
-        code: 0,
-        txHash: '',
-        gasWanted: response.route?.estimated_gas_used?.toString() || '0',
-        msgs: response.msgs,
-        estimatedAmountOut: response.route?.estimated_amount_out,
-        route: response.route,
+        txHash: responseData.tx_hash,
+        explorerLink: responseData.explorer_link,
       },
     };
   } catch (error) {
-    console.error('Transaction failed:', error);
+    console.error('Skip Submit API Error:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Transaction failed',
+      message: error instanceof Error ? error.message : 'Failed to submit transaction',
     };
-  } finally {
-    console.groupEnd();
+  }
+};
+
+export const trackTransaction = async (
+  chain_id: string,
+  tx_hash: string, // Hex encoded transaction hash
+  additionalParams?: Record<string, any>,
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    txHash: string;
+    explorerLink: string;
+  };
+}> => {
+  try {
+    const requestBody = {
+      tx_hash,
+      chain_id,
+      ...additionalParams,
+    };
+
+    console.log('[Skip API] Track Request:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(`${SKIP_GO_API_BASE}/tx/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Skip API] Track Error:', response.status, errorData);
+      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const responseData = await response.json();
+    console.log('[Skip API] Track Success:', JSON.stringify(responseData, null, 2));
+
+    return {
+      success: true,
+      message: 'Transaction tracking initiated successfully',
+      data: {
+        txHash: responseData.tx_hash,
+        explorerLink: responseData.explorer_link,
+      },
+    };
+  } catch (error) {
+    console.error('Skip Track API Error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to track transaction',
+    };
+  }
+};
+
+export const getTransactionStatus = async (
+  chain_id: string,
+  tx_hash: string,
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: TransactionStatusResponse;
+}> => {
+  try {
+    const params = new URLSearchParams({
+      tx_hash,
+      chain_id,
+    });
+
+    const url = `${SKIP_GO_API_BASE}/tx/status?${params.toString()}`;
+    console.log('[Skip API] Status Request:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[Skip API] Status Error:', response.status, errorData);
+      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const responseData = await response.json();
+    console.log('[Skip API] Status Success:', JSON.stringify(responseData, null, 2));
+
+    // Normalize the response structure
+    const normalizedData: TransactionStatusResponse = {
+      state: responseData.state || responseData.status,
+      transfers: Array.isArray(responseData.transfers) ? responseData.transfers : [responseData],
+      error: responseData.error,
+    };
+
+    return {
+      success: true,
+      message: 'Transaction status retrieved',
+      data: normalizedData,
+    };
+  } catch (error) {
+    console.error('Skip Status API Error:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to get transaction status',
+    };
   }
 };

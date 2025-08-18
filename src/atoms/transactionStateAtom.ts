@@ -208,7 +208,9 @@ export const maxAvailableAtom = atom(get => {
 
   if (!sendAsset) return 0;
 
-  const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
+  const walletAsset = walletAssets.find(
+    (asset: Asset) => asset.originDenom || asset.denom === sendAsset.originDenom || sendAsset.denom,
+  );
   if (!walletAsset) return 0;
 
   const maxAmount = parseFloat(walletAsset.amount || '0');

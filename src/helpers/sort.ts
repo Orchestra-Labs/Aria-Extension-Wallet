@@ -36,12 +36,83 @@ function sortAssets(
   const lowercasedSearchTerm = safeTrimLowerCase(searchTerm);
 
   return assets.sort((a, b) => {
+    // First, separate exact matches from partial matches
+    const aExactMatches = {
+      name: safeTrimLowerCase(a.name) === lowercasedSearchTerm,
+      symbol: safeTrimLowerCase(a.symbol) === lowercasedSearchTerm,
+      denom: safeTrimLowerCase(a.denom) === lowercasedSearchTerm,
+      originDenom: a.originDenom
+        ? safeTrimLowerCase(a.originDenom) === lowercasedSearchTerm
+        : false,
+      networkName: safeTrimLowerCase(a.networkName) === lowercasedSearchTerm,
+      chainId: safeTrimLowerCase(a.chainId) === lowercasedSearchTerm,
+    };
+
+    const bExactMatches = {
+      name: safeTrimLowerCase(b.name) === lowercasedSearchTerm,
+      symbol: safeTrimLowerCase(b.symbol) === lowercasedSearchTerm,
+      denom: safeTrimLowerCase(b.denom) === lowercasedSearchTerm,
+      originDenom: b.originDenom
+        ? safeTrimLowerCase(b.originDenom) === lowercasedSearchTerm
+        : false,
+      networkName: safeTrimLowerCase(b.networkName) === lowercasedSearchTerm,
+      chainId: safeTrimLowerCase(b.chainId) === lowercasedSearchTerm,
+    };
+
+    const aHasExactMatch = Object.values(aExactMatches).some(match => match);
+    const bHasExactMatch = Object.values(bExactMatches).some(match => match);
+
+    // If one has exact matches and the other doesn't, prioritize the one with exact matches
+    if (aHasExactMatch !== bHasExactMatch) {
+      return aHasExactMatch ? -1 : 1;
+    }
+
+    // If both have exact matches, prioritize based on the order: name > symbol > denom > originDenom > networkName > chainId
+    if (aHasExactMatch && bHasExactMatch) {
+      const exactMatchOrder = ['name', 'symbol', 'denom', 'originDenom', 'networkName', 'chainId'];
+
+      for (const field of exactMatchOrder) {
+        const aMatch = aExactMatches[field as keyof typeof aExactMatches];
+        const bMatch = bExactMatches[field as keyof typeof bExactMatches];
+
+        if (aMatch !== bMatch) {
+          return aMatch ? -1 : 1;
+        }
+      }
+
+      // If all exact matches are equal, prioritize native assets (where denom === originDenom)
+      const aIsNative =
+        a.originDenom && safeTrimLowerCase(a.denom) === safeTrimLowerCase(a.originDenom);
+      const bIsNative =
+        b.originDenom && safeTrimLowerCase(b.denom) === safeTrimLowerCase(b.originDenom);
+
+      if (aIsNative !== bIsNative) {
+        return aIsNative ? -1 : 1;
+      }
+    }
+
+    // For non-exact matches or when exact matches are equal, use the original sorting logic
     const valueA = getSortValue(a, sortType);
     const valueB = getSortValue(b, sortType);
 
     if (sortType === AssetSortType.NAME && lowercasedSearchTerm) {
-      const aFields = [a.name, a.networkName, a.chainId].map(f => safeTrimLowerCase(f));
-      const bFields = [b.name, b.networkName, b.chainId].map(f => safeTrimLowerCase(f));
+      const aFields = [
+        a.name,
+        a.symbol,
+        a.denom,
+        a.originDenom || '',
+        a.networkName,
+        a.chainId,
+      ].map(f => safeTrimLowerCase(f));
+
+      const bFields = [
+        b.name,
+        b.symbol,
+        b.denom,
+        b.originDenom || '',
+        b.networkName,
+        b.chainId,
+      ].map(f => safeTrimLowerCase(f));
 
       const aMatches = aFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
       const bMatches = bFields.map(f => (f.includes(lowercasedSearchTerm) ? 1 : 0));
@@ -49,26 +120,32 @@ function sortAssets(
       const aTotalMatches = aMatches.reduce((sum, m) => sum + m, 0 as number);
       const bTotalMatches = bMatches.reduce((sum, m) => sum + m, 0 as number);
 
-      // First sort by total number of matches (descending)
       if (aTotalMatches !== bTotalMatches) {
         return bTotalMatches - aTotalMatches;
       }
 
-      // Then sort by individual field matches in order: name, networkName, chainId
       for (let i = 0; i < aMatches.length; i++) {
         if (aMatches[i] !== bMatches[i]) {
           return bMatches[i] - aMatches[i];
         }
       }
 
-      // If still tied, prioritize priority assets
+      // If still equal, prioritize native assets
+      const aIsNative =
+        a.originDenom && safeTrimLowerCase(a.denom) === safeTrimLowerCase(a.originDenom);
+      const bIsNative =
+        b.originDenom && safeTrimLowerCase(b.denom) === safeTrimLowerCase(b.originDenom);
+
+      if (aIsNative !== bIsNative) {
+        return aIsNative ? -1 : 1;
+      }
+
       const aIsPriority = isPriorityCoin(a);
       const bIsPriority = isPriorityCoin(b);
       if (aIsPriority !== bIsPriority) {
         return aIsPriority ? -1 : 1;
       }
 
-      // If still tied, prioritize Symphony assets
       const aIsSymphony = a.chainId === SYMPHONY_MAINNET_ID || a.chainId === SYMPHONY_TESTNET_ID;
       const bIsSymphony = b.chainId === SYMPHONY_MAINNET_ID || b.chainId === SYMPHONY_TESTNET_ID;
       if (aIsSymphony !== bIsSymphony) {
@@ -101,6 +178,7 @@ export function filterAndSortAssets(
         safeTrimLowerCase(asset.name).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.symbol).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.denom).includes(lowercasedSearchTerm) ||
+        safeTrimLowerCase(asset.originDenom).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.networkName).includes(lowercasedSearchTerm) ||
         safeTrimLowerCase(asset.chainId).includes(lowercasedSearchTerm)
       );
