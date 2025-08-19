@@ -11,7 +11,6 @@ import {
   chainWalletAtom,
   defaultAssetAtom,
   resetTransactionStatesAtom,
-  transactionTypeAtom,
   transactionErrorAtom,
   transactionStatusAtom,
   isLoadingAtom,
@@ -19,9 +18,9 @@ import {
   unloadFullRegistryAtom,
   loadFullRegistryAtom,
   calculatedFeeAtom,
-  resetTransactionLogAtom,
   loadSkipChainsAtom,
   loadSkipAssetsAtom,
+  transactionHasValidRouteAtom,
 } from '@/atoms';
 import {
   WalletSuccessScreen,
@@ -48,7 +47,7 @@ export const Send = () => {
   console.log("[Send] selected asset's network id", selectedAsset.chainId);
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   console.log('[Send] initial wallet state', walletState);
-  const transactionType = useAtomValue(transactionTypeAtom);
+  const transactionHasValidRoute = useAtomValue(transactionHasValidRouteAtom);
   const [transactionStatus, setTransactionStatus] = useAtom(transactionStatusAtom);
   const isLoading = useAtomValue(isLoadingAtom);
   const isSuccess = useAtomValue(isTransactionSuccessAtom);
@@ -56,7 +55,6 @@ export const Send = () => {
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const calculatedFee = useAtomValue(calculatedFeeAtom);
-  const resetLogs = useSetAtom(resetTransactionLogAtom);
   const loadSkipChains = useSetAtom(loadSkipChainsAtom);
   const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
 
@@ -99,7 +97,6 @@ export const Send = () => {
     loadFullRegistry();
     loadSkipChains();
     loadSkipAssets();
-    resetLogs();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)
@@ -135,7 +132,7 @@ export const Send = () => {
           <Button
             className="w-[85%]"
             onClick={() => runTransaction()}
-            disabled={isLoading || sendState.amount === 0 || !transactionType.isValid}
+            disabled={isLoading || sendState.amount === 0 || !transactionHasValidRoute}
           >
             Send
           </Button>

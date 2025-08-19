@@ -13,7 +13,7 @@ export enum TransactionType {
 
 export enum TransactionStatus {
   IDLE = 'idle',
-  LOADING = 'loading',
+  PENDING = 'pending',
   SUCCESS = 'success',
   ERROR = 'error',
 }

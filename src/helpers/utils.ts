@@ -1,4 +1,10 @@
-import { Asset, SimplifiedChainInfo, TransactionDetails, TransactionState } from '@/types';
+import {
+  Asset,
+  SimplifiedChainInfo,
+  TransactionDetails,
+  TransactionState,
+  TransactionStep,
+} from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -172,4 +178,44 @@ export const categorizeTransaction = async ({
     isSwap,
     isExchange,
   };
+};
+
+export const getStepDescription = (
+  step: TransactionStep,
+  recipientAddress: string,
+  walletAddress: string,
+): string => {
+  const toAddress = recipientAddress || walletAddress;
+  const shortAddress = `${toAddress.substring(0, 10)}...${toAddress.substring(toAddress.length - 5)}`;
+
+  let description: string;
+
+  switch (step.type) {
+    case TransactionType.SEND:
+      description = `Sending ${step.fromAsset.symbol} to ${shortAddress} on ${step.toChain}`;
+      break;
+    case TransactionType.SWAP:
+      description = `Swapping ${step.fromAsset.symbol} to ${step.toAsset.symbol} on ${step.fromChain}`;
+      break;
+    case TransactionType.EXCHANGE:
+      description = `Exchanging ${step.fromAsset.symbol} (${step.fromChain}) to ${step.toAsset.symbol} (${step.toChain}) via Skip`;
+      break;
+    case TransactionType.IBC_SEND:
+      description = `Transferring ${step.fromAsset.symbol} from ${step.fromChain} to ${step.toChain} via ${step.via === 'skip' ? 'Skip' : 'IBC'}`;
+      break;
+    default:
+      description = `Processing ${step.type} transaction`;
+  }
+
+  // Add logging for the description
+  console.log(`Transaction Step Description: ${description}`, {
+    transactionType: step.type,
+    fromAsset: step.fromAsset.symbol,
+    toAsset: step.type !== TransactionType.SEND ? step.toAsset?.symbol : undefined,
+    fromChain: step.fromChain,
+    toChain: step.toChain,
+    recipientAddress: shortAddress,
+  });
+
+  return description;
 };

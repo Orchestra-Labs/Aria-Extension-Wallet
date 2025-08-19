@@ -11,8 +11,6 @@ import {
   Asset,
   CalculatedFeeDisplay,
   FeeState,
-  TransactionLog,
-  TransactionLogEntry,
   TransactionState,
   TransactionStatusState,
 } from '@/types';
@@ -20,8 +18,8 @@ import { selectedAssetAtom } from './assetsAtom';
 import { networkLevelAtom } from './networkLevelAtom';
 import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { allWalletAssetsAtom } from './walletAtom';
-import { transactionTypeAtom } from './transactionTypeAtom';
 import { getFeeTextClass } from '@/helpers';
+import { transactionHasValidRouteAtom, transactionRouteAtom } from './transactionRouteAtom';
 
 type TransactionStateAtom = WritableAtom<
   TransactionState,
@@ -82,7 +80,9 @@ export const feeStateAtom = atom<FeeState, [FeeState | ((prev: FeeState) => FeeS
 
     const chainInfo = chainRegistry[networkLevel][selectedAsset.chainId];
     const feeToken =
-      chainInfo?.fees?.find(fee => fee.denom === selectedAsset.denom) || chainInfo?.fees?.[0];
+      chainInfo?.fees?.find(
+        fee => fee.denom === selectedAsset.originDenom || selectedAsset.denom,
+      ) || chainInfo?.fees?.[0];
 
     return {
       ...currentState, // Preserve any other manually set fields
@@ -110,11 +110,11 @@ export const calculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
   console.group('[calculatedFeeAtom] Recalculating fee display');
   const sendState = get(sendStateAtom);
   const feeState = get(feeStateAtom);
-  const transactionType = get(transactionTypeAtom);
+  const transactionHasValidRoute = get(transactionHasValidRouteAtom);
 
   console.log('Send state:', sendState);
   console.log('Fee state:', feeState);
-  console.log('Transaction type valid:', transactionType.isValid);
+  console.log('Transaction type valid:', transactionHasValidRoute);
 
   const defaultReturn: CalculatedFeeDisplay = {
     feeAmount: 0,
@@ -126,7 +126,7 @@ export const calculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
     gasPrice: 0,
   };
 
-  if (!sendState.asset || !transactionType.isValid) {
+  if (!sendState.asset || !transactionHasValidRoute) {
     console.log('Returning default - no asset or invalid transaction type');
     console.groupEnd();
     return defaultReturn;
@@ -194,10 +194,12 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
     status: TransactionStatus.IDLE,
   });
 
-  // Reset transaction log
-  set(transactionLogAtom, {
-    isSimulation: false,
-    entries: [],
+  // Reset transaction route
+  set(transactionRouteAtom, {
+    steps: [],
+    currentStep: 0,
+    isComplete: false,
+    isSimulation: true,
   });
 });
 
@@ -219,48 +221,12 @@ export const maxAvailableAtom = atom(get => {
   return Math.max(0, maxAmount - feeAmount);
 });
 
-export const transactionLogAtom = atom<TransactionLog>({
-  isSimulation: false,
-  entries: [],
-});
-
-// Add derived atoms for log operations
-export const addTransactionLogEntryAtom = atom(null, (get, set, entry: TransactionLogEntry) => {
-  const current = get(transactionLogAtom);
-  set(transactionLogAtom, {
-    ...current,
-    entries: [...current.entries, entry],
-  });
-});
-
-export const updateTransactionLogEntryAtom = atom(
-  null,
-  (get, set, { index, updates }: { index: number; updates: Partial<TransactionLogEntry> }) => {
-    const current = get(transactionLogAtom);
-    const newEntries = [...current.entries];
-    if (index >= 0 && index < newEntries.length) {
-      newEntries[index] = { ...newEntries[index], ...updates };
-    }
-    set(transactionLogAtom, {
-      ...current,
-      entries: newEntries,
-    });
-  },
-);
-
-export const resetTransactionLogAtom = atom(null, (_, set) => {
-  set(transactionLogAtom, {
-    isSimulation: false,
-    entries: [],
-  });
-});
-
 export const transactionStatusAtom = atom<TransactionStatusState>({
   status: TransactionStatus.IDLE,
 });
 
 export const isLoadingAtom = atom(
-  get => get(transactionStatusAtom).status === TransactionStatus.LOADING,
+  get => get(transactionStatusAtom).status === TransactionStatus.PENDING,
 );
 
 export const isTransactionSuccessAtom = atom(
@@ -291,7 +257,7 @@ export const receiveErrorAtom = atom<{
 });
 
 // Add these derived atoms for convenience
-export const isInvalidTransactionAtom = atom(get => get(transactionTypeAtom).isValid !== true);
+export const isInvalidTransactionAtom = atom(get => get(transactionHasValidRouteAtom) !== true);
 export const hasSendErrorAtom = atom(get => get(sendErrorAtom).message !== '');
 export const hasReceiveErrorAtom = atom(get => get(receiveErrorAtom).message !== '');
 

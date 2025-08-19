@@ -8,7 +8,7 @@ import { NetworkLevel, ROUTES, SettingsOption } from '@/constants';
 import {
   networkLevelAtom,
   resetSelectedValidatorChainAtom,
-  resetTransactionLogAtom,
+  resetTransactionRouteAtom,
   sessionWalletAtom,
   userAccountAtom,
   validatorDataAtom,
@@ -21,12 +21,12 @@ const MainLayout: React.FC = () => {
   const userAccount = useAtomValue(userAccountAtom);
   const setValidatorState = useSetAtom(validatorDataAtom);
   const resetSelectedValidatorChain = useSetAtom(resetSelectedValidatorChainAtom);
-  const resetLogs = useSetAtom(resetTransactionLogAtom);
+  const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
 
   const toggleNetworkLevel = () => {
     setValidatorState([]);
     resetSelectedValidatorChain();
-    resetLogs();
+    resetTxRoute();
     setNetworkLevel(prev =>
       prev === NetworkLevel.MAINNET ? NetworkLevel.TESTNET : NetworkLevel.MAINNET,
     );

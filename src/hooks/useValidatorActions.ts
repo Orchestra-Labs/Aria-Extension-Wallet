@@ -59,7 +59,7 @@ export const useValidatorActions = () => {
       if (!isSimulation) {
         setTransactionState(prev => ({
           ...prev,
-          status: TransactionStatus.LOADING,
+          status: TransactionStatus.PENDING,
           validatorAddress: singleTargetValidatorAddress,
         }));
       }

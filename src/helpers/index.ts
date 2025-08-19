@@ -21,7 +21,6 @@ export * from './statusUtils';
 export * from './swapTransactions';
 export * from './timer';
 export * from './transactionHandlers';
-export * from './transactionLogHelpers';
 export * from './truncateString';
 export * from './utils';
 export * from './uuid';

@@ -26,8 +26,8 @@ export const validatorTransactionStateAtom = atom<ValidatorTransactionState>({
 export const validatorAmountAtom = atom(0);
 
 // Derived atoms
-export const isValidatorTxLoadingAtom = atom(
-  get => get(validatorTransactionStateAtom).status === TransactionStatus.LOADING,
+export const isValidatorTxPendingAtom = atom(
+  get => get(validatorTransactionStateAtom).status === TransactionStatus.PENDING,
 );
 
 export const isValidatorTxSuccessAtom = atom(

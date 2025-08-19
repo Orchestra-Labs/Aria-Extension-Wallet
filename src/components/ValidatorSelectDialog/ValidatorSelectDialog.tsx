@@ -8,7 +8,7 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
   resetValidatorTransactionAtom,
-  isValidatorTxLoadingAtom,
+  isValidatorTxPendingAtom,
   isValidatorTxSuccessAtom,
   validatorErrorAtom,
   validatorTxFailedAtom,
@@ -46,7 +46,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const getDialogValidators = useAtomValue(dialogValidatorsAtom);
-  const isLoading = useAtomValue(isValidatorTxLoadingAtom);
+  const isLoading = useAtomValue(isValidatorTxPendingAtom);
   const isSuccess = useAtomValue(isValidatorTxSuccessAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
   const transactionFailed = useAtomValue(validatorTxFailedAtom);

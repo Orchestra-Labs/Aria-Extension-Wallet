@@ -13,14 +13,14 @@ import {
   recipientAddressAtom,
   sendErrorAtom,
   sendStateAtom,
-  transactionLogAtom,
   lastSimulationUpdateAtom,
   simulationBlockedAtom,
-  resetTransactionLogAtom,
-  transactionTypeAtom,
   transactionErrorAtom,
-  updateTransactionTypeAtom,
   chainWalletAtom,
+  updateTransactionRouteAtom,
+  transactionRouteAtom,
+  transactionHasValidRouteAtom,
+  resetTransactionRouteAtom,
 } from '@/atoms';
 import { useEffect } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -38,17 +38,17 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
-  const transactionType = useAtomValue(transactionTypeAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const addressVerified = useAtomValue(addressVerifiedAtom);
-  const setTransactionLog = useSetAtom(transactionLogAtom);
   const isLoading = useAtomValue(isLoadingAtom);
   const [sendError, setSendError] = useAtom(sendErrorAtom);
   const receiveError = useAtomValue(receiveErrorAtom);
   const hasSendError = useAtomValue(hasSendErrorAtom);
-  const resetLogs = useSetAtom(resetTransactionLogAtom);
+  const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
   const transactionError = useAtomValue(transactionErrorAtom);
-  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
+  const transactionRoute = useAtomValue(transactionRouteAtom);
+  const transactionHasValidRoute = useAtomValue(transactionHasValidRouteAtom);
+  const updateTransactionRoute = useSetAtom(updateTransactionRouteAtom);
   const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
 
   // New atoms for simulation state
@@ -158,7 +158,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       recipientAddress &&
       addressVerified &&
       sendState.amount > 0 &&
-      transactionType.isValid &&
+      transactionHasValidRoute &&
       !isLoading &&
       !transactionError;
 
@@ -167,7 +167,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       addressVerified,
       sendAmount: sendState.amount,
       isLoading,
-      transactionType,
+      transactionRoute,
       result: canRun,
       transactionError,
     });
@@ -182,7 +182,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       !recipientAddress ||
       !addressVerified
     ) {
-      setTransactionLog({ isSimulation: false, entries: [] });
+      resetTxRoute();
       return;
     }
 
@@ -242,7 +242,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const clearAmount = () => {
     handleStateUpdate({ sendAmount: 0, receiveAmount: 0 });
     setSendError({ message: '', status: InputStatus.NEUTRAL });
-    resetLogs();
+    resetTxRoute();
   };
 
   useEffect(() => {
@@ -250,7 +250,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       if (!walletState.address) return;
 
       try {
-        await updateTransactionType({
+        await updateTransactionRoute({
           sendState,
           receiveState,
           walletAddress: walletState.address,
@@ -271,7 +271,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       setLastUpdateTime(Date.now());
     }
     // NOTE: no sendstate dependency needed here.  sendstate calls for simulation elsewhere
-  }, [transactionType, isLoading]);
+  }, [transactionRoute, isLoading]);
 
   useEffect(() => {
     let intervalId: NodeJS.Timeout;
@@ -280,7 +280,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       intervalId = setInterval(() => {
         if (canRunSimulation()) {
           console.log('[Periodic Check] Running simulation');
-          resetLogs();
+          resetTxRoute();
           runSimulation();
           setLastUpdateTime(Date.now());
         } else {
@@ -306,7 +306,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         clearInterval(intervalId);
       }
     };
-  }, [transactionType, isLoading]);
+  }, [transactionRoute, isLoading]);
 
   useEffect(() => {
     if (hasSendError) {

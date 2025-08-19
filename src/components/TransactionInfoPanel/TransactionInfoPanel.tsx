@@ -6,7 +6,7 @@ import {
   isLoadingAtom,
   transactionErrorAtom,
   transactionFailedAtom,
-  transactionLogAtom,
+  transactionRouteAtom,
 } from '@/atoms';
 import { TransactionResultsTile } from '@/components';
 import { formatLowBalanceDisplay } from '@/helpers';
@@ -15,8 +15,8 @@ export const TransactionInfoPanel = () => {
   const isLoading = useAtomValue(isLoadingAtom);
   const transactionFailed = useAtomValue(transactionFailedAtom);
   const transactionError = useAtomValue(transactionErrorAtom);
-  const transactionLog = useAtomValue(transactionLogAtom);
   const calculatedFee = useAtomValue(calculatedFeeAtom);
+  const transactionRoute = useAtomValue(transactionRouteAtom);
 
   return (
     <>
@@ -38,23 +38,23 @@ export const TransactionInfoPanel = () => {
         )}
         {!isLoading &&
           !transactionFailed &&
-          transactionLog.entries.map(entry => (
+          transactionRoute.steps.map((step, index) => (
             <div
-              key={entry.description}
+              key={`${step.type}-${index}`}
               className="flex justify-between items-center w-full text-sm text-white mb-1"
             >
-              <span className="text-left truncate">{entry.description}</span>
+              <span className="text-left truncate">{step.log.description}</span>
               <span className="flex justify-end text-right w-[1rem]">
-                {entry.status === TransactionStatus.SUCCESS && (
+                {step.log.status === TransactionStatus.SUCCESS && (
                   <span className="h-4 w-4 text-success">✔</span>
                 )}
-                {entry.status === TransactionStatus.LOADING && (
+                {step.log.status === TransactionStatus.PENDING && (
                   <Spinner className="h-4 w-4 animate-spin fill-blue" />
                 )}
-                {entry.status === TransactionStatus.ERROR && (
+                {step.log.status === TransactionStatus.ERROR && (
                   <span className="h-4 w-4 text-error">✖</span>
                 )}
-                {entry.status === TransactionStatus.IDLE && (
+                {step.log.status === TransactionStatus.IDLE && (
                   <span className="h-4 w-4 text-gray-500">—</span>
                 )}
               </span>

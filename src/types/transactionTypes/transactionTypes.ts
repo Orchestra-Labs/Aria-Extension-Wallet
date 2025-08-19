@@ -1,6 +1,7 @@
 import { InputStatus, TransactionStatus, TransactionType } from '@/constants';
 import { Asset, FeeToken } from '../localStorageTypes';
 
+// TODO: remove
 export interface TransactionDetails {
   type: TransactionType;
   isValid: boolean;
@@ -28,29 +29,30 @@ export interface CalculatedFeeDisplay {
   gasPrice: number;
 }
 
-export interface TransactionLogEntry {
-  description: string;
-  fee?: {
-    amount: number;
-    denom: string;
-  };
-  status: TransactionStatus;
-  error?: string;
-  routeStep?: {
-    operationType: string;
-    fromChain: string;
-    toChain: string;
-    asset: string;
-    estimatedFee?: {
-      amount: string;
+export interface TransactionStep {
+  type: TransactionType;
+  via: 'skip' | 'standard';
+  fromChain: string;
+  toChain: string;
+  fromAsset: Asset;
+  toAsset: Asset;
+  log: {
+    description: string;
+    status: TransactionStatus;
+    txHash?: string;
+    error?: string;
+    fee?: {
+      amount: number;
       denom: string;
     };
   };
 }
 
-export interface TransactionLog {
+export interface TransactionRoute {
+  steps: TransactionStep[];
+  currentStep: number;
+  isComplete: boolean;
   isSimulation: boolean;
-  entries: TransactionLogEntry[];
 }
 
 export type TransactionError = {

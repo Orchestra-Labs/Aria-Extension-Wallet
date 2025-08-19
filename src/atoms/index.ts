@@ -14,7 +14,7 @@ export * from './processCompletedAtom';
 export * from './searchFilterAtom';
 export * from './swiperIndexAtom';
 export * from './transactionStateAtom';
-export * from './transactionTypeAtom';
+export * from './transactionRouteAtom';
 export * from './validatorActionsAtom';
 export * from './validatorsAtom';
 export * from './validatorStateAtom';

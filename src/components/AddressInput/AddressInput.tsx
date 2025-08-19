@@ -7,7 +7,7 @@ import {
   networkLevelAtom,
   receiveStateAtom,
   recipientAddressAtom,
-  resetTransactionLogAtom,
+  resetTransactionRouteAtom,
   selectedAssetAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
@@ -33,7 +33,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const fullRegistry = useAtomValue(fullChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
-  const resetLogs = useSetAtom(resetTransactionLogAtom);
+  const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
 
   const [allowValidateAddress, setAllowValidatePassword] = useState(false);
 
@@ -103,7 +103,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
           'to',
           matchedChain.chain_id,
         );
-        resetLogs();
+        resetTxRoute();
         setReceiveState(prevState => ({
           ...prevState,
           chainId: matchedChain.chain_id,
@@ -126,7 +126,7 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     if (newAddress === '') {
       setAllowValidatePassword(false);
       setStatus();
-      resetLogs();
+      resetTxRoute();
     }
 
     if (allowValidateAddress) {

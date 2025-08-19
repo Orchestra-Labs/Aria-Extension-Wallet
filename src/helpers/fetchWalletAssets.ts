@@ -5,10 +5,11 @@ import {
   GAMM_PREFIX,
   GAMM_EXPONENT_DEFAULT,
 } from '@/constants';
-import { Uri, Asset, SubscriptionRecord, LocalChainRegistry } from '@/types';
+import { Uri, Asset, SubscriptionRecord, LocalChainRegistry, IbcRegistry } from '@/types';
 import { queryRestNode } from './queryNodes';
 import { safeTrimLowerCase } from './formatString';
 import { getCachedPrices } from './priceCache';
+import { getIbcRegistry } from './dataHelpers';
 
 const adjustAmountByExponent = (amount: string, exponent: number): string => {
   const divisor = Math.pow(10, exponent);
@@ -58,7 +59,17 @@ const fetchAssetPrices = async (
   }
 };
 
-const resolveIbcAsset = async (ibcDenom: string, prefix: string, restUris: Uri[]) => {
+const resolveIbcAsset = async (
+  ibcDenom: string,
+  prefix: string,
+  restUris: Uri[],
+  currentChainId: string,
+  chainRegistry: LocalChainRegistry,
+): Promise<{
+  baseDenom: string;
+  path: string;
+  originChainId: string;
+}> => {
   try {
     const denomHash = ibcDenom.slice(4);
     const response = await queryRestNode({
@@ -71,10 +82,79 @@ const resolveIbcAsset = async (ibcDenom: string, prefix: string, restUris: Uri[]
       throw new Error(`No denom trace found for ${ibcDenom}`);
     }
 
+    const baseDenom = safeTrimLowerCase(response.denom_trace.base_denom);
+    const path = response.denom_trace.path || '';
+    let originChainId = '';
+
+    console.log(`[resolveIbcAsset] Base denom: ${baseDenom}, Path: ${path}`);
+
+    // Extract channel ID from path (format: "transfer/channel-X")
+    const pathParts = path.split('/');
+    if (pathParts.length >= 2) {
+      const channelId = pathParts[1];
+      console.log(`[resolveIbcAsset] Extracted channel ID: ${channelId}`);
+
+      const ibcRegistry = getIbcRegistry();
+      console.log(`[resolveIbcAsset] Full IBC registry:`, ibcRegistry);
+
+      const networkLevel = chainRegistry[currentChainId].network_level;
+      console.log(`[resolveIbcAsset] Network level: ${networkLevel}`);
+
+      // Get the correct network registry (mainnet or testnet)
+      const networkRegistry =
+        networkLevel === NetworkLevel.TESTNET ? ibcRegistry.data.testnet : ibcRegistry.data.mainnet;
+
+      if (!networkRegistry) {
+        throw new Error(`No IBC registry found for network level: ${networkLevel}`);
+      }
+
+      // Properly typed iteration through IBC registry entries
+      for (const [connectionKey, connection] of Object.entries(networkRegistry as IbcRegistry)) {
+        // Check if this connection involves our current chain
+        if (connectionKey.includes(currentChainId)) {
+          const [chain1, chain2] = connectionKey.split(',');
+          const isCurrentChainFirst = chain1 === currentChainId;
+
+          // Get the channel info for current chain specifically
+          const currentChainIBCInfo = connection[currentChainId];
+          console.log(
+            `[resolveIbcAsset] Current channel, connection key and recorded ibc channel:`,
+            channelId,
+            connectionKey,
+            currentChainIBCInfo.channel_id,
+          );
+
+          // Only proceed if the channel ID matches current chain's channel
+          if (currentChainIBCInfo?.channel_id === channelId) {
+            // The counterparty is the other chain in this connection
+            originChainId = isCurrentChainFirst ? chain2 : chain1;
+            console.log(
+              `[resolveIbcAsset] Found matching channel ${channelId} on ${currentChainId} connected to ${originChainId}`,
+            );
+            break;
+          }
+        }
+      }
+    } else {
+      console.log(`[resolveIbcAsset] Path doesn't contain channel information: ${path}`);
+    }
+
+    // TODO: handle multi-hop paths.  add all to list and use that list with tx router
+    // Fallback: If not found, check if this is a multihop IBC transfer
+    if (!originChainId && path.includes('/transfer/')) {
+      // For multihop transfers, the origin chain might be earlier in the path
+      // Example: "transfer/channel-1/transfer/channel-2/denom"
+      const hops = path.split('/transfer/');
+      if (hops.length > 2) {
+        // This is a multihop transfer - we'd need more complex logic to trace
+        console.warn(`Multihop IBC transfer detected for ${ibcDenom}, path: ${path}`);
+      }
+    }
+
     return {
-      baseDenom: safeTrimLowerCase(response.denom_trace.base_denom),
-      path: response.denom_trace.path || '',
-      originChainId: response.denom_trace.path?.split('/')[2] || '',
+      baseDenom,
+      path,
+      originChainId,
     };
   } catch (error) {
     console.error(`Error resolving IBC denom ${ibcDenom}:`, error);
@@ -195,7 +275,13 @@ export async function fetchWalletAssets(
             baseDenom: resolvedDenom,
             path,
             originChainId: resolvedOriginChainId,
-          } = await resolveIbcAsset(denom, bech32_prefix, rest_uris || []);
+          } = await resolveIbcAsset(
+            denom,
+            bech32_prefix,
+            rest_uris || [],
+            chainId,
+            fullChainRegistry,
+          );
           baseDenom = denom;
           isIbc = true;
           originDenom = resolvedDenom;
