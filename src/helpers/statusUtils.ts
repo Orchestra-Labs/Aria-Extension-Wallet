@@ -23,9 +23,3 @@ export const getVotingPowerStatus = (power: number, evenSplit: number) => {
   if (power > evenSplit * 1.5) return TextFieldStatus.WARN;
   return TextFieldStatus.GOOD;
 };
-
-export const getFeeTextClass = (percentage: number) => {
-  if (percentage > 1) return 'text-error';
-  if (percentage > 0.75) return 'text-warn';
-  return 'text-blue';
-};

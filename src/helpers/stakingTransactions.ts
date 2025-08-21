@@ -117,7 +117,7 @@ export const stakeToValidator = async (
 export const claimRewards = async (
   chain: SimplifiedChainInfo,
   validatorInfoArray: FullValidatorInfo[],
-  feeToken: FeeToken,
+  feeToken?: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
@@ -176,7 +176,7 @@ export const claimRewards = async (
       console.log(`Processing claim rewards batch ${index + 1}/${messageChunks.length}`);
 
       const estimatedGas = Math.ceil(parseFloat(simulation.gasWanted || '0') * 1.1);
-      const feeAmount = Math.ceil(estimatedGas * (feeToken.gasPriceStep?.average || 0.025));
+      const feeAmount = Math.ceil(estimatedGas * (feeToken?.gasPriceStep?.average || 0.025));
 
       const result = await queryRpcNode({
         endpoint,
@@ -186,7 +186,7 @@ export const claimRewards = async (
         feeToken,
         simulateOnly: false,
         fee: {
-          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
+          amount: [{ denom: feeToken?.denom || '', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
       });

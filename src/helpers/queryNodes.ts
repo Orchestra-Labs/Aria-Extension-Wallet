@@ -88,106 +88,76 @@ const performRpcQuery = async (
 
   try {
     let calculatedFee = fee;
-    let gasPrice = feeToken.gasPriceStep.low; // Start with low
-    let attempts = 0;
-    const maxAttempts = 2; // Try average first, then high if needed
+    let gasPrice = feeToken.gasPriceStep.average; // Start with low
 
-    while (attempts < maxAttempts) {
-      try {
-        if (!calculatedFee) {
-          console.log('[queryNodes] Calculating fee...');
-          const feeDenom = feeToken.denom;
-          const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
+    if (!calculatedFee) {
+      console.log('[queryNodes] Calculating fee...');
+      const feeDenom = feeToken.denom;
+      const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
 
-          // Simulate transaction to get gas estimate
-          const gasEstimation = await client.simulate(walletAddress, messages, memo);
-          console.log('[queryNodes] Raw Gas Estimation:', gasEstimation);
+      // Simulate transaction to get gas estimate
+      const gasEstimation = await client.simulate(walletAddress, messages, memo);
+      console.log('[queryNodes] Raw Gas Estimation:', gasEstimation);
 
-          // Add buffer (30% more gas than estimated)
-          const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
-          console.log('[queryNodes] Buffered Gas Estimation:', bufferedGasEstimation);
+      // Add buffer (30% more gas than estimated)
+      const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
+      console.log('[queryNodes] Buffered Gas Estimation:', bufferedGasEstimation);
 
-          // Calculate fee amount
-          const feeAmount = Math.ceil(
-            bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
-          );
-          console.log('[queryNodes] Calculated Fee Amount:', feeAmount);
+      // Calculate fee amount
+      const feeAmount = Math.ceil(
+        bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
+      );
+      console.log('[queryNodes] Calculated Fee Amount:', feeAmount);
 
-          calculatedFee = {
-            amount: [
-              {
-                denom: feeDenom,
-                amount: feeAmount.toString(),
-              },
-            ],
-            gas: bufferedGasEstimation.toString(),
-          };
-        }
-
-        console.log('[queryNodes] Final Calculated Fee:', calculatedFee);
-
-        if (simulateOnly) {
-          console.log('[queryNodes] Simulation success, returning fee info.');
-          return {
-            code: 0,
-            message: 'Simulation success',
-            fee: calculatedFee,
-            gasWanted: calculatedFee.gas,
-          };
-        }
-
-        const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
-        console.log('[queryNodes] Transaction result:', result);
-
-        if (result.code === 0) {
-          return {
-            code: 0,
-            txHash: result.transactionHash,
-            gasUsed: result.gasUsed?.toString(),
-            gasWanted: result.gasWanted?.toString(),
-            message: 'Transaction success',
-          };
-        }
-
-        // Handle specific error codes
-        if (result.code === 13) {
-          // 13 = insufficient fee
-          throw new Error('Insufficient fee');
-        }
-
-        console.error('[queryNodes] Transaction failed with code:', result.code);
-        throw new Error(`Transaction failed with code ${result.code}`);
-      } catch (error: any) {
-        console.error('[queryNodes] Error during RPC query:', error);
-
-        // Check if we should retry with higher gas price
-        if (
-          attempts < maxAttempts - 1 &&
-          (error.message.includes('insufficient fee') || error.code === 13)
-        ) {
-          attempts++;
-          gasPrice = feeToken.gasPriceStep.average; // Switch to average gas price
-          calculatedFee = undefined; // Force recalculation
-          console.log(`[queryNodes] Retrying with higher gas price: ${gasPrice}`);
-          continue;
-        }
-
-        // If we have an indexer error, handle specially
-        if (isIndexerError(error)) {
-          console.log('Indexer error detected.');
-          return {
-            code: 1,
-            message: 'Node indexer disabled',
-            txHash: error.txHash || 'unknown',
-          };
-        }
-
-        throw error;
-      }
+      calculatedFee = {
+        amount: [
+          {
+            denom: feeDenom,
+            amount: feeAmount.toString(),
+          },
+        ],
+        gas: bufferedGasEstimation.toString(),
+      };
     }
 
-    throw new Error('All fee adjustment attempts failed');
+    console.log('[queryNodes] Final Calculated Fee:', calculatedFee);
+
+    if (simulateOnly) {
+      console.log('[queryNodes] Simulation success, returning fee info.');
+      return {
+        code: 0,
+        message: 'Simulation success',
+        fee: calculatedFee,
+        gasWanted: calculatedFee.gas,
+      };
+    }
+
+    const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
+    console.log('[queryNodes] Transaction result:', result);
+
+    if (result.code === 0) {
+      return {
+        code: 0,
+        txHash: result.transactionHash,
+        gasUsed: result.gasUsed?.toString(),
+        gasWanted: result.gasWanted?.toString(),
+        message: 'Transaction success',
+      };
+    }
+
+    console.error('[queryNodes] Transaction failed with code:', result.code);
+    throw new Error(`Transaction failed with code ${result.code}`);
   } catch (error: any) {
+    // If we have an indexer error, handle specially
+    if (isIndexerError(error)) {
+      console.log('Indexer error detected.');
+      return {
+        code: 1,
+        message: 'Node indexer disabled',
+        txHash: error.txHash || 'unknown',
+      };
+    }
+
     console.error('[queryNodes] Final error:', error);
     throw error;
   }

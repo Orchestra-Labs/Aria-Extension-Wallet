@@ -18,6 +18,12 @@ export enum TransactionStatus {
   ERROR = 'error',
 }
 
+export enum TextClass {
+  ERROR = 'text-error',
+  WARNING = 'text-warning',
+  GOOD = 'text-blue',
+}
+
 export enum TextFieldStatus {
   ERROR = 'error',
   WARN = 'warn',

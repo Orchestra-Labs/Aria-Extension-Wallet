@@ -119,7 +119,6 @@ export const getSkipSupportedAssets = async (
     }
 
     const responseData = (await response.json()) as SkipAssetsResponse;
-    console.log('[Skip API] Assets Success:', JSON.stringify(responseData, null, 2));
 
     // Convert Skip assets to our Asset type
     const convertedAssets: AssetRegistry = {};

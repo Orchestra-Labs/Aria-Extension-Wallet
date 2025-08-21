@@ -30,6 +30,7 @@ export interface TransactionRPCResponse extends BaseRPCResponse {
   gasWanted?: string;
   route?: any;
   estimatedAmountOut?: string;
+  fee?: any;
   fees?: any[];
   messages?: any[];
   minAmountOut?: string;

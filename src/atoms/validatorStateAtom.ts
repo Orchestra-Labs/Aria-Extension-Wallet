@@ -2,12 +2,12 @@ import { atom } from 'jotai';
 import {
   DEFAULT_FEE_STATE,
   DEFAULT_FEE_TOKEN,
+  TextClass,
   TransactionStatus,
   ValidatorAction,
 } from '@/constants';
 import { CalculatedFeeDisplay, FeeState } from '@/types';
 import { chainInfoAtom, selectedValidatorChainAtom } from './chainRegistryAtom';
-import { getFeeTextClass } from '@/helpers';
 
 // TODO: tie to Toast
 export interface ValidatorTransactionState {
@@ -107,7 +107,7 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
     return {
       feeAmount: 0,
       feeUnit: '',
-      textClass: 'text-blue',
+      textClass: TextClass.GOOD,
       percentage: 0,
       calculatedFee: 0,
       gasWanted: 0,
@@ -127,7 +127,7 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
     feeAmount: feeState.amount,
     feeUnit: asset.symbol,
     // NOTE: Percentage not applicable here since we don't have amount context
-    textClass: getFeeTextClass(0),
+    textClass: TextClass.GOOD,
     percentage: 0,
     calculatedFee,
     gasWanted: feeState.gasWanted,

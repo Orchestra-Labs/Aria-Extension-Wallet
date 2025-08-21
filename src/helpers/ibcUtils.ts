@@ -30,6 +30,7 @@ export const resolveChainId = (chainName: string, registry: LocalChainRegistry):
   return exactMatch?.[0] || null;
 };
 
+// TODO: avoid reading this in so much
 export const processIbcData = (
   ibcFiles: any[], // Always an array of IBC connection objects
   chainRegistry: LocalChainRegistry,

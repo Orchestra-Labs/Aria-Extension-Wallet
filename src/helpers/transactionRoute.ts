@@ -1,0 +1,59 @@
+import { TransactionType } from '@/constants';
+import { SimplifiedChainInfo, TransactionRoute, TransactionStep } from '@/types';
+import { truncateWalletAddress } from './truncateString';
+
+export const createStepHash = (step: TransactionStep): string => {
+  return `${step.type}-${step.via}-${step.fromChain}-${step.toChain}-${step.fromAsset.denom}-${step.toAsset.denom}`;
+};
+
+export const createRouteHash = (route: TransactionRoute): string => {
+  return route.steps.map(step => step.hash).join('|');
+};
+
+export const getStepDescription = (
+  step: TransactionStep,
+  recipientAddress: string,
+  walletAddress: string,
+  sendChainInfo: SimplifiedChainInfo,
+  receiveChainInfo: SimplifiedChainInfo,
+): string => {
+  const toAddress = recipientAddress || walletAddress;
+  const shortToAddress = truncateWalletAddress(sendChainInfo.bech32_prefix, toAddress);
+
+  const fromChainName = sendChainInfo.pretty_name;
+  const toChainName = receiveChainInfo.pretty_name;
+
+  const fromAssetSymbol = step.fromAsset.symbol;
+  const toAssetSymbol = step.toAsset.symbol;
+
+  let description: string;
+  switch (step.type) {
+    case TransactionType.SEND:
+      description = `${fromChainName}: ${fromAssetSymbol} => ${shortToAddress}`;
+      break;
+    case TransactionType.SWAP:
+      description = `${fromChainName}: ${fromAssetSymbol} => ${toAssetSymbol}`;
+      break;
+    case TransactionType.EXCHANGE:
+      const chainSuffix = fromChainName !== toChainName ? `, ${toChainName}` : '';
+      description = `${fromChainName}: ${fromAssetSymbol} => ${toAssetSymbol}${chainSuffix}`;
+      break;
+    case TransactionType.IBC_SEND:
+      description = `${fromChainName}: ${fromAssetSymbol} => ${toChainName}`;
+      break;
+    default:
+      description = `Processing ${step.type} transaction`;
+  }
+
+  // Add logging for the description
+  console.log(`Transaction Step Description: ${description}`, {
+    transactionType: step.type,
+    fromAsset: step.fromAsset.symbol,
+    toAsset: step.type !== TransactionType.SEND ? step.toAsset?.symbol : undefined,
+    fromChain: step.fromChain,
+    toChain: step.toChain,
+    recipientAddress: shortToAddress,
+  });
+
+  return description;
+};

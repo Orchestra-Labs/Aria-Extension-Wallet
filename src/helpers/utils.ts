@@ -1,10 +1,4 @@
-import {
-  Asset,
-  SimplifiedChainInfo,
-  TransactionDetails,
-  TransactionState,
-  TransactionStep,
-} from '@/types';
+import { Asset, SimplifiedChainInfo } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -14,7 +8,6 @@ import {
   SYMPHONY_MAINNET_ID,
   SYMPHONY_TESTNET_ID,
   TextFieldStatus,
-  TransactionType,
 } from '@/constants';
 
 export const cn = (...inputs: ClassValue[]) => {
@@ -118,104 +111,3 @@ export function getSymphonyChainId(networkLevel: NetworkLevel): string {
 export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
-
-export const categorizeTransaction = async ({
-  sendAddress,
-  recipientAddress,
-  sendState,
-  receiveState,
-  isSend = false,
-  isIBC = false,
-  isSwap = false,
-  isExchange = false,
-}: {
-  sendAddress: string;
-  recipientAddress: string;
-  sendState: TransactionState;
-  receiveState: TransactionState;
-  isSend?: boolean;
-  isIBC?: boolean;
-  isSwap?: boolean;
-  isExchange?: boolean;
-}): Promise<TransactionDetails> => {
-  // Basic validation
-  if (!(sendAddress && recipientAddress)) {
-    return {
-      type: TransactionType.INVALID,
-      isValid: false,
-      isIBC: false,
-      isSwap: false,
-      isExchange: false,
-    };
-  }
-
-  const sendAsset = sendState.asset;
-  const receiveAsset = receiveState.asset;
-
-  // Validate the transaction type
-  const isValid = sendAsset && receiveAsset && (isSend || isIBC || isSwap || isExchange);
-
-  // Determine transaction type
-  let type: TransactionType;
-  if (!isValid) {
-    type = TransactionType.INVALID;
-  } else if (isExchange) {
-    type = TransactionType.EXCHANGE;
-  } else if (isIBC && isSwap) {
-    type = TransactionType.IBC_SWAP;
-  } else if (isIBC) {
-    type = TransactionType.IBC_SEND;
-  } else if (isSwap) {
-    type = TransactionType.SWAP;
-  } else {
-    type = TransactionType.SEND;
-  }
-
-  return {
-    type,
-    isValid,
-    isIBC,
-    isSwap,
-    isExchange,
-  };
-};
-
-export const getStepDescription = (
-  step: TransactionStep,
-  recipientAddress: string,
-  walletAddress: string,
-): string => {
-  const toAddress = recipientAddress || walletAddress;
-  const shortAddress = `${toAddress.substring(0, 10)}...${toAddress.substring(toAddress.length - 5)}`;
-
-  let description: string;
-
-  switch (step.type) {
-    case TransactionType.SEND:
-      description = `Sending ${step.fromAsset.symbol} to ${shortAddress} on ${step.toChain}`;
-      break;
-    case TransactionType.SWAP:
-      description = `Swapping ${step.fromAsset.symbol} to ${step.toAsset.symbol} on ${step.fromChain}`;
-      break;
-    case TransactionType.EXCHANGE:
-      description = `Exchanging ${step.fromAsset.symbol} (${step.fromChain}) to ${step.toAsset.symbol} (${step.toChain}) via Skip`;
-      break;
-    case TransactionType.IBC_SEND:
-      description = `Transferring ${step.fromAsset.symbol} from ${step.fromChain} to ${step.toChain} via ${step.via === 'skip' ? 'Skip' : 'IBC'}`;
-      break;
-    default:
-      description = `Processing ${step.type} transaction`;
-  }
-
-  // Add logging for the description
-  console.log(`Transaction Step Description: ${description}`, {
-    transactionType: step.type,
-    fromAsset: step.fromAsset.symbol,
-    toAsset: step.type !== TransactionType.SEND ? step.toAsset?.symbol : undefined,
-    fromChain: step.fromChain,
-    toChain: step.toChain,
-    recipientAddress: shortAddress,
-  });
-
-  return description;
-};

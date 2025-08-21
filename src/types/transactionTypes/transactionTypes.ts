@@ -1,15 +1,7 @@
-import { InputStatus, TransactionStatus, TransactionType } from '@/constants';
+import { InputStatus, TextClass, TransactionStatus, TransactionType } from '@/constants';
 import { Asset, FeeToken } from '../localStorageTypes';
 
-// TODO: remove
-export interface TransactionDetails {
-  type: TransactionType;
-  isValid: boolean;
-  isIBC: boolean;
-  isSwap: boolean;
-  isExchange: boolean;
-}
-
+// TODO: cut this down?  doubt all these fields are needed
 export interface FeeState {
   asset: Asset;
   amount: number; // Always stored in base units
@@ -22,7 +14,7 @@ export interface FeeState {
 export interface CalculatedFeeDisplay {
   feeAmount: number; // In base units
   feeUnit: string;
-  textClass: 'text-error' | 'text-warn' | 'text-blue';
+  textClass: TextClass;
   percentage: number;
   calculatedFee: number; // In symbol units
   gasWanted: number;
@@ -36,16 +28,15 @@ export interface TransactionStep {
   toChain: string;
   fromAsset: Asset;
   toAsset: Asset;
-  log: {
-    description: string;
-    status: TransactionStatus;
-    txHash?: string;
-    error?: string;
-    fee?: {
-      amount: number;
-      denom: string;
-    };
-  };
+  hash: string;
+}
+
+export interface TransactionLog {
+  description: string;
+  status: TransactionStatus;
+  txHash?: string;
+  error?: string;
+  fee: FeeState;
 }
 
 export interface TransactionRoute {
@@ -53,6 +44,10 @@ export interface TransactionRoute {
   currentStep: number;
   isComplete: boolean;
   isSimulation: boolean;
+}
+
+export interface TransactionLogs {
+  [stepHash: string]: TransactionLog;
 }
 
 export type TransactionError = {
@@ -81,5 +76,5 @@ export interface SendObject {
   recipientAddress: string;
   amount: string;
   denom: string;
-  feeToken: FeeToken;
+  feeToken?: FeeToken;
 }

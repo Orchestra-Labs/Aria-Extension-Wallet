@@ -1,14 +1,13 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   sendStateAtom,
   receiveStateAtom,
   chainWalletAtom,
   recipientAddressAtom,
-  feeStateAtom,
   networkLevelAtom,
   chainInfoAtom,
   transactionRouteAtom,
-  updateRouteStepStatusAtom,
+  updateTxStepLogAtom,
   resetRouteStatusAtom,
 } from '@/atoms';
 import { TransactionStatus, TransactionType } from '@/constants';
@@ -22,6 +21,7 @@ import {
   swapTransaction,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
+import { transactionLogsAtom } from '@/atoms/transactionLogsAtom';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
@@ -33,12 +33,11 @@ export const useSendActions = () => {
   const receiveState = useAtomValue(receiveStateAtom);
   const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
   const recipientAddress = useAtomValue(recipientAddressAtom);
-  // TODO: play around with fee state.  can't show for multiple cryptos currently, and can't show for just one step
-  const [feeState, _] = useAtom(feeStateAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const getChainInfo = useAtomValue(chainInfoAtom);
   const txRoute = useAtomValue(transactionRouteAtom);
-  const updateStepStatus = useSetAtom(updateRouteStepStatusAtom);
+  const txLogs = useAtomValue(transactionLogsAtom);
+  const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
 
   const executeSend = async ({
@@ -48,22 +47,19 @@ export const useSendActions = () => {
     sendObject: SendObject;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[executeSend] Starting standard send transaction');
-    try {
-      const sendChain = getChainInfo(sendState.chainId);
-      const prefix = sendChain.bech32_prefix;
-      const rpcUris = sendChain.rpc_uris;
+    console.log('[executeSend] Starting standard send transaction', sendObject);
+    const sendChain = getChainInfo(sendState.chainId);
+    const prefix = sendChain.bech32_prefix;
+    const rpcUris = sendChain.rpc_uris;
+    console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendState.chainId}`);
 
-      return await sendTransaction(
-        walletState.address,
-        sendObject,
-        simulateTransaction,
-        prefix,
-        rpcUris,
-      );
-    } finally {
-      console.groupEnd();
-    }
+    return await sendTransaction(
+      walletState.address,
+      sendObject,
+      simulateTransaction,
+      prefix,
+      rpcUris,
+    );
   };
 
   const executeStablecoinSwap = async ({
@@ -75,19 +71,14 @@ export const useSendActions = () => {
     receiveAsset: Asset;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[executeSwap] Starting stablecoin swap transaction');
-    try {
-      const swapParams = {
-        sendObject,
-        resultDenom: receiveAsset.denom, // need to use current denom here so it fails if ibc
-      };
-      const sendChain = getChainInfo(sendState.chainId);
-      const restUris = sendChain.rest_uris;
+    const swapParams = {
+      sendObject,
+      resultDenom: receiveAsset.denom, // need to use current denom here so it fails if ibc
+    };
+    const sendChain = getChainInfo(sendState.chainId);
+    const restUris = sendChain.rest_uris;
 
-      return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
-    } finally {
-      console.groupEnd();
-    }
+    return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
   };
 
   const executeIBC = async ({
@@ -97,7 +88,7 @@ export const useSendActions = () => {
     sendObject: SendObject;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[useSendActions] executeIBC - Starting IBC transaction');
+    console.log('[useSendActions] executeIBC - Starting IBC transaction');
     try {
       const sendChain = getChainInfo(sendState.chainId);
       const validChannel = await getValidIBCChannel({
@@ -137,8 +128,6 @@ export const useSendActions = () => {
         success: false,
         message: error instanceof Error ? error.message : 'IBC transaction failed',
       };
-    } finally {
-      console.groupEnd();
     }
   };
 
@@ -151,7 +140,7 @@ export const useSendActions = () => {
     receiveAssetDenom: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.group('[executeSkipTx] Starting IBC via Skip');
+    console.log('[executeSkipTx] Starting IBC via Skip');
     try {
       const amountIn = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
 
@@ -209,8 +198,6 @@ export const useSendActions = () => {
         success: false,
         message: error instanceof Error ? error.message : 'IBC via Skip failed',
       };
-    } finally {
-      console.groupEnd();
     }
   };
 
@@ -218,11 +205,14 @@ export const useSendActions = () => {
     step: TransactionStep,
     isSimulation: boolean,
   ): Promise<TransactionResult> => {
+    const stepLog = txLogs[step.hash];
+    const feeToken = stepLog?.fee?.feeToken;
+
     const sendObject: SendObject = {
       recipientAddress: recipientAddress || walletState.address,
       amount: sendState.amount.toString(),
       denom: step.fromAsset.denom,
-      feeToken: feeState.feeToken,
+      feeToken,
     };
 
     switch (step.type) {
@@ -248,56 +238,143 @@ export const useSendActions = () => {
   };
 
   const executeTransactionRoute = async (isSimulation: boolean): Promise<TransactionResult> => {
-    // Reset route status if real transaction
-    if (!isSimulation) {
-      resetRouteStatus();
-    }
+    console.log('[executeTransactionRoute] Starting', {
+      isSimulation,
+      txRouteSteps: txRoute.steps.length,
+      txRoute: txRoute,
+    });
 
-    // Execute steps sequentially
-    for (let i = 0; i < txRoute.steps.length; i++) {
-      const step = txRoute.steps[i];
+    resetRouteStatus(isSimulation);
 
-      // Update step to pending
-      updateStepStatus({
-        stepIndex: i,
-        status: TransactionStatus.PENDING,
-      });
+    let result: TransactionResult = { success: true, message: '' };
 
-      const result = await executeStep(step, isSimulation);
+    try {
+      // Execute steps sequentially
+      for (let i = 0; i < txRoute.steps.length; i++) {
+        const step = txRoute.steps[i];
 
-      if (!result.success) {
-        updateStepStatus({
+        console.log('[executeTransactionRoute] Processing step', {
           stepIndex: i,
-          status: TransactionStatus.ERROR,
-          error: result.message,
+          stepType: step.type,
+          stepVia: step.via,
+          fromChain: step.fromChain,
+          toChain: step.toChain,
+          fromAsset: step.fromAsset,
+          toAsset: step.toAsset,
         });
-        return result;
+
+        // Update step to pending
+        updateStepLog({
+          stepIndex: i,
+          status: TransactionStatus.PENDING,
+        });
+
+        result = await executeStep(step, isSimulation);
+
+        console.log('[executeTransactionRoute] Step result', {
+          stepIndex: i,
+          success: result.success,
+          message: result.message,
+          data: result.data,
+        });
+
+        if (!result.success) {
+          console.error('[executeTransactionRoute] Step failed', {
+            stepIndex: i,
+            error: result.message,
+          });
+
+          // Update failed step to ERROR
+          updateStepLog({
+            stepIndex: i,
+            status: TransactionStatus.ERROR,
+            error: result.message,
+          });
+
+          // Mark all remaining steps as IDLE
+          for (let j = i + 1; j < txRoute.steps.length; j++) {
+            updateStepLog({
+              stepIndex: j,
+              status: TransactionStatus.IDLE,
+            });
+          }
+
+          break;
+        }
+
+        let feeData = undefined;
+
+        if (result.data) {
+          // Handle different fee structures
+          if (result.data.fee) {
+            // For the structure shown in your logs {fee: {amount: Array, gas: string}}
+            const feeAmount =
+              result.data.fee.amount?.reduce(
+                (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+                0,
+              ) || 0;
+
+            feeData = {
+              gasWanted: result.data.fee.gas || result.data.gasWanted,
+              amount: feeAmount,
+            };
+          } else {
+            // For the expected structure {gasWanted: string, gasPrice: string}
+            feeData = {
+              gasWanted: result.data.gasWanted,
+              amount: result.data.fees
+                ? result.data.fees.reduce(
+                    (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+                    0,
+                  )
+                : undefined,
+            };
+          }
+        }
+
+        updateStepLog({
+          stepIndex: i,
+          status: TransactionStatus.SUCCESS,
+          txHash: result.data?.txHash,
+          feeData: feeData,
+        });
       }
 
-      updateStepStatus({
-        stepIndex: i,
-        status: TransactionStatus.SUCCESS,
-        txHash: result.data?.txHash,
-      });
-
-      // For simulations, only execute first step
-      if (isSimulation) return result;
+      // Complete transaction if it was successful
+      if (result.success && !isSimulation) {
+        console.log('[executeTransactionRoute] Transaction successful, refreshing data');
+        refreshData({ wallet: true });
+      }
+    } catch (error) {
+      console.error('[executeTransactionRoute] Unexpected error:', error);
+      result = {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
     }
 
-    // Complete transaction
-    if (!isSimulation) {
-      refreshData({ wallet: true });
-    }
-
-    return { success: true, message: '' };
+    console.log('[executeTransactionRoute] Final result:', result);
+    return result;
   };
 
   const runTransaction = async (): Promise<TransactionResult> => {
     return executeTransactionRoute(false);
   };
 
+  // In your useSendActions, add more logging:
   const runSimulation = async (): Promise<TransactionResult> => {
-    return executeTransactionRoute(true);
+    console.log('[runSimulation] Function called at:', Date.now());
+    try {
+      const result = await executeTransactionRoute(true);
+      console.log('[runSimulation] Completed:', result);
+      return result;
+    } catch (error) {
+      console.error('[runSimulation] Error:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   };
 
   return {

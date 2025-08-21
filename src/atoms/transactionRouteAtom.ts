@@ -2,16 +2,43 @@ import { atom } from 'jotai';
 import { TransactionType, TransactionStatus } from '@/constants';
 import { TransactionRoute, TransactionStep, TransactionState, Asset } from '@/types';
 import { chainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
-import { getStepDescription, getValidIBCChannel, isValidSwap } from '@/helpers';
-import { receiveStateAtom, sendStateAtom } from './transactionStateAtom';
+import {
+  createRouteHash,
+  createStepHash,
+  getStepDescription,
+  getValidIBCChannel,
+  isValidSwap,
+} from '@/helpers';
+import {
+  receiveStateAtom,
+  sendStateAtom,
+  simulationInvalidationAtom,
+} from './transactionStateAtom';
 import { skipAssetsAtom } from './assetsAtom';
 import { recipientAddressAtom } from './addressAtom';
+import {
+  createStepLogAtom,
+  resetTransactionLogsAtom,
+  transactionLogsAtom,
+  updateStepLogAtom,
+} from './transactionLogsAtom';
 
+export const transactionRouteHashAtom = atom<string>('');
 export const transactionRouteAtom = atom<TransactionRoute>({
   steps: [],
   currentStep: 0,
   isComplete: false,
   isSimulation: true,
+});
+
+export const transactionRouteFailedAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
+
+  return route.steps.some(step => {
+    const log = logs[step.hash];
+    return log?.status === TransactionStatus.ERROR;
+  });
 });
 
 export const resetTransactionRouteAtom = atom(null, (_, set) => {
@@ -22,19 +49,30 @@ export const resetTransactionRouteAtom = atom(null, (_, set) => {
     isComplete: false,
     isSimulation: true,
   });
+  set(resetTransactionLogsAtom);
 });
 
 export const transactionHasValidRouteAtom = atom<boolean>(get => {
   const route = get(transactionRouteAtom);
   const isValid = route.steps.length > 0;
+
   console.log('[transactionHasValidRouteAtom] Checking route validity:', {
+    steps: route.steps,
     stepsLength: route.steps.length,
     isValid,
+    routeDetails: route.steps.map(step => ({
+      type: step.type,
+      fromChain: step.fromChain,
+      toChain: step.toChain,
+      fromAsset: step.fromAsset.symbol,
+      toAsset: step.toAsset.symbol,
+    })),
   });
+
   return isValid;
 });
 
-export const updateRouteStepStatusAtom = atom(
+export const updateTxStepLogAtom = atom(
   null,
   (
     get,
@@ -44,62 +82,75 @@ export const updateRouteStepStatusAtom = atom(
       status: TransactionStatus;
       txHash?: string;
       error?: string;
+      feeData?: {
+        gasWanted?: string;
+        gasPrice?: string;
+        amount?: number;
+      };
     },
   ) => {
     const currentRoute = get(transactionRouteAtom);
+    const step = currentRoute.steps[params.stepIndex];
+
+    if (!step) {
+      console.error('[updateRouteStepStatusAtom] Step not found:', params.stepIndex);
+      return;
+    }
+
+    set(updateStepLogAtom, {
+      stepHash: step.hash,
+      log: {
+        status: params.status,
+        ...(params.txHash && { txHash: params.txHash }),
+        ...(params.error && { error: params.error }),
+      },
+      feeData: params.feeData,
+    });
+
     console.log('[updateRouteStepStatusAtom] Updating step status:', {
       stepIndex: params.stepIndex,
-      currentStatus: currentRoute.steps[params.stepIndex]?.log.status,
+      stepHash: step.hash,
       newStatus: params.status,
       txHash: params.txHash,
       error: params.error,
     });
 
-    const updatedSteps = currentRoute.steps.map((step, idx) => {
-      if (idx === params.stepIndex) {
-        return {
-          ...step,
-          log: {
-            ...step.log,
-            status: params.status,
-            ...(params.txHash && { txHash: params.txHash }),
-            ...(params.error && { error: params.error }),
-          },
-        };
-      }
-      return step;
-    });
-
     set(transactionRouteAtom, {
       ...currentRoute,
-      steps: updatedSteps,
       currentStep:
         params.status === TransactionStatus.SUCCESS
           ? params.stepIndex + 1
           : currentRoute.currentStep,
       isComplete:
-        params.status === TransactionStatus.SUCCESS && params.stepIndex === updatedSteps.length - 1,
+        params.status === TransactionStatus.SUCCESS &&
+        params.stepIndex === currentRoute.steps.length - 1,
     });
   },
 );
 
-export const resetRouteStatusAtom = atom(null, (get, set) => {
+export const resetRouteStatusAtom = atom(null, (get, set, isSimulation: boolean = false) => {
   const currentRoute = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
   console.log('[resetRouteStatusAtom] Resetting route status');
-  set(transactionRouteAtom, {
-    ...currentRoute,
-    steps: currentRoute.steps.map(step => ({
-      ...step,
+
+  // Reset all step statuses to PENDING
+  currentRoute.steps.forEach(step => {
+    const existingLog = logs[step.hash];
+    set(updateStepLogAtom, {
+      stepHash: step.hash,
       log: {
-        ...step.log,
+        ...existingLog,
         status: TransactionStatus.PENDING,
-        txHash: undefined,
         error: undefined,
       },
-    })),
+    });
+  });
+
+  set(transactionRouteAtom, {
+    ...currentRoute,
     currentStep: 0,
     isComplete: false,
-    isSimulation: false,
+    isSimulation: isSimulation,
   });
 });
 
@@ -110,35 +161,29 @@ export const updateTransactionRouteAtom = atom(
     set,
     params: {
       walletAddress: string;
-      recipientAddress?: string;
       sendState?: TransactionState;
       receiveState?: TransactionState;
+      isUserAction?: boolean;
     },
   ) => {
-    console.log('[updateTransactionRouteAtom] Starting route update');
+    console.log('[updateTransactionRouteAtom] Starting route update with params:', {
+      walletAddress: params.walletAddress,
+      sendState: params.sendState,
+      receiveState: params.receiveState,
+      isUserAction: params.isUserAction,
+    });
 
     const getChainInfo = get(chainInfoAtom);
     const sendState = params.sendState || get(sendStateAtom);
     const receiveState = params.receiveState || get(receiveStateAtom);
-    const receiveAddress = params.recipientAddress || get(recipientAddressAtom);
+    const receiveAddress = get(recipientAddressAtom);
     const skipChains = get(skipChainsAtom);
     const skipAssets = get(skipAssetsAtom);
 
     if (!sendState.asset || !receiveState.asset) {
-      console.error('[updateTransactionRouteAtom] Missing assets:', {
-        sendAsset: sendState.asset,
-        receiveAsset: receiveState.asset,
-      });
+      console.error('[updateTransactionRouteAtom] Missing assets');
       return;
     }
-
-    console.log('[updateTransactionRouteAtom] Initial state:', {
-      sendState,
-      receiveState,
-      receiveAddress,
-      skipChains,
-      skipAssetsCount: Object.keys(skipAssets).length,
-    });
 
     const steps: TransactionStep[] = [];
     const sendChain = getChainInfo(sendState.chainId);
@@ -146,12 +191,7 @@ export const updateTransactionRouteAtom = atom(
     const restUris = sendChain?.rest_uris;
 
     if (!sendChain || !receiveChain) {
-      console.error('[updateTransactionRouteAtom] Missing chain info:', {
-        sendChainId: sendState.chainId,
-        sendChainExists: !!sendChain,
-        receiveChainId: receiveState.chainId,
-        receiveChainExists: !!receiveChain,
-      });
+      console.error('[updateTransactionRouteAtom] Missing chain info');
       return;
     }
 
@@ -210,8 +250,8 @@ export const updateTransactionRouteAtom = atom(
       isValidStablecoinSwapTx,
     });
 
-    // Helper function to create a transaction step with log
-    const createAndDescribeStep = (
+    // Helper function to create a transaction step (without log)
+    const createStep = (
       type: TransactionType,
       via: 'skip' | 'standard',
       fromChain: string,
@@ -219,38 +259,50 @@ export const updateTransactionRouteAtom = atom(
       fromAsset: Asset,
       toAsset: Asset,
     ): TransactionStep => {
-      const baseStep = {
+      const step = {
         type,
         via,
         fromChain,
         toChain,
         fromAsset,
         toAsset,
+        hash: '',
       };
 
+      return {
+        ...step,
+        hash: createStepHash(step),
+      };
+    };
+
+    // Create steps and logs separately
+    const createAndDescribeStep = (
+      type: TransactionType,
+      via: 'skip' | 'standard',
+      fromChainId: string,
+      toChainId: string,
+      fromAsset: Asset,
+      toAsset: Asset,
+    ): TransactionStep => {
+      const fromChain = getChainInfo(fromChainId);
+      const toChain = getChainInfo(toChainId);
+
+      const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset);
       const description = getStepDescription(
-        { ...baseStep, log: { description: '', status: TransactionStatus.PENDING } },
+        step,
         receiveAddress,
         params.walletAddress,
-      );
-
-      console.log('[updateTransactionRouteAtom] Creating step:', {
-        type,
-        via,
         fromChain,
         toChain,
-        fromAssetDenom: fromAsset.denom,
-        toAssetDenom: toAsset.denom,
+      );
+
+      // Create log entry for this step
+      set(createStepLogAtom, {
+        step,
         description,
       });
 
-      return {
-        ...baseStep,
-        log: {
-          description,
-          status: TransactionStatus.PENDING,
-        },
-      };
+      return step;
     };
 
     // Case 1: Simple send
@@ -376,28 +428,29 @@ export const updateTransactionRouteAtom = atom(
     }
 
     if (steps.length === 0) {
-      console.warn('[updateTransactionRouteAtom] No route conditions were met. Details:', {
-        sendAsset: sendState.asset,
-        receiveAsset: receiveState.asset,
-        sendChain: sendChain,
-        receiveChain: receiveChain,
-        isSimpleSend,
-        isValidStablecoinSwapTx,
-        isCurrentSendDenomSupported,
-        isCurrentReceiveDenomSupported,
-        areChainsSkipSupported,
-        sendAndReceiveAssetsMatch,
-        sendAndReceiveChainsMatch,
-      });
-    } else {
-      console.log('[updateTransactionRouteAtom] Generated route steps:', steps);
+      console.warn('[updateTransactionRouteAtom] No route conditions were met');
     }
 
-    set(transactionRouteAtom, {
+    const newRoute = {
       steps,
       currentStep: 0,
       isComplete: false,
       isSimulation: true,
-    });
+    };
+
+    const currentRoute = get(transactionRouteAtom);
+    const currentHash = createRouteHash(currentRoute);
+    const newHash = createRouteHash(newRoute);
+
+    if (currentHash !== newHash) {
+      console.log('[updateTransactionRouteAtom] Route changed, updating');
+      set(transactionRouteAtom, newRoute);
+      set(transactionRouteHashAtom, newHash);
+      set(simulationInvalidationAtom, prev => ({
+        ...prev,
+        shouldInvalidate: true,
+        routeHash: newHash, // Reset route hash to force new simulation
+      }));
+    }
   },
 );

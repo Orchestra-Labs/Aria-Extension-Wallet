@@ -2,21 +2,53 @@ import { Spinner } from '@/assets/icons';
 import { TransactionStatus } from '@/constants';
 import { useAtomValue } from 'jotai';
 import {
-  calculatedFeeAtom,
-  isLoadingAtom,
+  calculatedTotalFeeDisplayAtom,
   transactionErrorAtom,
   transactionFailedAtom,
   transactionRouteAtom,
 } from '@/atoms';
-import { TransactionResultsTile } from '@/components';
 import { formatLowBalanceDisplay } from '@/helpers';
+import { getStepLogAtom } from '@/atoms/transactionLogsAtom';
+import { TransactionStep } from '@/types';
 
 export const TransactionInfoPanel = () => {
-  const isLoading = useAtomValue(isLoadingAtom);
   const transactionFailed = useAtomValue(transactionFailedAtom);
   const transactionError = useAtomValue(transactionErrorAtom);
-  const calculatedFee = useAtomValue(calculatedFeeAtom);
   const transactionRoute = useAtomValue(transactionRouteAtom);
+  const calculatedFee = useAtomValue(calculatedTotalFeeDisplayAtom);
+
+  const isSimulation = transactionRoute.isSimulation;
+
+  const getStatusIcon = (status: TransactionStatus) => {
+    switch (status) {
+      case TransactionStatus.SUCCESS:
+        return <span className="h-4 w-4 text-success">✔</span>;
+      case TransactionStatus.PENDING:
+        return <Spinner className="h-4 w-4 animate-spin fill-blue" />;
+      case TransactionStatus.ERROR:
+        return <span className="h-4 w-4 text-error">✖</span>;
+      case TransactionStatus.IDLE:
+      default:
+        return <span className="h-4 w-4 text-gray-500">—</span>;
+    }
+  };
+
+  // Component to render each step with its log
+  const TransactionStepItem = ({ step, index }: { step: TransactionStep; index: number }) => {
+    const log = useAtomValue(getStepLogAtom(step.hash));
+
+    return (
+      <div
+        key={`${step.type}-${index}`}
+        className="flex justify-between items-center w-full text-sm text-white mb-1"
+      >
+        <span className="text-left truncate">{log?.description || 'Processing...'}</span>
+        <span className="flex justify-end text-right w-[1rem]">
+          {getStatusIcon(log?.status || TransactionStatus.IDLE)}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -26,51 +58,46 @@ export const TransactionInfoPanel = () => {
         */}
       {/* Info Section */}
       <div
-        className={`flex flex-grow mx-2 my-4 border rounded-md border-neutral-4 justify-center ${
-          isLoading || transactionError
+        className={`flex flex-grow mx-2 my-2 border rounded-md border-neutral-4 justify-center ${
+          //isTxPending ||
+          transactionFailed && !isSimulation
             ? 'items-center '
             : 'flex-col items-start overflow-y-auto p-4'
         }`}
       >
-        {isLoading && <Spinner className="h-16 w-16 animate-spin fill-blue" />}
-        {transactionFailed && (
+        {/* {isTxPending && <Spinner className="h-16 w-16 animate-spin fill-blue" />} */}
+        {/* {transactionFailed && !isSimulation && (
           <TransactionResultsTile isSuccess={false} size="sm" message={transactionError} />
-        )}
-        {!isLoading &&
-          !transactionFailed &&
+        )} */}
+        {transactionRoute.steps.length === 0 ? (
+          <span className="text-white text-sm">Calculating transaction route...</span>
+        ) : (
           transactionRoute.steps.map((step, index) => (
-            <div
-              key={`${step.type}-${index}`}
-              className="flex justify-between items-center w-full text-sm text-white mb-1"
-            >
-              <span className="text-left truncate">{step.log.description}</span>
-              <span className="flex justify-end text-right w-[1rem]">
-                {step.log.status === TransactionStatus.SUCCESS && (
-                  <span className="h-4 w-4 text-success">✔</span>
-                )}
-                {step.log.status === TransactionStatus.PENDING && (
-                  <Spinner className="h-4 w-4 animate-spin fill-blue" />
-                )}
-                {step.log.status === TransactionStatus.ERROR && (
-                  <span className="h-4 w-4 text-error">✖</span>
-                )}
-                {step.log.status === TransactionStatus.IDLE && (
-                  <span className="h-4 w-4 text-gray-500">—</span>
-                )}
-              </span>
-            </div>
-          ))}
+            <TransactionStepItem key={`${step.type}-${index}`} step={step} index={index} />
+          ))
+        )}
       </div>
 
       {/* TODO: move fee section to own component (reused in other places) */}
       {/* Fee Section */}
       <div className="flex justify-between items-center text-blue text-sm font-bold mx-2">
-        <p>Estimated Fee</p>
-        <p className={calculatedFee.textClass}>
-          {calculatedFee && calculatedFee.feeAmount > 0
-            ? formatLowBalanceDisplay(`${calculatedFee.calculatedFee}`, calculatedFee.feeUnit)
-            : '-'}
-        </p>
+        {transactionFailed ? (
+          <>
+            <p>Error:</p>
+            <p className="text-error truncate max-w-[50%]">
+              {transactionError ? transactionError : 'Unidentified error'}
+            </p>
+          </>
+        ) : (
+          <>
+            <p>Estimated Fee</p>
+            <p className={calculatedFee.textClass}>
+              {calculatedFee && calculatedFee.feeAmount > 0
+                ? formatLowBalanceDisplay(`${calculatedFee.calculatedFee}`, calculatedFee.feeUnit)
+                : '-'}
+            </p>
+          </>
+        )}
       </div>
     </>
   );

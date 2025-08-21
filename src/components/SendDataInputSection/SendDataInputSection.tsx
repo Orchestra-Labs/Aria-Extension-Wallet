@@ -4,28 +4,25 @@ import { Button, Separator } from '@/ui-kit';
 import { Swap } from '@/assets/icons';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
-  addressVerifiedAtom,
   hasSendErrorAtom,
-  isLoadingAtom,
+  isTxPendingAtom,
   maxAvailableAtom,
   receiveErrorAtom,
   receiveStateAtom,
   recipientAddressAtom,
   sendErrorAtom,
   sendStateAtom,
-  lastSimulationUpdateAtom,
-  simulationBlockedAtom,
-  transactionErrorAtom,
   chainWalletAtom,
   updateTransactionRouteAtom,
-  transactionRouteAtom,
-  transactionHasValidRouteAtom,
   resetTransactionRouteAtom,
+  simulationInvalidationAtom,
+  transactionRouteHashAtom,
+  canRunSimulationAtom,
 } from '@/atoms';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
 import { AddressInput } from '../AddressInput';
-import { InputStatus } from '@/constants';
+import { InputStatus, SIM_TX_FRESHNESS_TIMEOUT } from '@/constants';
 import { formatBalanceDisplay } from '@/helpers';
 
 interface SendDataInputSectionProps {}
@@ -39,21 +36,20 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
-  const addressVerified = useAtomValue(addressVerifiedAtom);
-  const isLoading = useAtomValue(isLoadingAtom);
+  const isTxPending = useAtomValue(isTxPendingAtom);
   const [sendError, setSendError] = useAtom(sendErrorAtom);
   const receiveError = useAtomValue(receiveErrorAtom);
   const hasSendError = useAtomValue(hasSendErrorAtom);
   const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
-  const transactionError = useAtomValue(transactionErrorAtom);
-  const transactionRoute = useAtomValue(transactionRouteAtom);
-  const transactionHasValidRoute = useAtomValue(transactionHasValidRouteAtom);
   const updateTransactionRoute = useSetAtom(updateTransactionRouteAtom);
   const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
+  const [simulationInvalidation, setSimulationInvalidation] = useAtom(simulationInvalidationAtom);
+  const transactionRouteHash = useAtomValue(transactionRouteHashAtom);
+  const canRunSimulation = useAtomValue(canRunSimulationAtom);
 
-  // New atoms for simulation state
-  const [lastUpdateTime, setLastUpdateTime] = useAtom(lastSimulationUpdateAtom);
-  const [updateBlocked, setUpdateBlocked] = useAtom(simulationBlockedAtom);
+  // Refs for tracking
+  const simulationIntervalRef = useRef<NodeJS.Timeout>();
+  const lastSimulationRunRef = useRef<number>(0);
 
   // Derived values
   // TODO: add max receivable atom for receiving unit
@@ -113,15 +109,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     receiveAsset?: Asset;
   }) => {
     console.log('[AssetInputSection] handleStateUpdate called with:', update);
-    if (updateBlocked) {
-      console.log('[AssetInputSection] Update blocked, skipping');
-      return;
-    }
-    setUpdateBlocked(true);
-
     const newState = calculateDerivedState(update);
-    const now = Date.now();
-    setLastUpdateTime(now);
 
     console.log('[AssetInputSection] New state:', newState);
 
@@ -145,48 +133,9 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         ...prev,
         amount: newState.receiveAmount,
         asset: newState.receiveAsset,
-        chainId: receiveState.chainId, // receive chain id only changes via address
+        chainId: receiveState.chainId, // ensure receive chain id only changes via address
       }));
     }
-
-    setUpdateBlocked(false);
-  };
-
-  // TODO: fix.  this is not stopping simulations on transaction error
-  const canRunSimulation = () => {
-    const canRun =
-      recipientAddress &&
-      addressVerified &&
-      sendState.amount > 0 &&
-      transactionHasValidRoute &&
-      !isLoading &&
-      !transactionError;
-
-    console.log('[canRunSimulation] Evaluation:', {
-      recipientAddress: !!recipientAddress,
-      addressVerified,
-      sendAmount: sendState.amount,
-      isLoading,
-      transactionRoute,
-      result: canRun,
-      transactionError,
-    });
-
-    return canRun;
-  };
-
-  const simulateTransaction = async () => {
-    if (
-      isNaN(sendState.amount) ||
-      sendState.amount === 0 ||
-      !recipientAddress ||
-      !addressVerified
-    ) {
-      resetTxRoute();
-      return;
-    }
-
-    runSimulation();
   };
 
   // Handler functions
@@ -206,13 +155,8 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     });
   };
 
-  const updateSendAmount = (amount: number) => {
-    handleStateUpdate({ sendAmount: amount });
-  };
-
-  const updateReceiveAmount = (amount: number) => {
-    handleStateUpdate({ receiveAmount: amount });
-  };
+  const updateSendAmount = (amount: number) => handleStateUpdate({ sendAmount: amount });
+  const updateReceiveAmount = (amount: number) => handleStateUpdate({ receiveAmount: amount });
 
   const switchFields = () => {
     handleStateUpdate({
@@ -245,6 +189,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     resetTxRoute();
   };
 
+  // Update transaction route when inputs change
   useEffect(() => {
     const updateTxType = async () => {
       if (!walletState.address) return;
@@ -254,7 +199,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
           sendState,
           receiveState,
           walletAddress: walletState.address,
-          recipientAddress: recipientAddress,
+          isUserAction: true,
         });
       } catch (error) {
         console.error('Error updating transaction type:', error);
@@ -264,49 +209,51 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     updateTxType();
   }, [sendState, receiveState, recipientAddress, walletState]);
 
-  // Effects
+  // Main simulation trigger effect. Runs on timeout or when conditions change
   useEffect(() => {
-    if (canRunSimulation()) {
-      simulateTransaction();
-      setLastUpdateTime(Date.now());
+    // Periodic simulation setup
+    console.log('[Periodic Simulation Setup] Starting periodic invalidation');
+
+    // Clear any existing interval
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
     }
-    // NOTE: no sendstate dependency needed here.  sendstate calls for simulation elsewhere
-  }, [transactionRoute, isLoading]);
 
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    // Set up periodic invalidation
+    simulationIntervalRef.current = setInterval(() => {
+      console.log('[Periodic Invalidation] Setting shouldInvalidate to true');
+      setSimulationInvalidation(prev => ({
+        ...prev,
+        shouldInvalidate: true,
+      }));
+    }, SIM_TX_FRESHNESS_TIMEOUT);
 
-    const setupInterval = () => {
-      intervalId = setInterval(() => {
-        if (canRunSimulation()) {
-          console.log('[Periodic Check] Running simulation');
-          resetTxRoute();
-          runSimulation();
-          setLastUpdateTime(Date.now());
-        } else {
-          // Clear interval if conditions are no longer met
-          console.log('[Periodic Check] Conditions no longer met, clearing interval');
-          clearInterval(intervalId);
-        }
-      }, 5000);
-    };
+    // Simulation execution logic
+    if (simulationInvalidation.shouldInvalidate && canRunSimulation) {
+      console.log('[Simulation Trigger] Running simulation due to invalidation');
+      lastSimulationRunRef.current = Date.now();
 
-    // Initial check
-    if (canRunSimulation()) {
-      if (Date.now() - lastUpdateTime > 5000) {
-        simulateTransaction();
-        setLastUpdateTime(Date.now());
+      try {
+        runSimulation();
+
+        // Reset invalidation after successful simulation
+        setSimulationInvalidation({
+          lastRunTimestamp: Date.now(),
+          routeHash: transactionRouteHash,
+          shouldInvalidate: false,
+        });
+      } catch (error) {
+        console.error('[Simulation Trigger] Simulation failed:', error);
       }
-      // Start the interval after initial check
-      setupInterval();
     }
 
+    // Cleanup on unmount
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      if (simulationIntervalRef.current) {
+        clearInterval(simulationIntervalRef.current);
       }
     };
-  }, [transactionRoute, isLoading]);
+  }, [simulationInvalidation, canRunSimulation]);
 
   useEffect(() => {
     if (hasSendError) {
@@ -318,7 +265,6 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   }, [hasSendError]);
 
   // TODO: highlight on send dialog assets which can reach the selected receive asset
-  // TODO: highlight on receive dialog assets which are reachable by the selected send asset
   return (
     <>
       <AddressInput addBottomMargin={false} updateReceiveAsset={updateReceiveAsset} />
@@ -334,7 +280,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         updateAsset={updateSendAsset}
         updateAmount={updateSendAmount}
         showClearAndMax
-        disableButtons={isLoading}
+        disableButtons={isTxPending}
         onClear={clearAmount}
         onMax={() => setMaxAmount('send')}
         includeBottomMargin={false}
@@ -357,7 +303,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         updateAsset={updateReceiveAsset}
         updateAmount={updateReceiveAmount}
         showClearAndMax
-        disableButtons={isLoading}
+        disableButtons={isTxPending}
         onClear={clearAmount}
         onMax={() => setMaxAmount('receive')}
         includeBottomMargin={false}

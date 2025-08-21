@@ -109,7 +109,6 @@ export const CreateWallet = () => {
   // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
 
-  // TODO: Add first level of transaction routing (swap to IBC send or IBC to swap)
   // TODO: fix copytextfield issue of enlarged border on click
   // TODO: Add remember me
 
@@ -139,7 +138,6 @@ export const CreateWallet = () => {
   // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
   // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
   // TODO: add link to github repo for registry
-  // TODO: Add routing
   // TODO: modify claim, restake, and unstake functions to withdraw from all unique delegator addresses
   // TODO: add show/hide function to validator list (by chain)
 

@@ -11,16 +11,15 @@ import {
   chainWalletAtom,
   defaultAssetAtom,
   resetTransactionStatesAtom,
-  transactionErrorAtom,
-  transactionStatusAtom,
-  isLoadingAtom,
+  isTxPendingAtom,
   isTransactionSuccessAtom,
   unloadFullRegistryAtom,
   loadFullRegistryAtom,
-  calculatedFeeAtom,
   loadSkipChainsAtom,
   loadSkipAssetsAtom,
   transactionHasValidRouteAtom,
+  transactionRouteAtom,
+  finalTransactionHashAtom,
 } from '@/atoms';
 import {
   WalletSuccessScreen,
@@ -48,15 +47,16 @@ export const Send = () => {
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   console.log('[Send] initial wallet state', walletState);
   const transactionHasValidRoute = useAtomValue(transactionHasValidRouteAtom);
-  const [transactionStatus, setTransactionStatus] = useAtom(transactionStatusAtom);
-  const isLoading = useAtomValue(isLoadingAtom);
+  const isTxPending = useAtomValue(isTxPendingAtom);
   const isSuccess = useAtomValue(isTransactionSuccessAtom);
-  const transactionError = useAtomValue(transactionErrorAtom);
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
-  const calculatedFee = useAtomValue(calculatedFeeAtom);
   const loadSkipChains = useSetAtom(loadSkipChainsAtom);
   const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
+  const transactionRoute = useAtomValue(transactionRouteAtom);
+  const finalTxHash = useAtomValue(finalTransactionHashAtom);
+
+  const isSimulation = transactionRoute.isSimulation;
 
   const resetStates = () => {
     console.log('[Send] Resetting transaction states');
@@ -78,20 +78,6 @@ export const Send = () => {
   };
 
   useEffect(() => {
-    if (!transactionError) return;
-
-    const timeout = setTimeout(() => {
-      setTransactionStatus(prev => ({
-        ...prev,
-        // NOTE: Clear error after timeout
-        error: undefined,
-      }));
-    }, 5000);
-
-    return () => clearTimeout(timeout);
-  }, [transactionError]);
-
-  useEffect(() => {
     console.log("[Send] walletstate's address on init", walletState.address);
     setRecipientAddress(walletState.address);
     loadFullRegistry();
@@ -105,21 +91,18 @@ export const Send = () => {
     };
   }, []);
 
-  if (location.pathname === ROUTES.APP.SEND && isSuccess) {
-    return <WalletSuccessScreen caption="Transaction success!" txHash={transactionStatus.txHash} />;
+  if (location.pathname === ROUTES.APP.SEND && isSuccess && !isSimulation) {
+    return <WalletSuccessScreen caption="Transaction success!" txHash={finalTxHash} />;
   }
 
-  console.log('[Send] Current calculated fee display:', calculatedFee);
   return (
     <div className="h-screen flex flex-col bg-black text-white">
       <Header title={'Send'} onClose={handleBackClick} useArrow={true} />
 
       {/* Content container */}
       <div className="flex flex-col justify-between flex-grow p-4 rounded-lg overflow-y-auto">
-        <>
-          {/* TODO: add chain selection if self */}
-          <SendDataInputSection />
-        </>
+        {/* TODO: add chain selection if self */}
+        <SendDataInputSection />
 
         {/* Info Section */}
         <TransactionInfoPanel />
@@ -132,7 +115,7 @@ export const Send = () => {
           <Button
             className="w-[85%]"
             onClick={() => runTransaction()}
-            disabled={isLoading || sendState.amount === 0 || !transactionHasValidRoute}
+            disabled={isTxPending || sendState.amount === 0 || !transactionHasValidRoute}
           >
             Send
           </Button>

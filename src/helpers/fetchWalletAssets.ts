@@ -86,19 +86,12 @@ const resolveIbcAsset = async (
     const path = response.denom_trace.path || '';
     let originChainId = '';
 
-    console.log(`[resolveIbcAsset] Base denom: ${baseDenom}, Path: ${path}`);
-
     // Extract channel ID from path (format: "transfer/channel-X")
     const pathParts = path.split('/');
     if (pathParts.length >= 2) {
       const channelId = pathParts[1];
-      console.log(`[resolveIbcAsset] Extracted channel ID: ${channelId}`);
-
       const ibcRegistry = getIbcRegistry();
-      console.log(`[resolveIbcAsset] Full IBC registry:`, ibcRegistry);
-
       const networkLevel = chainRegistry[currentChainId].network_level;
-      console.log(`[resolveIbcAsset] Network level: ${networkLevel}`);
 
       // Get the correct network registry (mainnet or testnet)
       const networkRegistry =
@@ -117,26 +110,15 @@ const resolveIbcAsset = async (
 
           // Get the channel info for current chain specifically
           const currentChainIBCInfo = connection[currentChainId];
-          console.log(
-            `[resolveIbcAsset] Current channel, connection key and recorded ibc channel:`,
-            channelId,
-            connectionKey,
-            currentChainIBCInfo.channel_id,
-          );
 
           // Only proceed if the channel ID matches current chain's channel
           if (currentChainIBCInfo?.channel_id === channelId) {
             // The counterparty is the other chain in this connection
             originChainId = isCurrentChainFirst ? chain2 : chain1;
-            console.log(
-              `[resolveIbcAsset] Found matching channel ${channelId} on ${currentChainId} connected to ${originChainId}`,
-            );
             break;
           }
         }
       }
-    } else {
-      console.log(`[resolveIbcAsset] Path doesn't contain channel information: ${path}`);
     }
 
     // TODO: handle multi-hop paths.  add all to list and use that list with tx router
