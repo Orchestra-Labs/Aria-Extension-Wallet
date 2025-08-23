@@ -10,3 +10,4 @@ export * from './prefixes';
 export * from './session';
 export * from './sessionStorage';
 export * from './wallet';
+export * from './validatorStats';

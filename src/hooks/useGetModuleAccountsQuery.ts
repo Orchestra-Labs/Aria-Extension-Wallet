@@ -11,14 +11,16 @@ type ModuleAccountsResponseDto = {
 type RequestParams = {
   prefix: string;
   restUris: Uri[];
+  chainId: string;
 };
 
-const getModuleAccountsRequest = async ({ prefix, restUris }: RequestParams) => {
+const getModuleAccountsRequest = async ({ prefix, restUris, chainId }: RequestParams) => {
   const response = await queryRestNode({
     endpoint: COSMOS_CHAIN_ENDPOINTS.getModuleAccounts,
     queryType: QueryType.GET,
     prefix,
     restUris,
+    chainId,
   });
 
   return response as unknown as ModuleAccountsResponseDto;

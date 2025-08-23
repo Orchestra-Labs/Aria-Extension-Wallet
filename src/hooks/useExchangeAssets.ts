@@ -8,12 +8,7 @@ import {
 } from '@/constants';
 import { getSymphonyChainId, getSymphonyDefaultAsset, queryRestNode } from '@/helpers';
 import { useAtomValue } from 'jotai';
-import {
-  allWalletAssetsAtom,
-  subscribedChainRegistryAtom,
-  sendStateAtom,
-  networkLevelAtom,
-} from '@/atoms';
+import { allWalletAssetsAtom, sendStateAtom, networkLevelAtom, chainInfoAtom } from '@/atoms';
 import BigNumber from 'bignumber.js';
 
 interface ExchangeRequirementResponse {
@@ -34,14 +29,14 @@ export const useExchangeAssets = () => {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const sendState = useAtomValue(sendStateAtom);
   const walletAssets = useAtomValue(allWalletAssetsAtom);
-  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const symphonyId = getSymphonyChainId(networkLevel);
-  const chainInfo = chainRegistry[networkLevel][symphonyId];
+  const chainInfo = getChainInfo(symphonyId);
   console.log(`[useExchangeAssets] chainInfo for ${symphonyId}:`, chainInfo);
 
   if (!chainInfo) {
@@ -72,6 +67,7 @@ export const useExchangeAssets = () => {
         queryType: QueryType.GET,
         prefix,
         restUris,
+        chainId: symphonyId,
       })) as unknown as ExchangeRequirementResponse;
       console.log('[useExchangeAssets] noted response:', response);
 
@@ -100,6 +96,7 @@ export const useExchangeAssets = () => {
           queryType: QueryType.GET,
           prefix,
           restUris,
+          chainId: symphonyId,
         });
 
         adjustmentRate = parseFloat(exchangeRateResponse.return_coin.amount) / 1000000;

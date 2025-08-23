@@ -1,21 +1,38 @@
 import {
+  CommType,
   DEFAULT_FEE_TOKEN,
   DEFAULT_REST_TIMEOUT,
+  FIVE_MINUTES,
   MAX_RETRIES_PER_QUERY,
+  ONE_SECOND,
   QueryType,
   SYMPHONY_ENDPOINTS,
 } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
-import { FeeToken, RPCResponse, Uri } from '@/types';
+import { FeeToken, RPCResponse, SortedValidator, Uri } from '@/types';
 import {
   createOfflineSignerByPrefix,
   getAddressByChainPrefix,
   getSessionToken,
+  getSortedValidators,
+  recordQueryResult,
 } from './dataHelpers';
 import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
 
-//indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
+// Client connection caching
+const clientCache = new Map<string, SigningStargateClient>();
+const CACHE_TTL = FIVE_MINUTES;
+// Sorted URIs caching
+const SORT_CACHE_TTL = ONE_SECOND * 5;
+
+interface ValidatorCacheEntry {
+  validators: SortedValidator[];
+  timestamp: number;
+}
+
+let sortedValidatorsCache: { [cacheKey: string]: ValidatorCacheEntry } = {};
+
 const isIndexerError = (error: any): boolean => {
   return (
     error?.message?.includes('transaction indexing is disabled') ||
@@ -23,13 +40,51 @@ const isIndexerError = (error: any): boolean => {
   );
 };
 
-// Helper: Perform a REST API query to a selected node
-// TODO: make queryType an enum
+const shouldRecordFailure = (error: any): boolean => {
+  const errorMessage = error?.message || '';
+
+  // Client errors (4xx) - validator/access issues
+  const isClientError =
+    errorMessage.includes('HTTP 400') ||
+    errorMessage.includes('HTTP 401') ||
+    errorMessage.includes('HTTP 403') ||
+    errorMessage.includes('HTTP 404') ||
+    errorMessage.includes('HTTP 405') ||
+    errorMessage.includes('HTTP 408') ||
+    errorMessage.includes('HTTP 409') ||
+    errorMessage.includes('HTTP 410') ||
+    errorMessage.includes('HTTP 429');
+
+  // Server errors (5xx) - validator infrastructure problems
+  const isServerError =
+    errorMessage.includes('HTTP 500') ||
+    errorMessage.includes('HTTP 501') ||
+    errorMessage.includes('HTTP 502') ||
+    errorMessage.includes('HTTP 503') ||
+    errorMessage.includes('HTTP 504') ||
+    errorMessage.includes('HTTP 507') ||
+    errorMessage.includes('HTTP 508') ||
+    errorMessage.includes('HTTP 509') ||
+    errorMessage.includes('HTTP 522');
+
+  // Also record indexer errors since they're validator-specific
+  const isIndexerRelated = isIndexerError(error);
+
+  // Connection errors (not HTTP status but network-level issues)
+  const isConnectionError =
+    errorMessage.includes('ECONNREFUSED') ||
+    errorMessage.includes('ENOTFOUND') ||
+    errorMessage.includes('ECONNRESET') ||
+    errorMessage.includes('ETIMEDOUT');
+
+  return isClientError || isServerError || isIndexerRelated || isConnectionError;
+};
+
 const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
   const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
   const uriEndpoint = `${adjustedUri}${endpoint}`;
-  // console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
+  const startTime = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
 
@@ -42,19 +97,15 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
     });
 
     clearTimeout(timeoutId);
+    const queryTime = Date.now() - startTime;
 
     if (!response.ok) {
-      console.error('[queryNodes] Node query failed:', response);
-      throw new Error('Node query failed');
+      console.error('[queryNodes] Node query failed:', response.status, response.statusText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const responseBody = await response.json();
-
-    // console.log(
-    //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
-    //   responseBody,
-    // );
-    return responseBody;
+    return { data: responseBody, queryTime, statusCode: response.status };
   } catch (error) {
     clearTimeout(timeoutId);
 
@@ -65,12 +116,10 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
       throw error;
     }
 
-    // Handle non-Error throwables
     throw new Error(`Unknown error occurred: ${String(error)}`);
   }
 };
 
-// Helper: Perform an RPC query using signing, such as for claiming rewards or staking
 const performRpcQuery = async (
   client: SigningStargateClient,
   walletAddress: string,
@@ -83,31 +132,24 @@ const performRpcQuery = async (
   },
   memo: string = 'wallet',
 ): Promise<RPCResponse> => {
-  console.log('[queryNodes] Performing RPC query...');
-  console.log('[queryNodes] Fee Token:', feeToken);
-
   try {
     let calculatedFee = fee;
-    let gasPrice = feeToken.gasPriceStep.average; // Start with low
+    let gasPrice = feeToken.gasPriceStep.average;
 
     if (!calculatedFee) {
-      console.log('[queryNodes] Calculating fee...');
       const feeDenom = feeToken.denom;
       const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
 
       // Simulate transaction to get gas estimate
       const gasEstimation = await client.simulate(walletAddress, messages, memo);
-      console.log('[queryNodes] Raw Gas Estimation:', gasEstimation);
 
       // Add buffer (30% more gas than estimated)
       const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
-      console.log('[queryNodes] Buffered Gas Estimation:', bufferedGasEstimation);
 
       // Calculate fee amount
       const feeAmount = Math.ceil(
         bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
       );
-      console.log('[queryNodes] Calculated Fee Amount:', feeAmount);
 
       calculatedFee = {
         amount: [
@@ -120,10 +162,7 @@ const performRpcQuery = async (
       };
     }
 
-    console.log('[queryNodes] Final Calculated Fee:', calculatedFee);
-
     if (simulateOnly) {
-      console.log('[queryNodes] Simulation success, returning fee info.');
       return {
         code: 0,
         message: 'Simulation success',
@@ -133,7 +172,6 @@ const performRpcQuery = async (
     }
 
     const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
-    console.log('[queryNodes] Transaction result:', result);
 
     if (result.code === 0) {
       return {
@@ -148,9 +186,7 @@ const performRpcQuery = async (
     console.error('[queryNodes] Transaction failed with code:', result.code);
     throw new Error(`Transaction failed with code ${result.code}`);
   } catch (error: any) {
-    // If we have an indexer error, handle specially
     if (isIndexerError(error)) {
-      console.log('Indexer error detected.');
       return {
         code: 1,
         message: 'Node indexer disabled',
@@ -163,39 +199,90 @@ const performRpcQuery = async (
   }
 };
 
-const getTranactionSigner = async (
+const getCachedSigner = async (
   endpoint: string,
   uri: Uri,
   mnemonic: string,
   prefix: string,
 ): Promise<SigningStargateClient> => {
+  const cacheKey = `${uri.address}-${prefix}`;
+
+  // Check cache and validate it's not too old
+  const cachedClient = clientCache.get(cacheKey);
+  if (cachedClient) {
+    return cachedClient;
+  }
+
   const isSymphonyQuery = Object.values(SYMPHONY_ENDPOINTS).some(symphonyEndpoint =>
     endpoint.startsWith(symphonyEndpoint),
   );
 
-  console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
   const offlineSigner = await createOfflineSignerByPrefix(mnemonic, prefix);
 
-  const signer = isSymphonyQuery
+  const client = isSymphonyQuery
     ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
     : await SigningStargateClient.connectWithSigner(uri.address, offlineSigner);
-  return signer;
+
+  // Cache the client
+  clientCache.set(cacheKey, client);
+
+  // Set timeout to clear cache entry
+  setTimeout(() => {
+    clientCache.delete(cacheKey);
+  }, CACHE_TTL);
+
+  return client;
+};
+
+const sortUrisWithCache = (uris: Uri[], sortedValidators: SortedValidator[]): Uri[] => {
+  const performanceRank = new Map<string, number>();
+  sortedValidators.forEach((validator, index) => {
+    performanceRank.set(validator.validatorId, index);
+  });
+
+  return [...uris].sort((a, b) => {
+    const rankA = performanceRank.get(a.address) ?? Infinity;
+    const rankB = performanceRank.get(b.address) ?? Infinity;
+    return rankA - rankB;
+  });
+};
+
+const getSortedUris = (chainId: string, uris: Uri[], commType: CommType): Uri[] => {
+  const now = Date.now();
+  const cacheKey = `${chainId}-${commType}`;
+
+  // Use cache if available and not expired
+  if (
+    sortedValidatorsCache[cacheKey] &&
+    now - sortedValidatorsCache[cacheKey].timestamp < SORT_CACHE_TTL
+  ) {
+    return sortUrisWithCache(uris, sortedValidatorsCache[cacheKey].validators);
+  }
+
+  const sortedValidators = getSortedValidators(chainId, commType);
+  sortedValidatorsCache[cacheKey] = {
+    validators: sortedValidators,
+    timestamp: now,
+  };
+
+  return sortUrisWithCache(uris, sortedValidators);
 };
 
 const queryWithRetry = async ({
   endpoint,
   useRPC = false,
-  queryType = 'GET',
+  queryType = QueryType.GET,
   messages = [],
   feeToken = DEFAULT_FEE_TOKEN,
   simulateOnly = false,
   fee,
   prefix,
   uris,
+  chainId,
 }: {
   endpoint: string;
   useRPC?: boolean;
-  queryType?: 'GET' | 'POST';
+  queryType?: QueryType;
   messages?: any[];
   feeToken?: FeeToken;
   simulateOnly?: boolean;
@@ -205,15 +292,21 @@ const queryWithRetry = async ({
   };
   prefix: string;
   uris: Uri[];
+  chainId: string;
 }): Promise<RPCResponse> => {
   let attemptCount = 0;
   let lastError: any = null;
 
-  // TODO: add rest.cosmos.directory/[chain name] (i.e. rest.cosmos.directory/symphony) or rest.testcosmos.directory/[chain name] to start of list before querying.
-  const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
-  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= uris.length - 1) {
-    const uriIndex = attemptCount % shuffledUris.length;
-    const uri = shuffledUris[uriIndex];
+  // Determine query type for sorting and recording
+  const queryTypeCategory: CommType = useRPC ? CommType.RPC : CommType.REST;
+
+  // Pre-sort all URIs once and create a queue
+  const sortedUris = getSortedUris(chainId, uris, queryTypeCategory);
+  const uriQueue = [...sortedUris];
+
+  while (attemptCount < MAX_RETRIES_PER_QUERY && uriQueue.length > 0) {
+    const uri = uriQueue.shift()!;
+    const startTime = Date.now();
 
     try {
       if (useRPC) {
@@ -223,7 +316,7 @@ const queryWithRetry = async ({
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
 
-        const transactionSigner = await getTranactionSigner(endpoint, uri, mnemonic, prefix);
+        const transactionSigner = await getCachedSigner(endpoint, uri, mnemonic, prefix);
 
         const result = await performRpcQuery(
           transactionSigner,
@@ -233,22 +326,45 @@ const queryWithRetry = async ({
           simulateOnly,
           fee,
         );
+
+        const queryTime = Date.now() - startTime;
+        recordQueryResult(chainId, uri.address, queryTime, true, CommType.RPC);
+
         return result;
       } else {
         const result = await performRestQuery(uri.address, endpoint, queryType);
-        return result;
+        recordQueryResult(chainId, uri.address, result.queryTime, true, CommType.REST);
+        return result.data;
       }
     } catch (error) {
-      console.error(`[queryNodes] ${error}`);
+      const queryTime = Date.now() - startTime;
+      console.error(`[queryNodes] Query failed for ${uri.address}: ${error}`);
+
+      if (shouldRecordFailure(error)) {
+        recordQueryResult(chainId, uri.address, queryTime, false, queryTypeCategory);
+      } else {
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else {
+          errorMessage = String(error);
+        }
+        console.log(`[queryNodes] Not recording failure for ${uri.address}: ${errorMessage}`);
+      }
 
       attemptCount++;
       lastError = error;
 
-      const backoff = Math.min(2 ** attemptCount * 500, 5000);
-      console.log(
-        `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
-      );
-      await delay(backoff);
+      if (uriQueue.length > 0) {
+        const backoff = Math.min(2 ** attemptCount * 500, 5000);
+        const nextUri = uriQueue[0];
+        console.log(
+          `[queryNodes] Next attempt via ${nextUri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
+        );
+        await delay(backoff);
+      }
     }
   }
 
@@ -260,7 +376,9 @@ const queryWithRetry = async ({
     };
   }
 
-  throw new Error(`All ${MAX_RETRIES_PER_QUERY} attempts failed. ${lastError?.message || ''}`);
+  throw new Error(
+    `All ${Math.min(MAX_RETRIES_PER_QUERY, uris.length)} attempts failed. ${lastError?.message || ''}`,
+  );
 };
 
 export const queryRestNode = async ({
@@ -268,11 +386,13 @@ export const queryRestNode = async ({
   queryType = QueryType.GET,
   prefix,
   restUris,
+  chainId,
 }: {
   endpoint: string;
   queryType?: QueryType;
   prefix: string;
   restUris: Uri[];
+  chainId: string;
 }) =>
   queryWithRetry({
     endpoint,
@@ -280,6 +400,7 @@ export const queryRestNode = async ({
     queryType,
     prefix,
     uris: restUris,
+    chainId,
   });
 
 export const queryRpcNode = async ({
@@ -290,10 +411,12 @@ export const queryRpcNode = async ({
   fee,
   prefix,
   rpcUris,
+  chainId,
 }: {
   endpoint: string;
   prefix: string;
   rpcUris: Uri[];
+  chainId: string;
   messages?: any[];
   feeToken?: FeeToken;
   simulateOnly?: boolean;
@@ -311,4 +434,15 @@ export const queryRpcNode = async ({
     fee,
     prefix,
     uris: rpcUris,
+    chainId,
   });
+
+// Clear client cache utility
+export const clearClientCache = (): void => {
+  clientCache.clear();
+};
+
+// Clear sorted URIs cache utility
+export const clearSortedUrisCache = (): void => {
+  sortedValidatorsCache = {};
+};

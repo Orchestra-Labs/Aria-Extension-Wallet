@@ -14,13 +14,21 @@ export const isValidSend = ({
   return result;
 };
 
-export const sendTransaction = async (
-  fromAddress: string,
-  sendObject: SendObject,
-  simulateOnly: boolean = false,
-  prefix: string,
-  rpcUris: Uri[],
-): Promise<TransactionResult> => {
+export const sendTransaction = async ({
+  fromAddress,
+  sendObject,
+  prefix,
+  rpcUris,
+  chainId,
+  simulateOnly = false,
+}: {
+  fromAddress: string;
+  sendObject: SendObject;
+  prefix: string;
+  rpcUris: Uri[];
+  chainId: string;
+  simulateOnly?: boolean;
+}): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
@@ -50,6 +58,7 @@ export const sendTransaction = async (
       rpcUris,
       messages,
       feeToken,
+      chainId,
       simulateOnly,
     });
 

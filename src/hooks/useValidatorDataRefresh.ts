@@ -35,7 +35,7 @@ export function useValidatorDataRefresh() {
       console.log(`[ValidatorRefresh] Using wallet address: ${wallet.address}`);
 
       const startTime = Date.now();
-      const data = await fetchValidatorData(chain, wallet.address);
+      const data = await fetchValidatorData({ chain, delegatorAddress: wallet.address });
 
       console.log(
         `[ValidatorRefresh] Completed fetch for ${chainId} in ${Date.now() - startTime}ms`,

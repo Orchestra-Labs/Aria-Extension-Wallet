@@ -76,6 +76,7 @@ const resolveIbcAsset = async (
       prefix,
       endpoint: `${COSMOS_CHAIN_ENDPOINTS.getIBCInfo}${denomHash}`,
       restUris,
+      chainId: currentChainId,
     });
 
     if (!response.denom_trace?.base_denom) {

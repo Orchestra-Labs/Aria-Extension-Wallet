@@ -37,6 +37,7 @@ export const useExchangeRequirements = () => {
         queryType: QueryType.GET,
         prefix,
         restUris,
+        chainId: symphonyChainId,
       })) as unknown as ExchangeRequirementsResponse;
 
       if (!response?.total?.amount) {

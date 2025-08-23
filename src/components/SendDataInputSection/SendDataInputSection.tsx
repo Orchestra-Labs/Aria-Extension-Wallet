@@ -237,11 +237,11 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         runSimulation();
 
         // Reset invalidation after successful simulation
-        setSimulationInvalidation({
-          lastRunTimestamp: Date.now(),
+        setSimulationInvalidation(prev => ({
+          ...prev,
           routeHash: transactionRouteHash,
           shouldInvalidate: false,
-        });
+        }));
       } catch (error) {
         console.error('[Simulation Trigger] Simulation failed:', error);
       }

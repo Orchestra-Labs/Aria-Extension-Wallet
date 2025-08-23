@@ -36,6 +36,7 @@ const getBalancesRequest = async ({ walletAddress, chainId }: RequestParams) => 
     endpoint: `${COSMOS_CHAIN_ENDPOINTS.getBalance}${walletAddress}`,
     prefix,
     restUris,
+    chainId,
   });
 
   console.log('[getBalancesRequest] response:', response);

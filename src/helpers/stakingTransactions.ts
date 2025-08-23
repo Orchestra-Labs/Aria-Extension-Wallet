@@ -88,6 +88,7 @@ export const stakeToValidator = async (
       rpcUris: chain.rpc_uris,
       messages,
       feeToken,
+      chainId: chain.chain_id,
       simulateOnly,
     });
 
@@ -151,6 +152,7 @@ export const claimRewards = async (
         rpcUris,
         messages,
         feeToken,
+        chainId: chain.chain_id,
         simulateOnly: true,
       });
 
@@ -184,11 +186,12 @@ export const claimRewards = async (
         rpcUris,
         messages,
         feeToken,
-        simulateOnly: false,
+        chainId: chain.chain_id,
         fee: {
           amount: [{ denom: feeToken?.denom || '', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
+        simulateOnly: false,
       });
 
       if (!result || result.code !== 0) {
@@ -314,6 +317,7 @@ export const claimAndRestake = async (
       rpcUris,
       messages,
       feeToken,
+      chainId: chain.chain_id,
       simulateOnly: true,
     });
 
@@ -347,11 +351,12 @@ export const claimAndRestake = async (
       rpcUris,
       messages,
       feeToken,
-      simulateOnly: false,
+      chainId: chain.chain_id,
       fee: {
         amount: [{ denom: feeToken?.denom || 'note', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
         gas: estimatedGas.toString(),
       },
+      simulateOnly: false,
     });
 
     if (!result || result.code !== 0) {
@@ -465,6 +470,7 @@ export const claimAndUnstake = async ({
         rpcUris,
         messages,
         feeToken,
+        chainId: chain.chain_id,
         simulateOnly: true,
       });
 
@@ -500,11 +506,12 @@ export const claimAndUnstake = async ({
         rpcUris,
         messages,
         feeToken,
-        simulateOnly: false,
+        chainId: chain.chain_id,
         fee: {
           amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
+        simulateOnly: false,
       });
 
       if (!result || result.code !== 0) {

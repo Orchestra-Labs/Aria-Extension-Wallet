@@ -9,27 +9,19 @@ import {
   QueryType,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import {
-  subscribedChainRegistryAtom,
-  receiveStateAtom,
-  sendStateAtom,
-  networkLevelAtom,
-} from '@/atoms';
+import { receiveStateAtom, sendStateAtom, networkLevelAtom, chainInfoAtom } from '@/atoms';
 import { getSymphonyChainId, isValidSwap, queryRestNode } from '@/helpers';
 
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
-  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   // Safely get chain info with fallback to DEFAULT_CHAIN_ID
   const symphonyChainId = getSymphonyChainId(networkLevel);
-  const getChainInfo = (chainId: string) => {
-    return chainRegistry[networkLevel][chainId] || chainRegistry[networkLevel][symphonyChainId];
-  };
 
-  const chainInfo = getChainInfo(sendState.chainId);
+  const chainInfo = getChainInfo(symphonyChainId);
   const prefix = chainInfo?.bech32_prefix || '';
   const restUris = chainInfo?.rest_uris || [];
 
@@ -65,6 +57,7 @@ export function useExchangeRate() {
         queryType: QueryType.GET,
         prefix,
         restUris,
+        chainId: symphonyChainId,
       });
 
       if (!response?.return_coin?.amount) {

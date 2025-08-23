@@ -11,15 +11,21 @@ import { COSMOS_CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import { queryRestNode, queryRpcNode } from './queryNodes';
 import { getIbcChannelInfo } from './ibcUtils';
 
-export const fetchActiveIBCChannels = async (
-  prefix: string,
-  restUris: Uri[],
-): Promise<IBCChannelData[]> => {
+export const fetchActiveIBCChannels = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<IBCChannelData[]> => {
   try {
     const response = await queryRestNode({
       endpoint: COSMOS_CHAIN_ENDPOINTS.getIBCConnections,
       prefix,
       restUris,
+      chainId,
     });
     return (
       response.channels?.filter((channel: IBCChannelData) => channel.state === 'STATE_OPEN') || []
@@ -46,13 +52,15 @@ export const getValidIBCChannel = async ({
   console.log('[TransactionType] Checking for valid channel:', { sendChain, receiveChainId });
   if (sendChain.chain_id === receiveChainId || !sendChain || !receiveChainId) return null;
 
+  const fromChainId = sendChain.chain_id;
+
   // Get IBC channel info from registry
-  const channelInfo = getIbcChannelInfo(sendChain.chain_id, receiveChainId, networkLevel);
+  const channelInfo = getIbcChannelInfo(fromChainId, receiveChainId, networkLevel);
   if (!channelInfo) return null;
   console.log('[TransactionType] Channel Info?:', channelInfo);
 
   // Query active IBC channels
-  const activeChannels = await fetchActiveIBCChannels(prefix, restUris);
+  const activeChannels = await fetchActiveIBCChannels({ chainId: fromChainId, prefix, restUris });
   if (!activeChannels.length) return null;
   console.log('[TransactionType] Active Channels?:', activeChannels);
 
@@ -69,6 +77,7 @@ interface SendIBCTransactionParams {
   ibcObject: IBCObject;
   prefix: string;
   rpcUris: Uri[];
+  chainId: string;
   simulateOnly?: boolean;
 }
 
@@ -76,6 +85,7 @@ export const sendIBCTransaction = async ({
   ibcObject,
   prefix,
   rpcUris,
+  chainId,
   simulateOnly = false,
 }: SendIBCTransactionParams): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendIbcMessage;
@@ -117,6 +127,7 @@ export const sendIBCTransaction = async ({
       rpcUris,
       messages,
       feeToken,
+      chainId: chainId,
       simulateOnly,
     });
 

@@ -1,21 +1,23 @@
 import { useAtomValue } from 'jotai';
 import { useGetBalances } from './useGetBalances';
 import { useGetModuleAccountsQuery } from './useGetModuleAccountsQuery';
-import { networkLevelAtom, subscribedChainRegistryAtom } from '@/atoms';
+import { chainInfoAtom, networkLevelAtom } from '@/atoms';
 import { getSymphonyChainId } from '@/helpers';
 
 const EXCHANGE_POOL_NAME = 'market';
 
 export const useExchangePoolBalance = () => {
-  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   const symphonyChainId = getSymphonyChainId(networkLevel);
-  const chain = chainRegistry[networkLevel][symphonyChainId];
+  const chain = getChainInfo(symphonyChainId);
+
   const prefix = chain.bech32_prefix;
   const restUris = chain.rest_uris;
 
   const { data: moduleAccountsData, isLoading: moduleAccountsLoading } = useGetModuleAccountsQuery({
+    chainId: symphonyChainId,
     prefix,
     restUris,
   });

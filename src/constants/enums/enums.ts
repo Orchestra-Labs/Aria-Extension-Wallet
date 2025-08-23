@@ -53,6 +53,11 @@ export enum QueryType {
   POST = 'POST',
 }
 
+export enum CommType {
+  RPC = 'rpc',
+  REST = 'rest',
+}
+
 export enum Position {
   TOP = 'top',
   BOTTOM = 'bottom',

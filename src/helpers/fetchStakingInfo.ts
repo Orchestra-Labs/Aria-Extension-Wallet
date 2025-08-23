@@ -57,13 +57,21 @@ const defaultUnbonding = {
   completion_time: '',
 };
 
-export const fetchUnbondingDelegations = async (
-  prefix: string,
-  restUris: Uri[],
-  delegatorAddress: string,
-  validatorAddress?: string,
-  paginationKey?: string,
-): Promise<{ delegations: UnbondingDelegationResponse[]; pagination: any }> => {
+export const fetchUnbondingDelegations = async ({
+  chainId,
+  prefix,
+  restUris,
+  delegatorAddress,
+  validatorAddress,
+  paginationKey,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  delegatorAddress: string;
+  validatorAddress?: string;
+  paginationKey?: string;
+}): Promise<{ delegations: UnbondingDelegationResponse[]; pagination: any }> => {
   try {
     let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/unbonding_delegations`;
     if (validatorAddress) {
@@ -74,7 +82,7 @@ export const fetchUnbondingDelegations = async (
       endpoint += `?pagination.key=${encodeURIComponent(paginationKey)}`;
     }
 
-    const response = await queryRestNode({ endpoint, prefix, restUris });
+    const response = await queryRestNode({ endpoint, prefix, restUris, chainId });
 
     return {
       delegations: (response.unbonding_responses ?? []).map((item: any) => {
@@ -107,12 +115,19 @@ export const fetchUnbondingDelegations = async (
   }
 };
 
-export const fetchDelegations = async (
-  prefix: string,
-  restUris: Uri[],
-  delegatorAddress: string,
-  validatorAddress?: string,
-): Promise<{ delegations: DelegationResponse[]; pagination: any }> => {
+export const fetchDelegations = async ({
+  chainId,
+  prefix,
+  restUris,
+  delegatorAddress,
+  validatorAddress,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  delegatorAddress: string;
+  validatorAddress?: string;
+}): Promise<{ delegations: DelegationResponse[]; pagination: any }> => {
   try {
     let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getDelegations}${delegatorAddress}`;
 
@@ -121,7 +136,7 @@ export const fetchDelegations = async (
       endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSpecificDelegations}${delegatorAddress}/delegations/${validatorAddress}`;
     }
 
-    const response = await queryRestNode({ endpoint, prefix, restUris });
+    const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
     return {
       delegations: (response.delegation_responses ?? []).map((item: any) => {
@@ -138,11 +153,17 @@ export const fetchDelegations = async (
   }
 };
 
-export const fetchAllValidators = async (
-  prefix: string,
-  restUris: Uri[],
-  bondStatus?: BondStatus,
-): Promise<ValidatorInfo[]> => {
+export const fetchAllValidators = async ({
+  chainId,
+  prefix,
+  restUris,
+  bondStatus,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  bondStatus?: BondStatus;
+}): Promise<ValidatorInfo[]> => {
   let allValidators: ValidatorInfo[] = [];
   let nextKey: string | null = null;
 
@@ -153,7 +174,7 @@ export const fetchAllValidators = async (
         endpoint += `&status=${bondStatus}`;
       }
 
-      const response = await queryRestNode({ endpoint, prefix, restUris });
+      const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
       allValidators = allValidators.concat(response.validators ?? []);
 
@@ -167,16 +188,23 @@ export const fetchAllValidators = async (
   return allValidators;
 };
 
-export const fetchValidators = async (
-  prefix: string,
-  restUris: Uri[],
-  validatorAddress?: string,
-  bondStatus?: BondStatus,
-): Promise<{ validators: ValidatorInfo[]; pagination: any }> => {
+export const fetchValidators = async ({
+  chainId,
+  prefix,
+  restUris,
+  validatorAddress,
+  bondStatus,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  validatorAddress?: string;
+  bondStatus?: BondStatus;
+}): Promise<{ validators: ValidatorInfo[]; pagination: any }> => {
   try {
     if (validatorAddress) {
       let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getValidators}${validatorAddress}`;
-      const response = await queryRestNode({ endpoint, prefix, restUris });
+      const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
       // Filter single validator by bond status if provided
       if (bondStatus && response?.validator?.status !== bondStatus) {
@@ -188,7 +216,7 @@ export const fetchValidators = async (
         pagination: null,
       };
     } else {
-      const allValidators = await fetchAllValidators(prefix, restUris, bondStatus);
+      const allValidators = await fetchAllValidators({ chainId, prefix, restUris, bondStatus });
       return {
         validators: allValidators,
         pagination: null, // We're returning all matching validators, so pagination is not applicable
@@ -203,12 +231,19 @@ export const fetchValidators = async (
   }
 };
 
-export const fetchRewards = async (
-  prefix: string,
-  restUris: Uri[],
-  delegatorAddress: string,
-  delegations?: { validator_address: string }[],
-): Promise<{ validator: string; rewards: any[] }[]> => {
+export const fetchRewards = async ({
+  chainId,
+  prefix,
+  restUris,
+  delegatorAddress,
+  delegations,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  delegatorAddress: string;
+  delegations?: { validator_address: string }[];
+}): Promise<{ validator: string; rewards: any[] }[]> => {
   try {
     let endpoint = `${COSMOS_CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards`;
 
@@ -216,7 +251,12 @@ export const fetchRewards = async (
     if (delegations && delegations.length > 0) {
       const rewardsPromises = delegations.map(async delegation => {
         const specificEndpoint = `${COSMOS_CHAIN_ENDPOINTS.getRewards}/${delegatorAddress}/rewards/${delegation.validator_address}`;
-        const response = await queryRestNode({ endpoint: specificEndpoint, prefix, restUris });
+        const response = await queryRestNode({
+          chainId,
+          endpoint: specificEndpoint,
+          prefix,
+          restUris,
+        });
 
         const rewards = Array.isArray(response.rewards)
           ? response.rewards
@@ -232,7 +272,7 @@ export const fetchRewards = async (
     }
 
     // Fetch all rewards for the delegator
-    const response = await queryRestNode({ endpoint, prefix, restUris });
+    const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
     // Process the response and map rewards for each validator
     if (Array.isArray(response.rewards)) {
@@ -254,13 +294,18 @@ export const fetchRewards = async (
   }
 };
 
-export const fetchStakingParams = async (
-  prefix: string,
-  restUris: Uri[],
-): Promise<StakingParams | null> => {
+export const fetchStakingParams = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<StakingParams | null> => {
   try {
     const endpoint = `${COSMOS_CHAIN_ENDPOINTS.getStakingParams}`;
-    const response = await queryRestNode({ endpoint, prefix, restUris });
+    const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
     if (response && 'params' in response) {
       // Convert unbonding_time to days
@@ -281,13 +326,21 @@ export const fetchStakingParams = async (
   }
 };
 
-const fetchAllSigningInfos = async (prefix: string, restUris: Uri[]): Promise<SigningInfo[]> => {
+const fetchAllSigningInfos = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<SigningInfo[]> => {
   let allInfos: SigningInfo[] = [];
   let nextKey: string | null = null;
 
   do {
     const endpoint = `${COSMOS_CHAIN_ENDPOINTS.getSigningInfos}${nextKey ? `?pagination.key=${encodeURIComponent(nextKey)}` : ''}`;
-    const response = await queryRestNode({ endpoint, prefix, restUris });
+    const response = await queryRestNode({ chainId, endpoint, prefix, restUris });
 
     const infos = response?.info ?? [];
     allInfos = allInfos.concat(infos);
@@ -300,7 +353,7 @@ const fetchAllSigningInfos = async (prefix: string, restUris: Uri[]): Promise<Si
 };
 
 // TODO: move to utils
-const getEpochsPerYear = (epochIdentifier: string): number => {
+const getEpochsPerYear = ({ epochIdentifier }: { epochIdentifier: string }): number => {
   switch (epochIdentifier.toLowerCase()) {
     case 'day':
       return 365;
@@ -316,16 +369,23 @@ const getEpochsPerYear = (epochIdentifier: string): number => {
   }
 };
 
-const fetchEpochBasedInflation = async (
-  prefix: string,
-  restUris: Uri[],
-  mintModulePath: string,
-): Promise<number> => {
+const fetchEpochBasedInflation = async ({
+  chainId,
+  prefix,
+  restUris,
+  mintModulePath,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  mintModulePath: string;
+}): Promise<number> => {
   try {
     console.log(`[Endpoint] Starting epoch-based inflation calculation for ${mintModulePath}`);
 
     const [epochRes, paramsRes, poolRes] = await Promise.all([
       queryRestNode({
+        chainId,
         prefix,
         restUris,
         endpoint: `${mintModulePath}/epoch_provisions`,
@@ -333,11 +393,13 @@ const fetchEpochBasedInflation = async (
       queryRestNode({
         prefix,
         restUris,
+        chainId,
         endpoint: `${mintModulePath}/params`,
       }),
       queryRestNode({
         prefix,
         restUris,
+        chainId,
         endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool,
       }),
     ]);
@@ -362,12 +424,12 @@ const fetchEpochBasedInflation = async (
     });
 
     const epochIdentifier = params.epoch_identifier || 'week';
-    const epochsPerYear = getEpochsPerYear(epochIdentifier);
+    const epochsPerYear = getEpochsPerYear({ epochIdentifier });
 
     console.log('[Endpoint] Epoch calculations:', {
       epochIdentifier,
       epochsPerYear,
-      getEpochsPerYear: getEpochsPerYear(epochIdentifier),
+      getEpochsPerYear: getEpochsPerYear({ epochIdentifier }),
     });
 
     const yearlyStakingInflation =
@@ -389,11 +451,20 @@ const fetchEpochBasedInflation = async (
   }
 };
 
-const fetchStandardCosmosInflation = async (prefix: string, restUris: Uri[]): Promise<number> => {
+const fetchStandardCosmosInflation = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<number> => {
   try {
     // Try direct inflation endpoint first
     try {
       const inflationRes = await queryRestNode({
+        chainId,
         prefix,
         restUris,
         endpoint: COSMOS_CHAIN_ENDPOINTS.getInflation,
@@ -411,11 +482,13 @@ const fetchStandardCosmosInflation = async (prefix: string, restUris: Uri[]): Pr
         prefix,
         restUris,
         endpoint: COSMOS_CHAIN_ENDPOINTS.getMintParams,
+        chainId,
       }),
       queryRestNode({
         prefix,
         restUris,
         endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool,
+        chainId,
       }),
     ]);
 
@@ -440,34 +513,46 @@ const fetchStandardCosmosInflation = async (prefix: string, restUris: Uri[]): Pr
 };
 
 // TODO: move to utils
-export const getMintEndpoint = (
-  chainInfo: SimplifiedChainInfo,
-  // customMintPaths: Record<string, Record<string, string>> = {},
-): string => {
-  // Check custom paths first (e.g., Stargaze uses 'publicawesome')
-  // const customPath = customMintPaths[chainInfo.chain_id]?.mint;
-  // console.log('[Endpoint] Mint Endpoint:', chainInfo, customPath);
-  // if (customPath) return customPath;
-
+export const getMintEndpoint = ({ chainInfo }: { chainInfo: SimplifiedChainInfo }): string => {
   // Use chain_name from registry
   return `/${chainInfo.chain_name.replace(/\s+/g, '').toLowerCase()}/mint/v1beta1`;
 };
 
-const fetchInflation = async (chainInfo: SimplifiedChainInfo, restUris: Uri[]): Promise<number> => {
-  const mintEndpoint = getMintEndpoint(
+const fetchInflation = async ({
+  chainInfo,
+  restUris,
+}: {
+  chainInfo: SimplifiedChainInfo;
+  restUris: Uri[];
+}): Promise<number> => {
+  const mintEndpoint = getMintEndpoint({
     chainInfo,
-    // SPECIALIZED_ENDPOINTS
-  );
+  });
 
-  if (KNOWN_EPOCH_BASED_CHAINS.includes(chainInfo.chain_id)) {
-    console.log('[Endpoint] Marking as epoch based chain:', chainInfo.chain_id);
-    return fetchEpochBasedInflation(chainInfo.bech32_prefix, restUris, mintEndpoint);
+  const chainId = chainInfo.chain_id;
+  if (KNOWN_EPOCH_BASED_CHAINS.includes(chainId)) {
+    console.log('[Endpoint] Marking as epoch based chain:', chainId);
+    return fetchEpochBasedInflation({
+      chainId,
+      prefix: chainInfo.bech32_prefix,
+      restUris,
+      mintModulePath: mintEndpoint,
+    });
   }
-  return fetchStandardCosmosInflation(chainInfo.bech32_prefix, restUris);
+  return fetchStandardCosmosInflation({ chainId, prefix: chainInfo.bech32_prefix, restUris });
 };
 
-const fetchCommunityTax = async (prefix: string, restUris: Uri[]): Promise<number> => {
+const fetchCommunityTax = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<number> => {
   const res: any = await queryRestNode({
+    chainId,
     prefix,
     endpoint: COSMOS_CHAIN_ENDPOINTS.getDistributionParams,
     restUris,
@@ -476,8 +561,17 @@ const fetchCommunityTax = async (prefix: string, restUris: Uri[]): Promise<numbe
   return tax;
 };
 
-const fetchBondedRatio = async (prefix: string, restUris: Uri[]): Promise<number> => {
+const fetchBondedRatio = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<number> => {
   const res = await queryRestNode({
+    chainId,
     prefix,
     endpoint: COSMOS_CHAIN_ENDPOINTS.getStakingPool,
     restUris,
@@ -490,9 +584,18 @@ const fetchBondedRatio = async (prefix: string, restUris: Uri[]): Promise<number
   return ratio;
 };
 
-const fetchSignedBlocksWindow = async (prefix: string, restUris: Uri[]): Promise<number> => {
+const fetchSignedBlocksWindow = async ({
+  chainId,
+  prefix,
+  restUris,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+}): Promise<number> => {
   try {
     const slashingData: any = await queryRestNode({
+      chainId,
       prefix,
       restUris,
       endpoint: COSMOS_CHAIN_ENDPOINTS.getSlashingParams,
@@ -508,7 +611,13 @@ const fetchSignedBlocksWindow = async (prefix: string, restUris: Uri[]): Promise
   }
 };
 
-const convertPubKeyToValConsAddress = (pubKey: string, prefix: string): string => {
+const convertPubKeyToValConsAddress = ({
+  pubKey,
+  prefix,
+}: {
+  pubKey: string;
+  prefix: string;
+}): string => {
   try {
     const decoded = fromBase64(pubKey);
     const hashed = sha256(decoded).slice(0, 20);
@@ -520,21 +629,27 @@ const convertPubKeyToValConsAddress = (pubKey: string, prefix: string): string =
 };
 
 // TODO: move to utils
-export const isSymphonyChain = (chainId: string): boolean => {
+export const isSymphonyChain = ({ chainId }: { chainId: string }): boolean => {
   return SYMPHONY_CHAIN_ID_LIST.includes(chainId);
 };
 
-const fetchUptimeData = async (
-  prefix: string,
-  restUris: Uri[],
-  validators: ValidatorInfo[],
-): Promise<{ uptimeMap: Record<string, string>; signedBlocksWindow: number }> => {
+const fetchUptimeData = async ({
+  chainId,
+  prefix,
+  restUris,
+  validators,
+}: {
+  chainId: string;
+  prefix: string;
+  restUris: Uri[];
+  validators: ValidatorInfo[];
+}): Promise<{ uptimeMap: Record<string, string>; signedBlocksWindow: number }> => {
   const defaultWindow = 10000;
   const uptimeMap: Record<string, string> = {};
 
   try {
     // Get signed blocks window first
-    const signedBlocksWindow = await fetchSignedBlocksWindow(prefix, restUris).catch(
+    const signedBlocksWindow = await fetchSignedBlocksWindow({ chainId, prefix, restUris }).catch(
       () => defaultWindow,
     );
 
@@ -544,7 +659,7 @@ const fetchUptimeData = async (
     });
 
     // Try to get all signing infos at once
-    const signingInfos = await fetchAllSigningInfos(prefix, restUris).catch(() => []);
+    const signingInfos = await fetchAllSigningInfos({ chainId, prefix, restUris }).catch(() => []);
 
     if (signingInfos.length > 0) {
       const signingInfoMap = signingInfos.reduce<Record<string, number>>((acc, info) => {
@@ -565,7 +680,7 @@ const fetchUptimeData = async (
         }
 
         try {
-          const valcons = convertPubKeyToValConsAddress(pubKey, `${prefix}valcons`);
+          const valcons = convertPubKeyToValConsAddress({ pubKey, prefix: `${prefix}valcons` });
           const missed = signingInfoMap[valcons] ?? signedBlocksWindow;
           const uptime = ((signedBlocksWindow - missed) / signedBlocksWindow) * 100;
           uptimeMap[validator.operator_address] = uptime.toFixed(2);
@@ -587,29 +702,36 @@ const fetchUptimeData = async (
   }
 };
 
-export const fetchValidatorData = async (
-  chain: SimplifiedChainInfo,
-  delegatorAddress: string,
-): Promise<FullValidatorInfo[]> => {
+export const fetchValidatorData = async ({
+  chain,
+  delegatorAddress,
+}: {
+  chain: SimplifiedChainInfo;
+  delegatorAddress: string;
+}): Promise<FullValidatorInfo[]> => {
   try {
-    const { bech32_prefix: prefix, rest_uris: restUris } = chain;
+    const { chain_id: chainId, bech32_prefix: prefix, rest_uris: restUris } = chain;
 
     // Validate chain configuration
     if (!chain || !prefix || !restUris?.length) {
-      throw new Error(`Invalid chain configuration for ${chain.chain_id}`);
+      throw new Error(`Invalid chain configuration for ${chainId}`);
     }
 
     // First fetch validators separately since we need them for uptime calculation
     let validators: ValidatorInfo[] = [];
     try {
-      const validatorsResponse = await fetchValidators(prefix, restUris);
+      const validatorsResponse = await fetchValidators({
+        chainId,
+        prefix,
+        restUris,
+      });
       validators = validatorsResponse.validators;
       if (validators.length === 0) {
-        console.log(`[ValidatorData] No validators found for ${chain.chain_id}`);
+        console.log(`[ValidatorData] No validators found for ${chainId}`);
         return [];
       }
     } catch (error) {
-      console.error(`[ValidatorData] Error fetching validators for ${chain.chain_id}:`, error);
+      console.error(`[ValidatorData] Error fetching validators for ${chainId}:`, error);
       return [];
     }
 
@@ -635,36 +757,36 @@ export const fetchValidatorData = async (
       inflation,
       { uptimeMap },
     ] = await Promise.all([
-      fetchDelegations(prefix, restUris, delegatorAddress).catch(e => {
+      fetchDelegations({ chainId, prefix, restUris, delegatorAddress }).catch(e => {
         console.error(`Delegations error: ${e.message}`);
         return defaultResponses.delegations;
       }),
-      fetchRewards(prefix, restUris, delegatorAddress).catch(e => {
+      fetchRewards({ chainId, prefix, restUris, delegatorAddress }).catch(e => {
         console.error(`Rewards error: ${e.message}`);
         return defaultResponses.rewards;
       }),
-      fetchStakingParams(prefix, restUris).catch(e => {
+      fetchStakingParams({ chainId, prefix, restUris }).catch(e => {
         console.error(`Staking params error: ${e.message}`);
         return defaultResponses.stakingParams;
       }),
-      fetchUnbondingDelegations(prefix, restUris, delegatorAddress).catch(e => {
+      fetchUnbondingDelegations({ chainId, prefix, restUris, delegatorAddress }).catch(e => {
         console.error(`Unbonding delegations error: ${e.message}`);
         return defaultResponses.unbondingDelegations;
       }),
-      fetchCommunityTax(prefix, restUris).catch(e => {
+      fetchCommunityTax({ chainId, prefix, restUris }).catch(e => {
         console.error(`Community tax error: ${e.message}`);
         return defaultResponses.communityTax;
       }),
       // TODO: change from bonded ratio to total amount bonded
-      fetchBondedRatio(prefix, restUris).catch(e => {
+      fetchBondedRatio({ chainId, prefix, restUris }).catch(e => {
         console.error(`Bonded ratio error: ${e.message}`);
         return defaultResponses.bondedRatio;
       }),
-      fetchInflation(chain, restUris).catch(e => {
+      fetchInflation({ chainInfo: chain, restUris }).catch(e => {
         console.error(`Inflation error: ${e.message}`);
         return defaultResponses.inflation;
       }),
-      fetchUptimeData(prefix, restUris, validators).catch(e => {
+      fetchUptimeData({ chainId, prefix, restUris, validators }).catch(e => {
         console.error(`Uptime data error: ${e.message}`);
         return defaultResponses;
       }),

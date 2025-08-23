@@ -9,6 +9,7 @@ import {
   transactionRouteAtom,
   updateTxStepLogAtom,
   resetRouteStatusAtom,
+  simulationInvalidationAtom,
 } from '@/atoms';
 import { TransactionStatus, TransactionType } from '@/constants';
 import { Asset, IBCObject, SendObject, TransactionResult, TransactionStep } from '@/types';
@@ -39,6 +40,7 @@ export const useSendActions = () => {
   const txLogs = useAtomValue(transactionLogsAtom);
   const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
+  const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
 
   const executeSend = async ({
     sendObject,
@@ -53,13 +55,14 @@ export const useSendActions = () => {
     const rpcUris = sendChain.rpc_uris;
     console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendState.chainId}`);
 
-    return await sendTransaction(
-      walletState.address,
+    return await sendTransaction({
+      fromAddress: walletState.address,
       sendObject,
-      simulateTransaction,
       prefix,
       rpcUris,
-    );
+      chainId: sendState.chainId,
+      simulateOnly: simulateTransaction,
+    });
   };
 
   const executeStablecoinSwap = async ({
@@ -78,7 +81,13 @@ export const useSendActions = () => {
     const sendChain = getChainInfo(sendState.chainId);
     const restUris = sendChain.rest_uris;
 
-    return await swapTransaction(walletState.address, swapParams, restUris, simulateTransaction);
+    return await swapTransaction({
+      fromAddress: walletState.address,
+      swapObject: swapParams,
+      rpcUris: restUris,
+      chainId: sendState.chainId,
+      simulateOnly: simulateTransaction,
+    });
   };
 
   const executeIBC = async ({
@@ -120,6 +129,7 @@ export const useSendActions = () => {
         ibcObject,
         prefix: sendChain.bech32_prefix,
         rpcUris: sendChain.rpc_uris,
+        chainId: sendState.chainId,
         simulateOnly: simulateTransaction,
       });
     } catch (error) {
@@ -366,10 +376,22 @@ export const useSendActions = () => {
     console.log('[runSimulation] Function called at:', Date.now());
     try {
       const result = await executeTransactionRoute(true);
+
+      setSimulationInvalidation(prev => ({
+        ...prev,
+        lastRunTimestamp: Date.now(),
+      }));
+
       console.log('[runSimulation] Completed:', result);
       return result;
     } catch (error) {
       console.error('[runSimulation] Error:', error);
+
+      setSimulationInvalidation(prev => ({
+        ...prev,
+        lastRunTimestamp: Date.now(),
+      }));
+
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error',
