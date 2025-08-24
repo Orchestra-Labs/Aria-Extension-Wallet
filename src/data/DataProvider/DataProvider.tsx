@@ -8,6 +8,7 @@ import {
   networkLevelAtom,
   walletAddressesAtom,
   isGeneratingAddressesAtom,
+  loadSkipAssetsAtom,
 } from '@/atoms';
 
 import {
@@ -16,7 +17,7 @@ import {
   useAddressGeneration,
   useIbcRegistryRefresh,
 } from '@/hooks';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const DataProviderContext = createContext<{
@@ -46,6 +47,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const isGeneratingAddresses = useAtomValue(isGeneratingAddressesAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
   const isFetchingValidators = useAtomValue(isFetchingValidatorDataAtom);
+  const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
 
   const [phase1LoadComplete, setPhase1LoadComplete] = useState(false);
   const [phase2LoadComplete, setPhase2LoadComplete] = useState(false);
@@ -128,6 +130,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     if (hasLoaded) {
       console.log('[DataProvider] Initial data load complete');
       setIsInitialDataLoad(false);
+      loadSkipAssets();
     }
   }, [
     isInitialDataLoad,

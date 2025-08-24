@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
-import { TransactionType, TransactionStatus } from '@/constants';
+import { TransactionType, TransactionStatus, TransferMethod } from '@/constants';
 import { TransactionRoute, TransactionStep, TransactionState, Asset } from '@/types';
-import { chainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
+import { nonSubbedChainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
 import {
   createRouteHash,
   createStepHash,
@@ -140,7 +140,7 @@ export const resetRouteStatusAtom = atom(null, (get, set, isSimulation: boolean 
       stepHash: step.hash,
       log: {
         ...existingLog,
-        status: TransactionStatus.PENDING,
+        status: TransactionStatus.IDLE,
         error: undefined,
       },
     });
@@ -173,12 +173,15 @@ export const updateTransactionRouteAtom = atom(
       isUserAction: params.isUserAction,
     });
 
-    const getChainInfo = get(chainInfoAtom);
+    const getChainInfo = get(nonSubbedChainInfoAtom);
     const sendState = params.sendState || get(sendStateAtom);
     const receiveState = params.receiveState || get(receiveStateAtom);
     const receiveAddress = get(recipientAddressAtom);
     const skipChains = get(skipChainsAtom);
     const skipAssets = get(skipAssetsAtom);
+    set(resetTransactionLogsAtom);
+
+    sendState.amount;
 
     if (!sendState.asset || !receiveState.asset) {
       console.error('[updateTransactionRouteAtom] Missing assets');
@@ -205,6 +208,17 @@ export const updateTransactionRouteAtom = atom(
     for (const asset of Object.values(skipAssets)) {
       skipSupportedDenoms.add(asset.originDenom || asset.denom);
     }
+
+    console.log('[updateTransactionRouteAtom] Skip assets:', {
+      skipAssetsCount: Object.keys(skipAssets).length,
+      skipAssetsList: Object.values(skipAssets).map(a => ({
+        denom: a.denom,
+        originDenom: a.originDenom,
+        symbol: a.symbol,
+        chainId: a.chainId,
+      })),
+      lookingFor: 'uusdc',
+    });
 
     // Check denom support
     const isCurrentSendDenomSupported = skipSupportedDenoms.has(sendState.asset.denom);
@@ -258,6 +272,7 @@ export const updateTransactionRouteAtom = atom(
       toChain: string,
       fromAsset: Asset,
       toAsset: Asset,
+      isFirstStep: boolean = false,
     ): TransactionStep => {
       const step = {
         type,
@@ -271,30 +286,41 @@ export const updateTransactionRouteAtom = atom(
 
       return {
         ...step,
-        hash: createStepHash(step),
+        // Pass sendState.amount for the first step only
+        hash: createStepHash(step, isFirstStep ? sendState.amount : undefined),
       };
     };
 
     // Create steps and logs separately
     const createAndDescribeStep = (
       type: TransactionType,
-      via: 'skip' | 'standard',
+      via: TransferMethod,
       fromChainId: string,
       toChainId: string,
       fromAsset: Asset,
       toAsset: Asset,
+      isFirstStep: boolean = false,
     ): TransactionStep => {
       const fromChain = getChainInfo(fromChainId);
       const toChain = getChainInfo(toChainId);
 
-      const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset);
-      const description = getStepDescription(
+      if (!fromChain || !toChain) {
+        console.error('[createAndDescribeStep] Missing chain info:', {
+          fromChainId,
+          toChainId,
+          fromChainExists: !!fromChain,
+          toChainExists: !!toChain,
+        });
+        throw new Error(`Missing chain info for ${fromChainId} or ${toChainId}`);
+      }
+
+      const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset, isFirstStep);
+      const description = getStepDescription({
         step,
-        receiveAddress,
-        params.walletAddress,
-        fromChain,
-        toChain,
-      );
+        toAddress: receiveAddress,
+        sendChainInfo: fromChain,
+        receiveChainInfo: toChain,
+      });
 
       // Create log entry for this step
       set(createStepLogAtom, {
@@ -311,11 +337,12 @@ export const updateTransactionRouteAtom = atom(
       steps.push(
         createAndDescribeStep(
           TransactionType.SEND,
-          'standard',
+          TransferMethod.STANDARD,
           sendState.chainId,
           receiveState.chainId,
           sendState.asset,
           receiveState.asset,
+          true,
         ),
       );
     }
@@ -325,11 +352,12 @@ export const updateTransactionRouteAtom = atom(
       steps.push(
         createAndDescribeStep(
           TransactionType.SWAP,
-          'standard',
+          TransferMethod.STANDARD,
           sendState.chainId,
           receiveState.chainId,
           sendState.asset,
           receiveState.asset,
+          true,
         ),
       );
     }
@@ -344,11 +372,12 @@ export const updateTransactionRouteAtom = atom(
       steps.push(
         createAndDescribeStep(
           TransactionType.EXCHANGE,
-          'skip',
+          TransferMethod.SKIP,
           sendState.chainId,
           receiveState.chainId,
           sendState.asset,
           receiveState.asset,
+          true,
         ),
       );
     }
@@ -360,6 +389,7 @@ export const updateTransactionRouteAtom = atom(
       !sendAndReceiveAssetsMatch
     ) {
       console.log('[updateTransactionRouteAtom] Creating bridge + exchange route');
+      console.log('[updateTransactionRouteAtom] Sending asset, case 4:', sendState);
       // Step 1: Bridge to native chain via IBC
       const useSkipForIBC =
         skipChains.includes(sendState.chainId) &&
@@ -368,7 +398,7 @@ export const updateTransactionRouteAtom = atom(
       steps.push(
         createAndDescribeStep(
           TransactionType.IBC_SEND,
-          useSkipForIBC ? 'skip' : 'standard',
+          useSkipForIBC ? TransferMethod.SKIP : TransferMethod.STANDARD,
           sendState.chainId,
           sendState.asset.originChainId,
           sendState.asset,
@@ -377,14 +407,17 @@ export const updateTransactionRouteAtom = atom(
             denom: sendState.asset.originDenom,
             chainId: sendState.asset.originChainId,
           },
+          true,
         ),
       );
+
+      console.log('[updateTransactionRouteAtom] Steps, case 4:', steps);
 
       // Step 2: Then exchange via Skip
       steps.push(
         createAndDescribeStep(
           TransactionType.EXCHANGE,
-          'skip',
+          TransferMethod.SKIP,
           sendState.asset.originChainId,
           receiveState.chainId,
           {
@@ -393,10 +426,11 @@ export const updateTransactionRouteAtom = atom(
             chainId: sendState.asset.originChainId,
           },
           receiveState.asset,
+          false,
         ),
       );
     }
-    // Case 5: Direct IBC transfer (use Skip if supported, otherwise standard)
+    // Case 5: Standard IBC transfer
     else if (!sendAndReceiveChainsMatch && sendAndReceiveAssetsMatch) {
       console.log('[updateTransactionRouteAtom] Checking IBC channel');
       const isValidIbcTx = await getValidIBCChannel({
@@ -417,11 +451,12 @@ export const updateTransactionRouteAtom = atom(
         steps.push(
           createAndDescribeStep(
             TransactionType.IBC_SEND,
-            useSkip ? 'skip' : 'standard',
+            useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
             sendState.chainId,
             receiveState.chainId,
             sendState.asset,
             receiveState.asset,
+            true,
           ),
         );
       }

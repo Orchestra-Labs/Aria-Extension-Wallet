@@ -61,6 +61,13 @@ export const chainInfoAtom = atom(get => {
   return (chainId: string) => chainRegistry[networkLevel][chainId];
 });
 
+export const nonSubbedChainInfoAtom = atom(get => {
+  const networkLevel = get(networkLevelAtom);
+  const chainRegistry = get(fullChainRegistryAtom);
+
+  return (chainId: string) => chainRegistry[networkLevel][chainId];
+});
+
 // Helper atoms for derived states
 export const selectedChainIdsAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);

@@ -16,7 +16,6 @@ import {
   unloadFullRegistryAtom,
   loadFullRegistryAtom,
   loadSkipChainsAtom,
-  loadSkipAssetsAtom,
   transactionHasValidRouteAtom,
   transactionRouteAtom,
   finalTransactionHashAtom,
@@ -52,7 +51,6 @@ export const Send = () => {
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
   const loadSkipChains = useSetAtom(loadSkipChainsAtom);
-  const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
   const transactionRoute = useAtomValue(transactionRouteAtom);
   const finalTxHash = useAtomValue(finalTransactionHashAtom);
 
@@ -82,7 +80,6 @@ export const Send = () => {
     setRecipientAddress(walletState.address);
     loadFullRegistry();
     loadSkipChains();
-    loadSkipAssets();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)

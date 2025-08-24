@@ -5,6 +5,7 @@ export interface IBCChannel {
   port_id: string;
 }
 
+// TODO: remove if unused
 export interface IBCChannelData {
   channel_id: string;
   port_id: string;

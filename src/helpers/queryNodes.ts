@@ -24,7 +24,9 @@ import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
 const clientCache = new Map<string, SigningStargateClient>();
 const CACHE_TTL = FIVE_MINUTES;
 // Sorted URIs caching
-const SORT_CACHE_TTL = ONE_SECOND * 5;
+const SORT_CACHE_TTL = ONE_SECOND;
+
+let currentValidatorIndex = new Map<string, number>(); // Tracks current index per chain+type
 
 interface ValidatorCacheEntry {
   validators: SortedValidator[];
@@ -268,6 +270,34 @@ const getSortedUris = (chainId: string, uris: Uri[], commType: CommType): Uri[] 
   return sortUrisWithCache(uris, sortedValidators);
 };
 
+// TODO: move this sorting stuff to the validator sort file
+const getCurrentBestValidator = (chainId: string, uris: Uri[], commType: CommType): Uri | null => {
+  const sortedUris = getSortedUris(chainId, uris, commType);
+  if (sortedUris.length === 0) return null;
+
+  const cacheKey = `${chainId}-${commType}`;
+  const currentIndex = currentValidatorIndex.get(cacheKey) || 0;
+
+  // If current index is out of bounds, reset to 0
+  if (currentIndex >= sortedUris.length) {
+    currentValidatorIndex.set(cacheKey, 0);
+    return sortedUris[0];
+  }
+
+  return sortedUris[currentIndex];
+};
+
+const moveToNextValidator = (chainId: string, commType: CommType): void => {
+  const cacheKey = `${chainId}-${commType}`;
+  const currentIndex = currentValidatorIndex.get(cacheKey) || 0;
+  currentValidatorIndex.set(cacheKey, currentIndex + 1);
+};
+
+const resetValidatorIndex = (chainId: string, commType: CommType): void => {
+  const cacheKey = `${chainId}-${commType}`;
+  currentValidatorIndex.set(cacheKey, 0);
+};
+
 const queryWithRetry = async ({
   endpoint,
   useRPC = false,
@@ -300,12 +330,14 @@ const queryWithRetry = async ({
   // Determine query type for sorting and recording
   const queryTypeCategory: CommType = useRPC ? CommType.RPC : CommType.REST;
 
-  // Pre-sort all URIs once and create a queue
-  const sortedUris = getSortedUris(chainId, uris, queryTypeCategory);
-  const uriQueue = [...sortedUris];
+  // Get the current best validator for this chain and type
+  let currentUri = getCurrentBestValidator(chainId, uris, queryTypeCategory);
 
-  while (attemptCount < MAX_RETRIES_PER_QUERY && uriQueue.length > 0) {
-    const uri = uriQueue.shift()!;
+  if (!currentUri) {
+    throw new Error(`No validators available for ${chainId} ${queryTypeCategory}`);
+  }
+
+  while (attemptCount < MAX_RETRIES_PER_QUERY) {
     const startTime = Date.now();
 
     try {
@@ -316,7 +348,7 @@ const queryWithRetry = async ({
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
 
-        const transactionSigner = await getCachedSigner(endpoint, uri, mnemonic, prefix);
+        const transactionSigner = await getCachedSigner(endpoint, currentUri, mnemonic, prefix);
 
         const result = await performRpcQuery(
           transactionSigner,
@@ -328,21 +360,35 @@ const queryWithRetry = async ({
         );
 
         const queryTime = Date.now() - startTime;
-        recordQueryResult(chainId, uri.address, queryTime, true, CommType.RPC);
+        recordQueryResult(chainId, currentUri.address, queryTime, true, CommType.RPC);
 
+        // Success! Reset to use the best validator for next query
+        resetValidatorIndex(chainId, queryTypeCategory);
         return result;
       } else {
-        const result = await performRestQuery(uri.address, endpoint, queryType);
-        recordQueryResult(chainId, uri.address, result.queryTime, true, CommType.REST);
+        const result = await performRestQuery(currentUri.address, endpoint, queryType);
+        recordQueryResult(chainId, currentUri.address, result.queryTime, true, CommType.REST);
+
+        // Success! Reset to use the best validator for next query
+        resetValidatorIndex(chainId, queryTypeCategory);
         return result.data;
       }
     } catch (error) {
       const queryTime = Date.now() - startTime;
-      console.error(`[queryNodes] Query failed for ${uri.address}: ${error}`);
+      console.error(`[queryNodes] Query failed for ${currentUri.address}: ${error}`);
 
       if (shouldRecordFailure(error)) {
-        recordQueryResult(chainId, uri.address, queryTime, false, queryTypeCategory);
+        recordQueryResult(chainId, currentUri.address, queryTime, false, queryTypeCategory);
+
+        // Move to next validator for subsequent attempts
+        moveToNextValidator(chainId, queryTypeCategory);
+        currentUri = getCurrentBestValidator(chainId, uris, queryTypeCategory);
+
+        if (!currentUri) {
+          throw new Error(`No more validators available after ${attemptCount + 1} attempts`);
+        }
       } else {
+        // Non-serious error, don't move to next validator
         let errorMessage = 'Unknown error';
         if (error instanceof Error) {
           errorMessage = error.message;
@@ -351,17 +397,18 @@ const queryWithRetry = async ({
         } else {
           errorMessage = String(error);
         }
-        console.log(`[queryNodes] Not recording failure for ${uri.address}: ${errorMessage}`);
+        console.log(
+          `[queryNodes] Not recording failure for ${currentUri.address}: ${errorMessage}`,
+        );
       }
 
       attemptCount++;
       lastError = error;
 
-      if (uriQueue.length > 0) {
+      if (attemptCount < MAX_RETRIES_PER_QUERY && currentUri) {
         const backoff = Math.min(2 ** attemptCount * 500, 5000);
-        const nextUri = uriQueue[0];
         console.log(
-          `[queryNodes] Next attempt via ${nextUri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
+          `[queryNodes] Next attempt via ${currentUri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
         );
         await delay(backoff);
       }
@@ -376,9 +423,7 @@ const queryWithRetry = async ({
     };
   }
 
-  throw new Error(
-    `All ${Math.min(MAX_RETRIES_PER_QUERY, uris.length)} attempts failed. ${lastError?.message || ''}`,
-  );
+  throw new Error(`All ${MAX_RETRIES_PER_QUERY} attempts failed. ${lastError?.message || ''}`);
 };
 
 export const queryRestNode = async ({
@@ -436,13 +481,3 @@ export const queryRpcNode = async ({
     uris: rpcUris,
     chainId,
   });
-
-// Clear client cache utility
-export const clearClientCache = (): void => {
-  clientCache.clear();
-};
-
-// Clear sorted URIs cache utility
-export const clearSortedUrisCache = (): void => {
-  sortedValidatorsCache = {};
-};

@@ -16,6 +16,7 @@ export * from './sendTransactions';
 export * from './skipApiHelper';
 export * from './sleep';
 export * from './sort';
+export * from './sortValidatorUris';
 export * from './stakingTransactions';
 export * from './statusUtils';
 export * from './swapTransactions';

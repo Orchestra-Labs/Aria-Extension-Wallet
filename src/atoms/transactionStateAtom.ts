@@ -184,6 +184,8 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
     isComplete: false,
     isSimulation: true,
   });
+
+  set(transactionLogsAtom, {});
 });
 
 // TODO: consider later steps and the maximums inherent to those as well

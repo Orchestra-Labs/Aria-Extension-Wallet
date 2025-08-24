@@ -48,6 +48,11 @@ export enum NetworkLevel {
   MAINNET = 'mainnet',
 }
 
+export enum TransferMethod {
+  SKIP = 'skip',
+  STANDARD = 'standard',
+}
+
 export enum QueryType {
   GET = 'GET',
   POST = 'POST',

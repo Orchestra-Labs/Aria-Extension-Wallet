@@ -92,9 +92,11 @@ export const useSendActions = () => {
 
   const executeIBC = async ({
     sendObject,
+    receiveChainId,
     simulateTransaction,
   }: {
     sendObject: SendObject;
+    receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[useSendActions] executeIBC - Starting IBC transaction');
@@ -102,7 +104,7 @@ export const useSendActions = () => {
       const sendChain = getChainInfo(sendState.chainId);
       const validChannel = await getValidIBCChannel({
         sendChain,
-        receiveChainId: receiveState.chainId,
+        receiveChainId,
         networkLevel,
         prefix: sendChain.bech32_prefix,
         restUris: sendChain.rest_uris,
@@ -151,18 +153,23 @@ export const useSendActions = () => {
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[executeSkipTx] Starting IBC via Skip');
+    console.log('[executeSkipTx] Denom details:', {
+      sendObjectDenom: sendObject.denom,
+      receiveAssetDenom,
+      sendStateAsset: sendState.asset,
+      stepFromAsset: sendObject.denom,
+    });
     try {
-      const amountIn = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
+      const amount = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
 
       // First get the route
-      const routeResponse = await getRoute(
-        sendState.chainId,
-        sendObject.denom, // need to use current denom here whether ibc or original
-        receiveState.chainId,
-        receiveAssetDenom,
-        amountIn,
-        { allow_multi_tx: true, allow_swaps: false },
-      );
+      const routeResponse = await getRoute({
+        fromChainId: sendState.asset.originChainId, // Skip only recognizes native coins on their native chains
+        fromDenom: sendObject.denom,
+        toChainId: receiveState.chainId,
+        toDenom: receiveAssetDenom,
+        amount,
+      });
 
       if (!routeResponse.operations?.length) {
         throw new Error('No valid IBC route found');
@@ -174,7 +181,7 @@ export const useSendActions = () => {
         sendObject.denom, // need to use current denom here whether ibc or original
         receiveState.chainId,
         receiveAssetDenom,
-        amountIn,
+        amount,
         addressList,
         routeResponse.operations,
         routeResponse.estimated_amount_out,
@@ -203,7 +210,7 @@ export const useSendActions = () => {
         },
       };
     } catch (error) {
-      console.error('IBC via Skip failed:', error);
+      console.error('[useSendActions] IBC via Skip failed:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'IBC via Skip failed',
@@ -235,10 +242,20 @@ export const useSendActions = () => {
           simulateTransaction: isSimulation,
         });
       case TransactionType.IBC_SEND:
-        return await executeIBC({ sendObject, simulateTransaction: isSimulation });
-      case TransactionType.EXCHANGE:
-        return await executeSkipTx({
+        return await executeIBC({
           sendObject,
+          receiveChainId: step.toChain,
+          simulateTransaction: isSimulation,
+        });
+      case TransactionType.EXCHANGE:
+        const skipSendObject: SendObject = {
+          recipientAddress: recipientAddress || walletState.address,
+          amount: sendState.amount.toString(),
+          denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
+          feeToken,
+        };
+        return await executeSkipTx({
+          sendObject: skipSendObject,
           receiveAssetDenom: step.toAsset.denom,
           simulateTransaction: isSimulation,
         });

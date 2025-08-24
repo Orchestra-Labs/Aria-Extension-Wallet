@@ -165,24 +165,32 @@ export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   }
 };
 
-export const getRoute = async (
-  source_chain_id: string,
-  source_asset_denom: string,
-  dest_chain_id: string,
-  dest_asset_denom: string,
-  amount_in: string,
-  additionalParams?: Record<string, any>,
-): Promise<any> => {
+export const getRoute = async ({
+  fromChainId,
+  fromDenom,
+  toChainId,
+  toDenom,
+  amount,
+  additionalParams,
+}: {
+  fromChainId: string;
+  fromDenom: string;
+  toChainId: string;
+  toDenom: string;
+  amount: string;
+  additionalParams?: Record<string, any>;
+}): Promise<any> => {
   try {
     const requestBody = {
-      source_asset_denom,
-      source_asset_chain_id: source_chain_id,
-      dest_asset_denom,
-      dest_asset_chain_id: dest_chain_id,
-      amount_in,
+      source_asset_denom: fromDenom,
+      source_asset_chain_id: fromChainId,
+      dest_asset_denom: toDenom,
+      dest_asset_chain_id: toChainId,
+      amount_in: amount,
       allow_multi_tx: true,
       allow_swaps: true,
       smart_relay: true,
+      cumulative_affiliate_fee_bps: '10', // 0.1%, so $1 for every $1000 transferred
       ...additionalParams,
     };
 
@@ -197,7 +205,7 @@ export const getRoute = async (
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('[Skip API] Route Error:', response.status, errorData);
-      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+      throw new Error(errorData.message);
     }
 
     const responseData = await response.json();

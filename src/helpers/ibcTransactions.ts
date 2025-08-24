@@ -1,6 +1,5 @@
 import {
   IBCChannel,
-  IBCChannelData,
   IBCObject,
   RPCResponse,
   SimplifiedChainInfo,
@@ -11,28 +10,39 @@ import { COSMOS_CHAIN_ENDPOINTS, NetworkLevel, ONE_MINUTE } from '@/constants';
 import { queryRestNode, queryRpcNode } from './queryNodes';
 import { getIbcChannelInfo } from './ibcUtils';
 
-export const fetchActiveIBCChannels = async ({
+export const checkChannelState = async ({
+  channelId,
+  portId = 'transfer',
   chainId,
   prefix,
   restUris,
 }: {
+  channelId: string;
+  portId?: string;
   chainId: string;
   prefix: string;
   restUris: Uri[];
-}): Promise<IBCChannelData[]> => {
+}): Promise<{ isOpen: boolean; channel?: any }> => {
   try {
     const response = await queryRestNode({
-      endpoint: COSMOS_CHAIN_ENDPOINTS.getIBCConnections,
+      endpoint: `${COSMOS_CHAIN_ENDPOINTS.getIBCConnections}/${channelId}/ports/${portId}`,
       prefix,
       restUris,
       chainId,
     });
-    return (
-      response.channels?.filter((channel: IBCChannelData) => channel.state === 'STATE_OPEN') || []
-    );
+
+    console.log('[checkChannelState] Raw response:', response);
+
+    // Check if channel exists and is in OPEN state based on the actual response format
+    const isOpen = response.channel?.state === 'STATE_OPEN';
+
+    return {
+      isOpen,
+      channel: response.channel,
+    };
   } catch (error) {
-    console.error('Error fetching active IBC channels:', error);
-    return [];
+    console.error('Error checking channel state:', error);
+    return { isOpen: false };
   }
 };
 
@@ -59,18 +69,25 @@ export const getValidIBCChannel = async ({
   if (!channelInfo) return null;
   console.log('[TransactionType] Channel Info?:', channelInfo);
 
-  // Query active IBC channels
-  const activeChannels = await fetchActiveIBCChannels({ chainId: fromChainId, prefix, restUris });
-  if (!activeChannels.length) return null;
-  console.log('[TransactionType] Active Channels?:', activeChannels);
+  // Check the specific channel state
+  const channelState = await checkChannelState({
+    channelId: channelInfo.chain1.channel_id,
+    chainId: sendChain.chain_id,
+    prefix,
+    restUris,
+  });
 
-  // Find matching active channel
-  const validChannel = activeChannels.find(
-    channel => channel.channel_id === channelInfo.chain1.channel_id,
-  );
-  console.log('[TransactionType] Valid Channel?:', validChannel);
+  console.log('[getValidIBCChannel] Channel state check result:', channelState);
 
-  return validChannel || null;
+  if (channelState.isOpen) {
+    return {
+      channel_id: channelInfo.chain1.channel_id,
+      port_id: 'transfer',
+    };
+  }
+
+  console.log('[getValidIBCChannel] Channel is not open or not found');
+  return null;
 };
 
 interface SendIBCTransactionParams {
