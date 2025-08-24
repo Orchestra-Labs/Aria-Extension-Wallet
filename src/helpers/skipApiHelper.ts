@@ -165,6 +165,7 @@ export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   }
 };
 
+// TODO: enable amount out as an option (to handle billing)
 export const getRoute = async ({
   fromChainId,
   fromDenom,
@@ -217,30 +218,41 @@ export const getRoute = async ({
   }
 };
 
-export const getTransactionMessages = async (
-  source_chain_id: string,
-  source_asset_denom: string,
-  dest_chain_id: string,
-  dest_asset_denom: string,
-  amount_in: string,
-  address_list: string[],
-  operations: any[],
-  estimated_amount_out: string,
-  slippage_tolerance_percent: string = '0.25',
-  additionalParams?: Record<string, any>,
-): Promise<any> => {
+// TODO: enable amount out as an option (to handle billing)
+export const getTransactionMessages = async ({
+  fromChainId,
+  fromDenom,
+  toChainId,
+  toDenom,
+  amount,
+  addressList,
+  operations,
+  estimatedAmountOut,
+  slippageTolerancePercent = '0.25',
+  additionalParams,
+}: {
+  fromChainId: string;
+  fromDenom: string;
+  toChainId: string;
+  toDenom: string;
+  amount: string;
+  addressList: string[];
+  operations: any[];
+  estimatedAmountOut: string;
+  slippageTolerancePercent: string;
+  additionalParams?: Record<string, any>;
+}): Promise<any> => {
   try {
     const requestBody = {
-      source_asset_denom,
-      source_asset_chain_id: source_chain_id,
-      dest_asset_denom,
-      dest_asset_chain_id: dest_chain_id,
-      amount_in,
-      amount_out: estimated_amount_out,
-      address_list,
+      source_asset_chain_id: fromChainId,
+      source_asset_denom: fromDenom,
+      dest_asset_chain_id: toChainId,
+      dest_asset_denom: toDenom,
+      amount_in: amount,
+      address_list: addressList,
       operations,
-      estimated_amount_out,
-      slippage_tolerance_percent,
+      estimated_amount_out: estimatedAmountOut,
+      slippage_tolerance_percent: slippageTolerancePercent,
       timeout_seconds: '5',
       enable_gas_warnings: false,
       ...additionalParams,
@@ -257,7 +269,7 @@ export const getTransactionMessages = async (
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('[Skip API] Messages Error:', response.status, errorData);
-      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+      throw new Error(errorData.message);
     }
 
     const responseData = await response.json();
@@ -269,6 +281,7 @@ export const getTransactionMessages = async (
   }
 };
 
+// TODO: enable amount out as an option (to handle billing)
 export const submitTransaction = async (
   chain_id: string,
   tx: string, // Base64 encoded signed transaction
@@ -299,7 +312,7 @@ export const submitTransaction = async (
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error('[Skip API] Submit Error:', response.status, errorData);
-      throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
+      throw new Error(errorData.message);
     }
 
     const responseData = await response.json();

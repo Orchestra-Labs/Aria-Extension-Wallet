@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
 import { TransactionType, TransactionStatus, TransferMethod } from '@/constants';
 import { TransactionRoute, TransactionStep, TransactionState, Asset } from '@/types';
-import { nonSubbedChainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
+import { fullRegistryChainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
 import {
   createRouteHash,
   createStepHash,
@@ -173,7 +173,7 @@ export const updateTransactionRouteAtom = atom(
       isUserAction: params.isUserAction,
     });
 
-    const getChainInfo = get(nonSubbedChainInfoAtom);
+    const getChainInfo = get(fullRegistryChainInfoAtom);
     const sendState = params.sendState || get(sendStateAtom);
     const receiveState = params.receiveState || get(receiveStateAtom);
     const receiveAddress = get(recipientAddressAtom);

@@ -10,11 +10,16 @@ import {
   updateTxStepLogAtom,
   resetRouteStatusAtom,
   simulationInvalidationAtom,
+  walletAddressesAtom,
+  transactionLogsAtom,
+  fullRegistryChainInfoAtom,
 } from '@/atoms';
 import { TransactionStatus, TransactionType } from '@/constants';
 import { Asset, IBCObject, SendObject, TransactionResult, TransactionStep } from '@/types';
 import {
+  getAddressByChainPrefix,
   getRoute,
+  getSessionToken,
   getTransactionMessages,
   getValidIBCChannel,
   sendIBCTransaction,
@@ -22,7 +27,6 @@ import {
   swapTransaction,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
-import { transactionLogsAtom } from '@/atoms/transactionLogsAtom';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
@@ -36,10 +40,13 @@ export const useSendActions = () => {
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const getChainInfo = useAtomValue(chainInfoAtom);
+  const getFullRegistryChainInfo = useAtomValue(fullRegistryChainInfoAtom);
+
   const txRoute = useAtomValue(transactionRouteAtom);
   const txLogs = useAtomValue(transactionLogsAtom);
   const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
+  const walletAddresses = useAtomValue(walletAddressesAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
 
   const executeSend = async ({
@@ -143,6 +150,7 @@ export const useSendActions = () => {
     }
   };
 
+  // TODO: enable amount out as an option (to handle billing)
   const executeSkipTx = async ({
     sendObject,
     receiveAssetDenom,
@@ -175,18 +183,60 @@ export const useSendActions = () => {
         throw new Error('No valid IBC route found');
       }
 
-      const addressList = routeResponse.required_chain_addresses.map(() => walletState.address);
-      const messagesResponse = await getTransactionMessages(
-        sendState.chainId,
-        sendObject.denom, // need to use current denom here whether ibc or original
-        receiveState.chainId,
-        receiveAssetDenom,
+      const sessionToken = getSessionToken();
+      if (!sessionToken) throw new Error("Session token doesn't exist");
+      const mnemonic = sessionToken.mnemonic;
+
+      // Get addresses for each required chain
+      const addressList = await Promise.all(
+        routeResponse.required_chain_addresses.map(async (chainId: string) => {
+          const chainInfo = getFullRegistryChainInfo(chainId);
+
+          if (!chainInfo?.bech32_prefix) {
+            throw new Error(`Prefix not found for ${chainInfo.pretty_name} in path`);
+          }
+
+          const prefix = chainInfo.bech32_prefix;
+
+          // Use existing wallet address if available and has correct prefix
+          const existingAddress = walletAddresses[chainId];
+
+          if (existingAddress && existingAddress.startsWith(chainInfo.bech32_prefix)) {
+            console.log(
+              `[executeSkipTx] Using existing address for chain ${chainId}: ${existingAddress}`,
+            );
+            return existingAddress;
+          }
+
+          // Generate new address using the chain prefix
+          console.log(
+            `[executeSkipTx] Generating new address for chain ${chainId} with prefix ${chainInfo.bech32_prefix}`,
+          );
+          try {
+            const newAddress = await getAddressByChainPrefix(mnemonic, prefix);
+            console.log(`[executeSkipTx] Generated address for ${chainId}: ${newAddress}`);
+            return newAddress;
+          } catch (error) {
+            console.error(`[executeSkipTx] Failed to generate address for ${chainId}:`, error);
+            // Fallback to current wallet (may not work but prevents complete failure)
+            return walletState.address;
+          }
+        }),
+      );
+
+      console.log('[executeSkipTx] Final address list:', addressList);
+
+      const messagesResponse = await getTransactionMessages({
+        fromChainId: sendState.asset.originChainId, // Skip only recognizes native coins on their native chains
+        fromDenom: sendObject.denom, // need to use original denom here whether ibc or original
+        toChainId: receiveState.chainId,
+        toDenom: receiveAssetDenom,
         amount,
         addressList,
-        routeResponse.operations,
-        routeResponse.estimated_amount_out,
-        '0.25',
-      );
+        operations: routeResponse.operations,
+        estimatedAmountOut: routeResponse.estimated_amount_out,
+        slippageTolerancePercent: '0.25',
+      });
 
       // Calculate total fees
       const totalFees =

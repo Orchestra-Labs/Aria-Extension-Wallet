@@ -9,5 +9,5 @@ export * from './password';
 export * from './prefixes';
 export * from './session';
 export * from './sessionStorage';
-export * from './wallet';
 export * from './validatorStats';
+export * from './wallet';

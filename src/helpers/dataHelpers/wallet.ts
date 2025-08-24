@@ -55,16 +55,6 @@ export const getWalletByPrefix = async (
   return await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
 };
 
-// export async function createOfflineSigner(
-//   mnemonic: string,
-// ): Promise<DirectSecp256k1HdWallet> {
-//   const hdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
-//     prefix: WALLET_PREFIX,
-//   });
-//   console.log('Offline signer created successfully');
-//   return hdWallet;
-// }
-
 export async function createOfflineSignerByPrefix(
   mnemonic: string,
   prefix: string,
@@ -74,14 +64,6 @@ export async function createOfflineSignerByPrefix(
   return wallet;
 }
 
-// export async function createAminoSigner(mnemonic: string) {
-//   const hdWallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, {
-//     prefix: WALLET_PREFIX,
-//   });
-//   console.log('Amino signer created successfully');
-//   return hdWallet;
-// }
-
 export async function createAminoSignerByPrefix(
   mnemonic: string,
   prefix: string,
@@ -90,13 +72,6 @@ export async function createAminoSignerByPrefix(
   console.log(`Amino signer created with prefix "${prefix}"`);
   return wallet;
 }
-
-// export const getAddress = async (mnemonic: string): Promise<string> => {
-//   const wallet = await getWallet(mnemonic);
-//   const [account] = await wallet.getAccounts();
-//   console.log('Address retrieved:', account.address);
-//   return account.address;
-// };
 
 export async function getAddressesByChainPrefix(
   mnemonic: string,
