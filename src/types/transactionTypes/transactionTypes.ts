@@ -39,15 +39,15 @@ export interface TransactionLog {
   fee: FeeState;
 }
 
+export interface TransactionLogs {
+  [stepHash: string]: TransactionLog;
+}
+
 export interface TransactionRoute {
   steps: TransactionStep[];
   currentStep: number;
   isComplete: boolean;
   isSimulation: boolean;
-}
-
-export interface TransactionLogs {
-  [stepHash: string]: TransactionLog;
 }
 
 export type TransactionError = {
