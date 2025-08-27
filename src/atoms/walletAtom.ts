@@ -23,6 +23,11 @@ export const chainWalletAtom = (chainId: string) => {
   return chainWalletCache.get(chainId)!;
 };
 
+export const getChainWalletAtom = atom(get => (chainId: string) => {
+  const sessionWallet = get(sessionWalletAtom);
+  return sessionWallet.chainWallets[chainId] || { address: '', assets: [] };
+});
+
 // Secure updater for chain wallet data
 export const updateChainWalletAtom = atom(
   null,

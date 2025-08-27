@@ -1,3 +1,4 @@
+import { SkipTxResponse } from './transactionTypes';
 import {
   Coin,
   StakingParams,
@@ -35,6 +36,7 @@ export interface TransactionRPCResponse extends BaseRPCResponse {
   messages?: any[];
   minAmountOut?: string;
   height?: number;
+  skipTxResponse?: SkipTxResponse[];
 }
 
 //TX result incl the response

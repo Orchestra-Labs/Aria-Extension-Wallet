@@ -145,7 +145,7 @@ const resolveIbcAsset = async (
   }
 };
 
-const getBalances = async (
+export const getBalances = async (
   walletAddress: string,
   restUris: Uri[],
 ): Promise<Array<{ denom: string; amount: string }>> => {

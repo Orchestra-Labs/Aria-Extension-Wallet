@@ -53,7 +53,7 @@ export const AssetTile = ({
 
   const [copied, setCopied] = useState(false);
 
-  const chain = !isSelectable ? getChainInfo(asset.chainId) : undefined;
+  const chain = getChainInfo(asset.chainId);
   const prefix = chain?.bech32_prefix;
   const truncatedAddress = prefix ? truncateWalletAddress(prefix, walletState.address) : '';
 

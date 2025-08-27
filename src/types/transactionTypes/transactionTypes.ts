@@ -37,6 +37,7 @@ export interface TransactionLog {
   txHash?: string;
   error?: string;
   fee: FeeState;
+  feeSymbol: string;
 }
 
 export interface TransactionLogs {
