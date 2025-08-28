@@ -13,8 +13,15 @@ export const createStepHash = (step: TransactionStep, amount?: number): string =
   return `${baseString + amountString}`;
 };
 
-export const createRouteHash = (route: TransactionRoute): string => {
-  return route.steps.map(step => step.hash).join('|');
+export const createRouteHash = ({
+  route,
+  toAddress, // Include recipient address to force new simulation
+}: {
+  route: TransactionRoute;
+  toAddress: string;
+}): string => {
+  const stepsHash = route.steps.map(step => step.hash).join('|');
+  return `${stepsHash}-${toAddress}`;
 };
 
 export const getStepDescription = ({

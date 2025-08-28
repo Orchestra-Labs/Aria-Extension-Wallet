@@ -20,6 +20,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
   uusd: {
     denom: 'uusd',
     amount: '0',
+    displayAmount: '0',
     exchangeRate: '10',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/husd.png',
@@ -33,9 +34,10 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
     originDenom: 'uusd',
     originChainId: SYMPHONY_MAINNET_ID,
   },
-  ukhd: {
+  uhkd: {
     denom: 'uhkd',
     amount: '0',
+    displayAmount: '0',
     exchangeRate: '1.282',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/hhkd.png',
@@ -52,6 +54,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
   uvnd: {
     denom: 'uaux',
     amount: '0',
+    displayAmount: '0',
     exchangeRate: '0.000399',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/hvnd.png',
@@ -68,6 +71,7 @@ export const SYMPHONY_MAINNET_ASSET_REGISTRY: AssetRegistry = {
   [DEFAULT_DENOM]: {
     denom: DEFAULT_DENOM,
     amount: '0',
+    displayAmount: '0',
     exchangeRate: '1',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/mld.png',
@@ -87,6 +91,7 @@ export const SYMPHONY_TESTNET_ASSET_REGISTRY: AssetRegistry = {
   note: {
     denom: 'note',
     amount: '0',
+    displayAmount: '0',
     exchangeRate: '1',
     isIbc: false,
     logo: 'https://raw.githubusercontent.com/cosmos/chain-registry/master/testnets/symphonytestnet/images/mld.png',

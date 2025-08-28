@@ -196,15 +196,22 @@ export const maxAvailableAtom = atom(get => {
 
   if (!sendAsset) return 0;
 
-  const walletAsset = walletAssets.find(
-    (asset: Asset) => asset.originDenom || asset.denom === sendAsset.originDenom || sendAsset.denom,
-  );
+  // TODO: change to find all (when transaction routing enables combination sends)
+  const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
   if (!walletAsset) return 0;
 
   const maxAmount = parseFloat(walletAsset.amount || '0');
   const feeAmount = derivedFeeState?.amount || 0;
 
   return Math.max(0, maxAmount - feeAmount);
+});
+
+// TODO: group in with maxAvailableAtom as dictionary return
+export const maxAvailableDisplayAtom = atom(get => {
+  const sendAsset = get(sendStateAtom).asset;
+  const maxAmount = get(maxAvailableAtom);
+
+  return maxAmount / Math.pow(10, sendAsset.exponent);
 });
 
 export const isTxPendingAtom = atom(get => {

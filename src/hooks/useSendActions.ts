@@ -10,20 +10,34 @@ import {
   updateTxStepLogAtom,
   resetRouteStatusAtom,
   simulationInvalidationAtom,
-  walletAddressesAtom,
   transactionLogsAtom,
   fullRegistryChainInfoAtom,
+  getChainWalletAtom,
+  updateChainWalletAtom,
 } from '@/atoms';
 import { TransactionStatus, TransactionType } from '@/constants';
-import { Asset, IBCObject, SendObject, TransactionResult, TransactionStep } from '@/types';
 import {
+  Asset,
+  FeeToken,
+  IBCObject,
+  SendObject,
+  SignedTransactionData,
+  TransactionResult,
+  TransactionStep,
+  Uri,
+} from '@/types';
+import {
+  createAndSignSkipTransaction,
+  getAccountInfo,
   getAddressByChainPrefix,
+  getBalances,
   getRoute,
   getSessionToken,
   getTransactionMessages,
   getValidIBCChannel,
   sendIBCTransaction,
   sendTransaction,
+  submitTransaction,
   swapTransaction,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
@@ -36,6 +50,7 @@ export const useSendActions = () => {
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
+  const getWalletInfo = useAtomValue(getChainWalletAtom);
   const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
@@ -46,8 +61,152 @@ export const useSendActions = () => {
   const txLogs = useAtomValue(transactionLogsAtom);
   const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
-  const walletAddresses = useAtomValue(walletAddressesAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
+  const updateChainWallet = useSetAtom(updateChainWalletAtom);
+
+  // TODO: clean up.  not all of these functions need to be in this file
+  const checkGasBalance = async ({
+    address,
+    feeToken,
+    estimatedGas,
+    chainId,
+    restUris,
+  }: {
+    address: string;
+    feeToken: FeeToken;
+    estimatedGas: string;
+    chainId: string;
+    restUris: Uri[];
+  }): Promise<{ hasSufficientBalance: boolean; balance: number; required: number }> => {
+    try {
+      console.log('[checkGasBalance] Starting gas balance check', {
+        address,
+        feeTokenDenom: feeToken.denom,
+        estimatedGas,
+        chainId,
+      });
+
+      // FIRST: Check if wallet exists in local atom state
+      const chainWallet = getWalletInfo(chainId);
+
+      // If wallet doesn't exist in local state, query the chain using getBalances
+      if (!chainWallet) {
+        console.log(
+          '[BalanceCheck] Wallet not found in local state, querying chain using getBalances...',
+        );
+
+        const balances = await getBalances(address, restUris);
+        console.log('[BalanceCheck] Retrieved balances from chain:', balances);
+
+        const feeTokenBalance = balances.find((b: any) => {
+          console.log(
+            '[BalanceCheck] Comparing balance denom:',
+            b.denom,
+            'with fee token denom:',
+            feeToken.denom,
+          );
+          return b.denom === feeToken.denom;
+        });
+
+        const currentBalance = feeTokenBalance ? parseInt(feeTokenBalance.amount) : 0;
+        const gasPrice = feeToken.gasPriceStep.average;
+        const requiredGas = Math.ceil(parseInt(estimatedGas) * gasPrice);
+
+        console.log('[BalanceCheck] Chain query result:', {
+          feeTokenFound: !!feeTokenBalance,
+          currentBalance,
+          requiredGas,
+          hasSufficient: currentBalance >= requiredGas,
+          gasPrice,
+          estimatedGas,
+        });
+
+        return {
+          hasSufficientBalance: currentBalance >= requiredGas,
+          balance: currentBalance,
+          required: requiredGas,
+        };
+      }
+
+      // SECOND: Wallet exists in local state - use it for balance check
+      console.log('[BalanceCheck] Using local wallet state for chain:', chainId);
+      console.log('[BalanceCheck] Local wallet assets:', chainWallet.assets);
+
+      const localFeeTokenBalance = chainWallet.assets.find((asset: any) => {
+        console.log(
+          '[BalanceCheck] Comparing asset denom:',
+          asset.denom,
+          'with fee token denom:',
+          feeToken.denom,
+        );
+        return asset.denom === feeToken.denom;
+      });
+
+      if (!localFeeTokenBalance) {
+        // Fee token not found in local assets, assume insufficient
+        const gasPrice = feeToken.gasPriceStep.average;
+        const requiredGas = Math.ceil(parseInt(estimatedGas) * gasPrice);
+
+        console.log('[BalanceCheck] Fee token not found in local assets:', {
+          feeToken: feeToken.denom,
+          availableAssets: chainWallet.assets.map(a => ({
+            denom: a.denom,
+            originDenom: a.originDenom,
+            symbol: a.symbol,
+          })),
+          requiredGas,
+        });
+
+        return {
+          hasSufficientBalance: false,
+          balance: 0,
+          required: requiredGas,
+        };
+      }
+
+      const localBalance = parseInt(localFeeTokenBalance.amount || '0');
+      const gasPrice = feeToken.gasPriceStep.average;
+      const requiredGas = Math.ceil(parseInt(estimatedGas) * gasPrice);
+
+      console.log('[BalanceCheck] Using local wallet state:', {
+        localFeeTokenBalance: {
+          denom: localFeeTokenBalance.denom,
+          originDenom: localFeeTokenBalance.originDenom,
+          amount: localFeeTokenBalance.amount,
+          symbol: localFeeTokenBalance.symbol,
+        },
+        localBalance,
+        requiredGas,
+        hasSufficient: localBalance >= requiredGas,
+        gasPrice,
+        estimatedGas,
+      });
+
+      return {
+        hasSufficientBalance: localBalance >= requiredGas,
+        balance: localBalance,
+        required: requiredGas,
+      };
+    } catch (error) {
+      console.error('Error checking gas balance:', error);
+
+      // Fallback: if query fails, use pessimistic approach
+      const gasPrice = feeToken.gasPriceStep.average;
+      const requiredGas = Math.ceil(parseInt(estimatedGas) * gasPrice);
+
+      console.log('[BalanceCheck] Error occurred, using fallback values:', {
+        requiredGas,
+        gasPrice,
+        estimatedGas,
+      });
+
+      return {
+        hasSufficientBalance: false,
+        balance: 0,
+        required: requiredGas,
+      };
+    }
+  };
 
   const executeSend = async ({
     sendObject,
@@ -161,18 +320,12 @@ export const useSendActions = () => {
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[executeSkipTx] Starting IBC via Skip');
-    console.log('[executeSkipTx] Denom details:', {
-      sendObjectDenom: sendObject.denom,
-      receiveAssetDenom,
-      sendStateAsset: sendState.asset,
-      stepFromAsset: sendObject.denom,
-    });
-    try {
-      const amount = (sendState.amount * Math.pow(10, sendState.asset.exponent)).toFixed(0);
 
-      // First get the route
+    try {
+      const amount = `${sendState.amount}`;
+
       const routeResponse = await getRoute({
-        fromChainId: sendState.asset.originChainId, // Skip only recognizes native coins on their native chains
+        fromChainId: sendState.asset.originChainId,
         fromDenom: sendObject.denom,
         toChainId: receiveState.chainId,
         toDenom: receiveAssetDenom,
@@ -183,52 +336,92 @@ export const useSendActions = () => {
         throw new Error('No valid IBC route found');
       }
 
+      const totalFees =
+        routeResponse.estimated_fees?.reduce(
+          (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+          0,
+        ) || 0;
+
+      if (simulateTransaction) {
+        return {
+          success: true,
+          message: 'Transaction simulation successful',
+          data: {
+            code: 0,
+            txHash: 'simulated',
+            gasWanted: totalFees.toString(),
+            route: routeResponse,
+            estimatedAmountOut: routeResponse.estimated_amount_out,
+            fees: routeResponse.estimated_fees,
+          },
+        };
+      }
+
       const sessionToken = getSessionToken();
       if (!sessionToken) throw new Error("Session token doesn't exist");
       const mnemonic = sessionToken.mnemonic;
 
-      // Get addresses for each required chain
       const addressList = await Promise.all(
         routeResponse.required_chain_addresses.map(async (chainId: string) => {
           const chainInfo = getFullRegistryChainInfo(chainId);
-
           if (!chainInfo?.bech32_prefix) {
-            throw new Error(`Prefix not found for ${chainInfo.pretty_name} in path`);
+            throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId} in path`);
           }
-
           const prefix = chainInfo.bech32_prefix;
 
-          // Use existing wallet address if available and has correct prefix
-          const existingAddress = walletAddresses[chainId];
+          // FIRST: Check if wallet exists in local state
+          const existingWallet = getWalletInfo(chainId);
 
-          if (existingAddress && existingAddress.startsWith(chainInfo.bech32_prefix)) {
+          // If wallet exists and address has correct prefix, use it
+          if (existingWallet?.address && existingWallet.address.startsWith(prefix)) {
             console.log(
-              `[executeSkipTx] Using existing address for chain ${chainId}: ${existingAddress}`,
+              `[executeSkipTx] Using existing wallet for chain ${chainId}: ${existingWallet.address}`,
             );
-            return existingAddress;
+            return existingWallet.address;
           }
 
-          // Generate new address using the chain prefix
+          // SECOND: If no wallet exists, create a new address for this chain
           console.log(
-            `[executeSkipTx] Generating new address for chain ${chainId} with prefix ${chainInfo.bech32_prefix}`,
+            `[executeSkipTx] No wallet found for chain ${chainId}, generating new address`,
           );
-          try {
-            const newAddress = await getAddressByChainPrefix(mnemonic, prefix);
-            console.log(`[executeSkipTx] Generated address for ${chainId}: ${newAddress}`);
-            return newAddress;
-          } catch (error) {
-            console.error(`[executeSkipTx] Failed to generate address for ${chainId}:`, error);
-            // Fallback to current wallet (may not work but prevents complete failure)
-            return walletState.address;
-          }
+          const newAddress = await getAddressByChainPrefix(mnemonic, prefix);
+
+          // Update the chain wallet atom with the new address (empty assets for now)
+          updateChainWallet({
+            chainId,
+            address: newAddress,
+            assets: [], // Empty assets array, will be populated later by refresh
+          });
+
+          return newAddress;
         }),
       );
 
-      console.log('[executeSkipTx] Final address list:', addressList);
+      const accountInfoPromises = addressList.map(async (address, index) => {
+        const chainId = routeResponse.required_chain_addresses[index];
+        const chainInfo = getFullRegistryChainInfo(chainId);
+        if (!chainInfo) throw new Error(`Chain info not found for ${chainId}`);
+
+        try {
+          return await getAccountInfo(address, chainInfo.rest_uris);
+        } catch (error) {
+          console.warn(
+            `[executeSkipTx] Failed to get account info for ${address} on ${chainId}:`,
+            error,
+          );
+          // Return default account info for new addresses
+          return {
+            accountNumber: BigInt(0),
+            sequence: BigInt(0),
+          };
+        }
+      });
+
+      const accountInfos = await Promise.all(accountInfoPromises);
 
       const messagesResponse = await getTransactionMessages({
-        fromChainId: sendState.asset.originChainId, // Skip only recognizes native coins on their native chains
-        fromDenom: sendObject.denom, // need to use original denom here whether ibc or original
+        fromChainId: sendState.asset.originChainId,
+        fromDenom: sendObject.denom,
         toChainId: receiveState.chainId,
         toDenom: receiveAssetDenom,
         amount,
@@ -238,19 +431,41 @@ export const useSendActions = () => {
         slippageTolerancePercent: '0.25',
       });
 
-      // Calculate total fees
-      const totalFees =
-        routeResponse.estimated_fees?.reduce(
-          (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-          0,
-        ) || 0;
+      const signedTransactions: SignedTransactionData[] = [];
+      for (const skipTx of messagesResponse.txs) {
+        if (!skipTx.cosmos_tx) throw new Error('Missing cosmos_tx in Skip response');
+
+        const chainId = skipTx.cosmos_tx.chain_id;
+        const chainInfo = getChainInfo(chainId);
+        if (!chainInfo) throw new Error(`Chain info not found for ${chainId}`);
+
+        const addressIndex = routeResponse.required_chain_addresses.indexOf(chainId);
+        const accountInfo = accountInfos[addressIndex];
+
+        // Later when calling createAndSignSkipTransaction:
+        const signedBase64 = await createAndSignSkipTransaction(
+          mnemonic,
+          chainInfo,
+          skipTx.cosmos_tx,
+          chainInfo.bech32_prefix,
+          accountInfo.accountNumber, // Now a number
+          accountInfo.sequence, // Now a number
+        );
+
+        signedTransactions.push({ chainId, signedTx: signedBase64 });
+      }
+
+      if (!signedTransactions.length) throw new Error('No transactions were signed');
+
+      const submissionResult = await submitSignedTransactions(signedTransactions);
+      if (!submissionResult.success) return submissionResult;
 
       return {
         success: true,
-        message: simulateTransaction ? 'Transaction simulation successful' : 'Transaction prepared',
+        message: 'Transactions signed and ready to send',
         data: {
           code: 0,
-          txHash: simulateTransaction ? 'simulated' : '',
+          txHash: submissionResult.data?.txHash || '',
           gasWanted: totalFees.toString(),
           route: routeResponse,
           estimatedAmountOut: routeResponse.estimated_amount_out,
@@ -266,6 +481,54 @@ export const useSendActions = () => {
         message: error instanceof Error ? error.message : 'IBC via Skip failed',
       };
     }
+  };
+
+  // Add function to submit signed Skip transactions
+  const submitSkipTransactions = async (
+    signedTransactions: SignedTransactionData[],
+  ): Promise<TransactionResult> => {
+    try {
+      const results = await Promise.all(
+        signedTransactions.map(async txData => {
+          const result = await submitTransaction(txData.chainId, txData.signedTx);
+
+          // Return only the necessary data without chainId
+          return {
+            success: result.success,
+            message: result.message,
+            txHash: result.data?.txHash,
+            explorerLink: result.data?.explorerLink,
+          };
+        }),
+      );
+
+      const allSuccessful = results.every(result => result.success);
+
+      return {
+        success: allSuccessful,
+        message: allSuccessful
+          ? 'All transactions submitted successfully'
+          : 'Some transactions failed to submit',
+        data: {
+          code: allSuccessful ? 0 : 1,
+          skipTxResponse: results,
+          txHash: results[0]?.txHash, // First transaction hash as primary
+          gasWanted: '0',
+        },
+      };
+    } catch (error) {
+      console.error('Error submitting Skip transactions:', error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to submit transactions',
+      };
+    }
+  };
+
+  const submitSignedTransactions = async (
+    transactions: SignedTransactionData[],
+  ): Promise<TransactionResult> => {
+    return await submitSkipTransactions(transactions); // Pass stepHash
   };
 
   const executeStep = async (
@@ -329,6 +592,8 @@ export const useSendActions = () => {
       // Execute steps sequentially
       for (let i = 0; i < txRoute.steps.length; i++) {
         const step = txRoute.steps[i];
+        const stepLog = txLogs[step.hash];
+        const feeToken = stepLog?.fee?.feeToken;
 
         console.log('[executeTransactionRoute] Processing step', {
           stepIndex: i,
@@ -354,6 +619,71 @@ export const useSendActions = () => {
           message: result.message,
           data: result.data,
         });
+
+        if (
+          isSimulation &&
+          result.success &&
+          (step.type === TransactionType.IBC_SEND || step.type === TransactionType.EXCHANGE)
+        ) {
+          try {
+            const fromChainInfo = getChainInfo(step.fromChain);
+
+            if (!feeToken) {
+              throw new Error('No fee token available for gas balance check');
+            }
+
+            // Get the actual gas estimate from the simulation result
+            const estimatedGas = result.data?.gasWanted || '0'; // If no gas estimate provided, assume none
+
+            // Check gas balance with the actual estimated gas
+            const gasCheck = await checkGasBalance({
+              address: walletState.address,
+              feeToken,
+              estimatedGas,
+              chainId: step.fromChain,
+              restUris: fromChainInfo.rest_uris,
+            });
+
+            if (!gasCheck.hasSufficientBalance) {
+              // TODO: match symbol for this
+              const errorMessage = `Insufficient ${stepLog.feeSymbol} for gas.`;
+
+              console.error(
+                '[executeTransactionRoute] Insufficient gas balance after simulation:',
+                {
+                  stepIndex: i,
+                  stepType: step.type,
+                  feeToken: feeToken.denom,
+                  required: gasCheck.required,
+                  available: gasCheck.balance,
+                  estimatedGas,
+                  address: walletState.address,
+                },
+              );
+
+              // Override the successful result with a gas balance failure
+              result = {
+                success: false,
+                message: errorMessage,
+              };
+            } else {
+              console.log('[executeTransactionRoute] Gas balance check passed after simulation:', {
+                stepIndex: i,
+                stepType: step.type,
+                feeToken: feeToken.denom,
+                required: gasCheck.required,
+                available: gasCheck.balance,
+                estimatedGas,
+              });
+            }
+          } catch (error) {
+            console.error(
+              '[executeTransactionRoute] Gas balance check failed after simulation:',
+              error,
+            );
+            // Don't override the simulation result if gas check fails, just log it
+          }
+        }
 
         if (!result.success) {
           console.error('[executeTransactionRoute] Step failed', {

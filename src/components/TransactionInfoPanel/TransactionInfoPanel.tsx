@@ -17,8 +17,6 @@ export const TransactionInfoPanel = () => {
   const transactionRoute = useAtomValue(transactionRouteAtom);
   const calculatedFee = useAtomValue(calculatedTotalFeeDisplayAtom);
 
-  const isSimulation = transactionRoute.isSimulation;
-
   const getStatusIcon = (status: TransactionStatus) => {
     switch (status) {
       case TransactionStatus.SUCCESS:
@@ -58,12 +56,7 @@ export const TransactionInfoPanel = () => {
         */}
       {/* Info Section */}
       <div
-        className={`flex flex-grow mx-2 my-2 border rounded-md border-neutral-4 justify-center ${
-          //isTxPending ||
-          transactionFailed && !isSimulation
-            ? 'items-center '
-            : 'flex-col items-start overflow-y-auto p-4'
-        }`}
+        className={`flex flex-grow mx-2 my-2 border rounded-md border-neutral-4 justify-center flex-col items-start overflow-y-auto p-4`}
       >
         {/* {isTxPending && <Spinner className="h-16 w-16 animate-spin fill-blue" />} */}
         {/* {transactionFailed && !isSimulation && (

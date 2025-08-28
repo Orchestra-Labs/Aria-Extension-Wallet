@@ -65,6 +65,7 @@ export interface TransactionStatusState {
 export interface TransactionState {
   asset: Asset;
   amount: number;
+  displayAmount: number;
   chainId: string;
 }
 
@@ -75,7 +76,7 @@ export interface AddressValidationState {
 
 export interface SendObject {
   recipientAddress: string;
-  amount: string;
+  amount: string; // Always in base/denom units
   denom: string;
   feeToken?: FeeToken;
 }

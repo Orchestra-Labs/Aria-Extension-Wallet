@@ -4,12 +4,14 @@ import { DEFAULT_MAINNET_ASSET } from './localRegistry';
 export const DEFAULT_SEND_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
+  displayAmount: 0,
   chainId: SYMPHONY_MAINNET_ID,
 };
 
 export const DEFAULT_RECEIVE_STATE = {
   asset: DEFAULT_MAINNET_ASSET,
   amount: 0,
+  displayAmount: 0,
   chainId: SYMPHONY_MAINNET_ID,
 };
 

@@ -473,9 +473,8 @@ export const updateTransactionRouteAtom = atom(
       isSimulation: true,
     };
 
-    const currentRoute = get(transactionRouteAtom);
-    const currentHash = createRouteHash(currentRoute);
-    const newHash = createRouteHash(newRoute);
+    const currentHash = get(transactionRouteHashAtom);
+    const newHash = createRouteHash({ route: newRoute, toAddress: receiveAddress });
 
     if (currentHash !== newHash) {
       console.log('[updateTransactionRouteAtom] Route changed, updating');

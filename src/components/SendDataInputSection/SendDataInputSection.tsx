@@ -18,6 +18,7 @@ import {
   simulationInvalidationAtom,
   transactionRouteHashAtom,
   canRunSimulationAtom,
+  maxAvailableDisplayAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -35,6 +36,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const [sendState, setSendState] = useAtom(sendStateAtom);
   const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
+  const maxDisplayAvailable = useAtomValue(maxAvailableDisplayAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
   const isTxPending = useAtomValue(isTxPendingAtom);
   const [sendError, setSendError] = useAtom(sendErrorAtom);
@@ -53,40 +55,42 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
   // Derived values
   // TODO: add max receivable atom for receiving unit
-  const placeHolder = `Max: ${formatBalanceDisplay(`${maxAvailable}`, sendState.asset.symbol)}`;
+  const placeHolder = `Max: ${formatBalanceDisplay(`${maxDisplayAvailable}`, sendState.asset.symbol)}`;
 
   // Pure calculation function for derived state
   const calculateDerivedState = (update: {
-    sendAmount?: number;
-    receiveAmount?: number;
-    sendAsset?: Asset;
-    receiveAsset?: Asset;
+    newSendAmount?: number;
+    newReceiveAmount?: number;
+    newSendAsset?: Asset;
+    newReceiveAsset?: Asset;
   }) => {
-    const currentSendAsset = update.sendAsset || sendState.asset;
-    const currentReceiveAsset = update.receiveAsset || receiveState.asset;
+    const newSendAsset = update.newSendAsset || sendState.asset;
+    const newReceiveAsset = update.newReceiveAsset || receiveState.asset;
+
     const isSameAsset =
-      (currentSendAsset.originDenom || currentSendAsset.denom) ===
-      (currentReceiveAsset.originDenom || currentReceiveAsset.denom);
+      (newSendAsset.originDenom || newSendAsset.denom) ===
+      (newReceiveAsset.originDenom || newReceiveAsset.denom);
     const effectiveRate = isSameAsset ? 1 : exchangeRate;
 
-    let sendAmount = update.sendAmount ?? sendState.amount;
-    let receiveAmount = update.receiveAmount ?? receiveState.amount;
+    let newSendAmount = update.newSendAmount ?? sendState.displayAmount;
+    let newReceiveAmount = update.newReceiveAmount ?? receiveState.displayAmount;
 
     // Determine which value was user-updated
-    const isSendUpdate = update.sendAmount !== undefined;
-    const isReceiveUpdate = update.receiveAmount !== undefined;
+    const isSendUpdate = update.newSendAmount !== undefined;
+    const isReceiveUpdate = update.newReceiveAmount !== undefined;
 
     // Calculate derived amounts
     if (isSendUpdate) {
-      receiveAmount = sendAmount * effectiveRate;
+      newReceiveAmount = newSendAmount * effectiveRate;
     } else if (isReceiveUpdate) {
-      sendAmount = receiveAmount / effectiveRate;
+      newSendAmount = newReceiveAmount / effectiveRate;
     }
 
     // Apply max available constraints
-    if (sendAmount > maxAvailable) {
-      sendAmount = maxAvailable;
-      receiveAmount = sendAmount * effectiveRate;
+    if (newSendAmount > maxDisplayAvailable) {
+      newSendAmount = maxDisplayAvailable;
+      newReceiveAmount = newSendAmount * effectiveRate;
+
       setSendError({
         message: `Amount exceeded available balance.`,
         status: InputStatus.WARNING,
@@ -94,45 +98,51 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     }
 
     return {
-      sendAmount,
-      receiveAmount,
-      sendAsset: currentSendAsset,
-      receiveAsset: currentReceiveAsset,
+      sendAmount: newSendAmount,
+      receiveAmount: newReceiveAmount,
+      sendAsset: newSendAsset,
+      receiveAsset: newReceiveAsset,
     };
   };
 
   // Unified state update handler
   const handleStateUpdate = async (update: {
-    sendAmount?: number;
-    receiveAmount?: number;
-    sendAsset?: Asset;
-    receiveAsset?: Asset;
+    newSendAmount?: number;
+    newReceiveAmount?: number;
+    newSendAsset?: Asset;
+    newReceiveAsset?: Asset;
   }) => {
     console.log('[AssetInputSection] handleStateUpdate called with:', update);
-    const newState = calculateDerivedState(update);
+    const newDisplayState = calculateDerivedState(update);
+    const newSendDisplayAmount = newDisplayState.sendAmount;
+    const newSendAsset = newDisplayState.sendAsset;
+    const newReceiveDisplayAmount = newDisplayState.receiveAmount;
+    const newReceiveAsset = newDisplayState.receiveAsset;
 
-    console.log('[AssetInputSection] New state:', newState);
+    const newSendAmount = newSendDisplayAmount * Math.pow(10, newSendAsset.exponent);
+    const newReceiveAmount = newReceiveDisplayAmount * Math.pow(10, newReceiveAsset.exponent);
+
+    console.log('[AssetInputSection] New state:', newDisplayState);
 
     // Update states if values changed
-    if (newState.sendAmount !== sendState.amount || newState.sendAsset !== sendState.asset) {
+    if (newSendAmount !== sendState.amount || newSendAsset !== sendState.asset) {
       console.log('[AssetInputSection] Updating send state');
       setSendState(prev => ({
         ...prev,
-        amount: newState.sendAmount,
-        asset: newState.sendAsset,
-        chainId: newState.sendAsset.chainId,
+        amount: newSendAmount,
+        displayAmount: newSendDisplayAmount,
+        asset: newSendAsset,
+        chainId: newSendAsset.chainId,
       }));
     }
 
-    if (
-      newState.receiveAmount !== receiveState.amount ||
-      newState.receiveAsset !== receiveState.asset
-    ) {
+    if (newReceiveAmount !== receiveState.amount || newReceiveAsset !== receiveState.asset) {
       console.log('[AssetInputSection] Updating receive state');
       setReceiveState(prev => ({
         ...prev,
-        amount: newState.receiveAmount,
-        asset: newState.receiveAsset,
+        amount: newReceiveAmount,
+        displayAmount: newReceiveDisplayAmount,
+        asset: newReceiveAsset,
         chainId: receiveState.chainId, // ensure receive chain id only changes via address
       }));
     }
@@ -141,35 +151,31 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   // Handler functions
   const updateSendAsset = (newAsset: Asset) => {
     handleStateUpdate({
-      sendAsset: newAsset,
-      sendAmount: 0,
-      receiveAmount: 0,
+      newSendAsset: newAsset,
     });
   };
 
   const updateReceiveAsset = (newAsset: Asset) => {
     handleStateUpdate({
-      receiveAsset: newAsset,
-      sendAmount: 0,
-      receiveAmount: 0,
+      newReceiveAsset: newAsset,
     });
   };
 
-  const updateSendAmount = (amount: number) => handleStateUpdate({ sendAmount: amount });
-  const updateReceiveAmount = (amount: number) => handleStateUpdate({ receiveAmount: amount });
+  const updateSendAmount = (amount: number) => handleStateUpdate({ newSendAmount: amount });
+  const updateReceiveAmount = (amount: number) => handleStateUpdate({ newReceiveAmount: amount });
 
   const switchFields = () => {
     handleStateUpdate({
-      sendAsset: receiveState.asset,
-      receiveAsset: sendState.asset,
-      sendAmount: receiveState.amount,
-      receiveAmount: sendState.amount,
+      newSendAsset: receiveState.asset,
+      newReceiveAsset: sendState.asset,
+      newSendAmount: receiveState.displayAmount,
+      newReceiveAmount: sendState.displayAmount,
     });
   };
 
   const setMaxAmount = (type: 'send' | 'receive') => {
     if (type === 'send') {
-      handleStateUpdate({ sendAmount: maxAvailable });
+      handleStateUpdate({ newSendAmount: maxAvailable });
     } else {
       const sendAsset = sendState.asset;
       const receiveAsset = receiveState.asset;
@@ -179,12 +185,12 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         (receiveAsset.originDenom || receiveAsset.denom)
           ? 1
           : exchangeRate;
-      handleStateUpdate({ receiveAmount: maxAvailable * effectiveRate });
+      handleStateUpdate({ newReceiveAmount: maxAvailable * effectiveRate });
     }
   };
 
   const clearAmount = () => {
-    handleStateUpdate({ sendAmount: 0, receiveAmount: 0 });
+    handleStateUpdate({ newSendAmount: 0, newReceiveAmount: 0 });
     setSendError({ message: '', status: InputStatus.NEUTRAL });
     resetTxRoute();
   };
@@ -276,7 +282,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         status={sendError.status}
         messageText={sendError.message}
         assetState={sendState.asset}
-        amountState={sendState.amount}
+        amountState={sendState.displayAmount}
         updateAsset={updateSendAsset}
         updateAmount={updateSendAmount}
         showClearAndMax
@@ -299,7 +305,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         status={receiveError.status}
         messageText={receiveError.message}
         assetState={receiveState.asset}
-        amountState={receiveState.amount}
+        amountState={receiveState.displayAmount}
         updateAsset={updateReceiveAsset}
         updateAmount={updateReceiveAmount}
         showClearAndMax

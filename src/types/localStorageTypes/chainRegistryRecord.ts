@@ -19,6 +19,7 @@ export interface FeeToken {
 export interface Asset {
   denom: string;
   amount: string;
+  displayAmount: string;
   exchangeRate?: string;
   isIbc: boolean;
   logo: string;

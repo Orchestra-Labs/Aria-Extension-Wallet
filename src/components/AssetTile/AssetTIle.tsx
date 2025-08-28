@@ -81,7 +81,13 @@ export const AssetTile = ({
       ? '-'
       : formatBalanceDisplay(asset.exchangeRate || '1', unitSymbol);
   } else {
-    value = formatBalanceDisplay(asset.amount, symbol);
+    console.log('[AssetTile] Asset details:', {
+      displayAmount: asset.displayAmount,
+      symbol,
+      asset,
+    });
+
+    value = formatBalanceDisplay(asset.displayAmount || '0', symbol);
   }
 
   const isSelected = multiSelectEnabled

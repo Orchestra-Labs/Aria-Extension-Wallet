@@ -1,6 +1,7 @@
 export * from './closeAllExtensionPopups';
 export * from './feeUtils';
 export * from './dataHelpers';
+export * from './fetchAccountInfo';
 export * from './fetchBech32Prefixes';
 export * from './fetchStakingInfo';
 export * from './fetchWalletAssets';

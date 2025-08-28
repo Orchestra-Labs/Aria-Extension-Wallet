@@ -87,16 +87,16 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const totalValue = useMemo(() => {
     return networkWalletAssets.reduce((sum, asset) => {
-      const amount = new BigNumber(asset.amount || '0');
+      const amount = parseFloat(asset.displayAmount || '0');
       const price = asset.price || 0;
-      return sum.plus(amount.multipliedBy(price));
-    }, new BigNumber(0));
+      return sum + amount * price;
+    }, 0);
   }, [networkWalletAssets]);
 
   const totalTokenAmount = useMemo(() => {
     return networkWalletAssets.reduce((sum, asset) => {
-      return sum.plus(new BigNumber(asset.amount || '0'));
-    }, new BigNumber(0));
+      return sum + parseFloat(asset.displayAmount || '0');
+    }, 0);
   }, [networkWalletAssets]);
 
   if (currentStep === 0) {

@@ -265,6 +265,7 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
     result[base] = {
       denom: base,
       amount: '0',
+      displayAmount: '0',
       exchangeRate: '-',
       isIbc: false,
       logo,

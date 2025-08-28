@@ -4,6 +4,7 @@ import {
   NetworkLevel,
   GAMM_PREFIX,
   GAMM_EXPONENT_DEFAULT,
+  GREATER_EXPONENT_DEFAULT,
 } from '@/constants';
 import { Uri, Asset, SubscriptionRecord, LocalChainRegistry, IbcRegistry } from '@/types';
 import { queryRestNode } from './queryNodes';
@@ -11,6 +12,7 @@ import { safeTrimLowerCase } from './formatString';
 import { getCachedPrices } from './priceCache';
 import { getIbcRegistry } from './dataHelpers';
 
+// TODO: move to utils
 const adjustAmountByExponent = (amount: string, exponent: number): string => {
   const divisor = Math.pow(10, exponent);
   return (parseFloat(amount) / divisor).toFixed(exponent);
@@ -206,7 +208,7 @@ export async function fetchWalletAssets(
     `[fetchWalletAssets ${chainId}] Found ${Object.keys(assets).length} assets in registry`,
   );
 
-  // 1. First fetch all necessary data
+  // 1. First fetch balance and price data
   console.log(`[fetchWalletAssets ${chainId}] Fetching balances and prices...`);
   const [rawBalances, coinGeckoPrices] = await Promise.all([
     getBalances(walletAddress, rest_uris || []).then(balances => {
@@ -249,6 +251,7 @@ export async function fetchWalletAssets(
       let originDenom = denom;
       let originChainId = chainId;
       let trace = '';
+      let exponent = GREATER_EXPONENT_DEFAULT;
 
       // Handle IBC assets
       if (denom.startsWith(IBC_PREFIX)) {
@@ -290,22 +293,30 @@ export async function fetchWalletAssets(
 
       // Find matching asset metadata in full chain registry
       const normalizedBaseDenom = safeTrimLowerCase(baseDenom);
-      // TODO: remove.  asset metadata doesn't seem to be getting used
       let assetMetadata: Asset | undefined = undefined;
 
-      // Search through all chains in the full registry
-      for (const [_, chain] of Object.entries(fullChainRegistry)) {
-        if (!chain.assets) continue;
+      // Look in current chain's assets first (this is where native assets should be)
+      if (chainInfo.assets) {
+        assetMetadata = Object.values(chainInfo.assets).find(
+          asset => safeTrimLowerCase(asset.denom) === normalizedBaseDenom,
+        );
+      }
 
-        const found = Object.entries(chain.assets).find(
-          ([key, asset]) =>
-            safeTrimLowerCase(key) === normalizedBaseDenom ||
-            safeTrimLowerCase(asset.originDenom || asset.denom) === normalizedBaseDenom,
-        )?.[1];
+      // If not found in current chain, search through full registry for IBC assets
+      if (!assetMetadata && isIbc) {
+        for (const chain of Object.values(fullChainRegistry)) {
+          if (!chain.assets) continue;
 
-        if (found) {
-          assetMetadata = found;
-          break;
+          const found = Object.values(chain.assets).find(
+            asset =>
+              safeTrimLowerCase(asset.denom) === normalizedBaseDenom ||
+              safeTrimLowerCase(asset.originDenom || '') === normalizedBaseDenom,
+          );
+
+          if (found) {
+            assetMetadata = found;
+            break;
+          }
         }
       }
 
@@ -316,15 +327,25 @@ export async function fetchWalletAssets(
         return null;
       }
 
+      // Set exponent from metadata if found, otherwise use default
+      if (assetMetadata?.exponent !== undefined) {
+        exponent = assetMetadata.exponent;
+      }
+
+      // For non-IBC, non-GAMM native assets without explicit metadata, use default exponent
+      if (!isIbc && !denom.startsWith(GAMM_PREFIX) && !assetMetadata) {
+        exponent = GREATER_EXPONENT_DEFAULT; // Default for native tokens
+      }
+
       const isGammToken = denom.startsWith('gamm/pool/');
-      const exponent = isGammToken ? GAMM_EXPONENT_DEFAULT : assetMetadata?.exponent || 0;
-      const amountAdjusted = adjustAmountByExponent(amount, exponent);
+      exponent = isGammToken ? GAMM_EXPONENT_DEFAULT : exponent;
+      const displayAmount = adjustAmountByExponent(amount, exponent);
       const price = assetMetadata?.coinGeckoId
         ? coinGeckoPrices[assetMetadata.coinGeckoId] || 0
         : 0;
 
       console.log(
-        `[fetchWalletAssets ${chainId}] Processed asset: ${baseDenom}, amount: ${amountAdjusted}, price: ${price}, isIbc: ${isIbc}`,
+        `[fetchWalletAssets ${chainId}] Processed asset: ${baseDenom}, amount: ${amount}, display amount: ${displayAmount}, price: ${price}, isIbc: ${isIbc}`,
       );
 
       return {
@@ -337,7 +358,8 @@ export async function fetchWalletAssets(
           isFeeToken: false,
           coinGeckoId: undefined,
         }),
-        amount: amountAdjusted,
+        amount,
+        displayAmount,
         price,
         isIbc,
         chainId: chainId,

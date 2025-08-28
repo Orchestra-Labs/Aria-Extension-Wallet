@@ -128,6 +128,7 @@ export const allReceivableAssetsAtom = atom(get => {
     return {
       denom: asset.denom,
       amount: '0',
+      displayAmount: '0',
       exchangeRate: asset.exchangeRate || '-',
       isIbc: walletAsset?.isIbc || false,
       logo: asset.logo,
