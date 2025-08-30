@@ -1,10 +1,12 @@
 export { useDebounce } from './useDebounce';
+export * from './useGetSigner';
 export * from './useAddressGenerator';
 export * from './useExchangeAssets';
 export * from './useExchangePoolBalance';
 export * from './useExchangeRate';
 export * from './useExchangeRequirements';
 export * from './useGetModuleAccountsQuery';
+export * from './useGetSigner';
 export * from './useGetTobinTaxRateQuery';
 export * from './useIbcRegistryRefresh';
 export * from './useInactivityCheck';

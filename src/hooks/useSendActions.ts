@@ -13,7 +13,6 @@ import {
   transactionLogsAtom,
   fullRegistryChainInfoAtom,
   getChainWalletAtom,
-  updateChainWalletAtom,
 } from '@/atoms';
 import { TransactionStatus, TransactionType } from '@/constants';
 import {
@@ -21,31 +20,32 @@ import {
   FeeToken,
   IBCObject,
   SendObject,
-  SignedTransactionData,
   TransactionResult,
   TransactionStep,
   Uri,
 } from '@/types';
 import {
-  createAndSignSkipTransaction,
-  getAccountInfo,
   getAddressByChainPrefix,
   getBalances,
-  getRoute,
   getSessionToken,
-  getTransactionMessages,
   getValidIBCChannel,
   sendIBCTransaction,
   sendTransaction,
-  submitTransaction,
   swapTransaction,
+  executeSkipRoute,
+  initializeSkipClient,
+  getSkipRoute,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
+import { useGetSigner } from './useGetSigner';
+import { useEffect } from 'react';
+import { UserAddress } from '@skip-go/client/cjs';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
 export const useSendActions = () => {
   const { refreshData } = useRefreshData();
+  const { getCosmosSigner, getEvmSigner, getSvmSigner } = useGetSigner();
 
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
@@ -62,7 +62,6 @@ export const useSendActions = () => {
   const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
-  const updateChainWallet = useSetAtom(updateChainWalletAtom);
 
   // TODO: clean up.  not all of these functions need to be in this file
   const checkGasBalance = async ({
@@ -310,6 +309,7 @@ export const useSendActions = () => {
   };
 
   // TODO: enable amount out as an option (to handle billing)
+  // In useSendActions.ts
   const executeSkipTx = async ({
     sendObject,
     receiveAssetDenom,
@@ -319,12 +319,13 @@ export const useSendActions = () => {
     receiveAssetDenom: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[executeSkipTx] Starting IBC via Skip');
+    console.log('[executeSkipTx] Starting Skip Tx');
 
     try {
       const amount = `${sendState.amount}`;
 
-      const routeResponse = await getRoute({
+      // Use the new Skip client route function instead of direct API call
+      const routeResponse = await getSkipRoute({
         fromChainId: sendState.asset.originChainId,
         fromDenom: sendObject.denom,
         toChainId: receiveState.chainId,
@@ -336,13 +337,14 @@ export const useSendActions = () => {
         throw new Error('No valid IBC route found');
       }
 
-      const totalFees =
-        routeResponse.estimated_fees?.reduce(
-          (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-          0,
-        ) || 0;
-
+      // For simulation, return early with route info
       if (simulateTransaction) {
+        const totalFees =
+          routeResponse.estimatedFees?.reduce(
+            (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+            0,
+          ) || 0;
+
         return {
           success: true,
           message: 'Transaction simulation successful',
@@ -351,184 +353,106 @@ export const useSendActions = () => {
             txHash: 'simulated',
             gasWanted: totalFees.toString(),
             route: routeResponse,
-            estimatedAmountOut: routeResponse.estimated_amount_out,
-            fees: routeResponse.estimated_fees,
+            estimatedAmountOut: routeResponse.estimatedAmountOut,
+            fees: routeResponse.estimatedFees,
           },
         };
       }
 
-      const sessionToken = getSessionToken();
-      if (!sessionToken) throw new Error("Session token doesn't exist");
-      const mnemonic = sessionToken.mnemonic;
+      // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
+      const requiredChainAddresses = routeResponse.requiredChainAddresses;
 
-      const addressList = await Promise.all(
-        routeResponse.required_chain_addresses.map(async (chainId: string) => {
-          const chainInfo = getFullRegistryChainInfo(chainId);
-          if (!chainInfo?.bech32_prefix) {
-            throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId} in path`);
-          }
-          const prefix = chainInfo.bech32_prefix;
+      const userAddresses: UserAddress[] = await Promise.all(
+        requiredChainAddresses.map(async (chainId: string, index: number) => {
+          console.log(`🔄 Processing chain ${index}: ${chainId}`);
 
-          // FIRST: Check if wallet exists in local state
-          const existingWallet = getWalletInfo(chainId);
+          let address: string;
+          const chainWallet = getWalletInfo(chainId);
 
-          // If wallet exists and address has correct prefix, use it
-          if (existingWallet?.address && existingWallet.address.startsWith(prefix)) {
+          if ((chainWallet && chainWallet.address) || chainWallet.address.trim() !== '') {
+            console.log(`✅ Using local wallet for ${chainId}: ${chainWallet.address}`);
+            address = chainWallet.address;
+          } else {
+            console.log(`⚠️  No local wallet found for ${chainId}, generating from mnemonic`);
+            // Fallback: get address from mnemonic
+            const sessionToken = getSessionToken();
+            if (!sessionToken) throw new Error("Session token doesn't exist");
+
+            const chainInfo = getFullRegistryChainInfo(chainId);
+            console.log(`🔍 Chain info for ${chainId}:`, chainInfo);
+
+            if (!chainInfo?.bech32_prefix) {
+              console.error(`❌ Prefix not found for chain ${chainId}`);
+              throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId}`);
+            }
+
             console.log(
-              `[executeSkipTx] Using existing wallet for chain ${chainId}: ${existingWallet.address}`,
+              `🔑 Generating address for ${chainId} with prefix: ${chainInfo.bech32_prefix}`,
             );
-            return existingWallet.address;
+            try {
+              address = await getAddressByChainPrefix(
+                sessionToken.mnemonic,
+                chainInfo.bech32_prefix,
+              );
+              console.log(`✅ Generated address for ${chainId}: ${address}`);
+            } catch (error) {
+              console.error(`❌ Failed to generate address for ${chainId}:`, error);
+              throw error;
+            }
           }
 
-          // SECOND: If no wallet exists, create a new address for this chain
-          console.log(
-            `[executeSkipTx] No wallet found for chain ${chainId}, generating new address`,
-          );
-          const newAddress = await getAddressByChainPrefix(mnemonic, prefix);
-
-          // Update the chain wallet atom with the new address (empty assets for now)
-          updateChainWallet({
+          return {
             chainId,
-            address: newAddress,
-            assets: [], // Empty assets array, will be populated later by refresh
-          });
-
-          return newAddress;
+            address,
+          };
         }),
       );
 
-      const accountInfoPromises = addressList.map(async (address, index) => {
-        const chainId = routeResponse.required_chain_addresses[index];
-        const chainInfo = getFullRegistryChainInfo(chainId);
-        if (!chainInfo) throw new Error(`Chain info not found for ${chainId}`);
+      console.log('👥 Final user addresses:', userAddresses);
 
-        try {
-          return await getAccountInfo(address, chainInfo.rest_uris);
-        } catch (error) {
-          console.warn(
-            `[executeSkipTx] Failed to get account info for ${address} on ${chainId}:`,
-            error,
-          );
-          // Return default account info for new addresses
-          return {
-            accountNumber: BigInt(0),
-            sequence: BigInt(0),
-          };
-        }
-      });
+      // FIX: Validate that all addresses are properly defined
+      const validAddresses = userAddresses.filter(
+        addr => addr && addr.chainId && addr.address && addr.address.trim() !== '',
+      );
 
-      const accountInfos = await Promise.all(accountInfoPromises);
-
-      const messagesResponse = await getTransactionMessages({
-        fromChainId: sendState.asset.originChainId,
-        fromDenom: sendObject.denom,
-        toChainId: receiveState.chainId,
-        toDenom: receiveAssetDenom,
-        amount,
-        addressList,
-        operations: routeResponse.operations,
-        estimatedAmountOut: routeResponse.estimated_amount_out,
-        slippageTolerancePercent: '0.25',
-      });
-
-      const signedTransactions: SignedTransactionData[] = [];
-      for (const skipTx of messagesResponse.txs) {
-        if (!skipTx.cosmos_tx) throw new Error('Missing cosmos_tx in Skip response');
-
-        const chainId = skipTx.cosmos_tx.chain_id;
-        const chainInfo = getChainInfo(chainId);
-        if (!chainInfo) throw new Error(`Chain info not found for ${chainId}`);
-
-        const addressIndex = routeResponse.required_chain_addresses.indexOf(chainId);
-        const accountInfo = accountInfos[addressIndex];
-
-        // Later when calling createAndSignSkipTransaction:
-        const signedBase64 = await createAndSignSkipTransaction(
-          mnemonic,
-          chainInfo,
-          skipTx.cosmos_tx,
-          chainInfo.bech32_prefix,
-          accountInfo.accountNumber, // Now a number
-          accountInfo.sequence, // Now a number
-        );
-
-        signedTransactions.push({ chainId, signedTx: signedBase64 });
+      if (validAddresses.length !== requiredChainAddresses.length) {
+        throw new Error('Failed to generate valid addresses for all required chains');
       }
 
-      if (!signedTransactions.length) throw new Error('No transactions were signed');
-
-      const submissionResult = await submitSignedTransactions(signedTransactions);
-      if (!submissionResult.success) return submissionResult;
-
-      return {
-        success: true,
-        message: 'Transactions signed and ready to send',
-        data: {
-          code: 0,
-          txHash: submissionResult.data?.txHash || '',
-          gasWanted: totalFees.toString(),
-          route: routeResponse,
-          estimatedAmountOut: routeResponse.estimated_amount_out,
-          fees: routeResponse.estimated_fees,
-          messages: messagesResponse.msgs,
-          minAmountOut: messagesResponse.min_amount_out,
+      // Execute the route using Skip's built-in execution
+      const result = await executeSkipRoute(
+        routeResponse,
+        userAddresses,
+        async (chainId: string) => {
+          console.log(`🖊️  Getting signer for chain: ${chainId}`);
+          const signer = await getCosmosSigner(chainId);
+          return signer;
         },
-      };
-    } catch (error) {
-      console.error('[useSendActions] IBC via Skip failed:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'IBC via Skip failed',
-      };
-    }
-  };
-
-  // Add function to submit signed Skip transactions
-  const submitSkipTransactions = async (
-    signedTransactions: SignedTransactionData[],
-  ): Promise<TransactionResult> => {
-    try {
-      const results = await Promise.all(
-        signedTransactions.map(async txData => {
-          const result = await submitTransaction(txData.chainId, txData.signedTx);
-
-          // Return only the necessary data without chainId
-          return {
-            success: result.success,
-            message: result.message,
-            txHash: result.data?.txHash,
-            explorerLink: result.data?.explorerLink,
-          };
-        }),
+        getEvmSigner,
+        getSvmSigner,
       );
 
-      const allSuccessful = results.every(result => result.success);
-
-      return {
-        success: allSuccessful,
-        message: allSuccessful
-          ? 'All transactions submitted successfully'
-          : 'Some transactions failed to submit',
-        data: {
-          code: allSuccessful ? 0 : 1,
-          skipTxResponse: results,
-          txHash: results[0]?.txHash, // First transaction hash as primary
-          gasWanted: '0',
-        },
-      };
+      if (result.success) {
+        return {
+          success: true,
+          message: 'Route successfully executed',
+          data: {
+            code: 0,
+            txHash: 'multi-tx', // Skip handles multiple transactions
+            gasWanted: '0',
+            route: routeResponse,
+          },
+        };
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error) {
-      console.error('Error submitting Skip transactions:', error);
+      console.error('[useSendActions] Skip Tx failed:', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to submit transactions',
+        message: error instanceof Error ? error.message : 'Skip Tx failed',
       };
     }
-  };
-
-  const submitSignedTransactions = async (
-    transactions: SignedTransactionData[],
-  ): Promise<TransactionResult> => {
-    return await submitSkipTransactions(transactions); // Pass stepHash
   };
 
   const executeStep = async (
@@ -685,7 +609,8 @@ export const useSendActions = () => {
           }
         }
 
-        if (!result.success) {
+        // If false or no results
+        if (!(result?.success || false)) {
           console.error('[executeTransactionRoute] Step failed', {
             stepIndex: i,
             error: result.message,
@@ -741,7 +666,7 @@ export const useSendActions = () => {
 
         updateStepLog({
           stepIndex: i,
-          status: TransactionStatus.SUCCESS,
+          status: result?.success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
           txHash: result.data?.txHash,
           feeData: feeData,
         });
@@ -795,6 +720,12 @@ export const useSendActions = () => {
       };
     }
   };
+
+  useEffect(() => {
+    // Initialize Skip client
+    console.log('[useSendActions] Initializing Skip client...');
+    initializeSkipClient();
+  }, []);
 
   return {
     runTransaction,

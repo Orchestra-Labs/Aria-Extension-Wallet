@@ -1,5 +1,4 @@
 import { Secp256k1HdWallet } from '@cosmjs/amino';
-import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 
 import { SYMPHONY_PREFIX } from '@/constants';
 import { NetworkSubscriptionRecord, WalletRecord } from '@/types';
@@ -74,25 +73,7 @@ export async function getAddressesByChainPrefix(
 }
 
 export async function getAddressByChainPrefix(mnemonic: string, prefix: string): Promise<string> {
-  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
+  const wallet = await getWalletByPrefix(mnemonic, prefix);
   const [account] = await wallet.getAccounts();
   return account.address;
-}
-
-export async function createOfflineSignerByPrefix(
-  mnemonic: string,
-  prefix: string,
-): Promise<DirectSecp256k1HdWallet> {
-  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
-  console.log(`Offline signer created with prefix "${prefix}"`);
-  return wallet;
-}
-
-export async function createAminoSignerByPrefix(
-  mnemonic: string,
-  prefix: string,
-): Promise<Secp256k1HdWallet> {
-  const wallet = await Secp256k1HdWallet.fromMnemonic(mnemonic, { prefix });
-  console.log(`Amino signer created with prefix "${prefix}"`);
-  return wallet;
 }

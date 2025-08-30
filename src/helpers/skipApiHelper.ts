@@ -1,6 +1,26 @@
 import { AssetRegistry } from '@/types';
+import { OfflineDirectSigner } from '@cosmjs/proto-signing';
+import { QueryType } from '@/constants';
+import {
+  executeRoute,
+  RouteResponse,
+  setClientOptions,
+  route as skipRoute,
+  UserAddress,
+} from '@skip-go/client';
+import { OfflineAminoSigner } from '@cosmjs/amino';
+import { WalletClient } from 'viem';
+import { Adapter } from '@solana/wallet-adapter-base';
 
-const SKIP_GO_API_BASE = 'https://api.skip.build/v2';
+// TODO: move this call to server, keep auth at top level there
+const SKIP_GO_API_BASE = 'https://api.skip.build';
+const SKIP_API_KEY = import.meta.env.VITE_SKIP_API_KEY;
+
+const SKIP_HEADERS = {
+  'Content-Type': 'application/json',
+  accept: 'application/json',
+  Authorization: `${SKIP_API_KEY}`,
+};
 
 type ChainInfo = {
   chain_id: string;
@@ -93,6 +113,28 @@ export interface SkipAssetsResponse {
   chain_to_assets_map: Record<string, { assets: SkipAsset[] }>;
 }
 
+// In skipapihelper.ts - update initializeSkipClient
+export const initializeSkipClient = () => {
+  try {
+    const dynamicApiUrl = `${window.location.origin}/api/skip`;
+    console.log('[initializeSkipClient] Setting API URL:', dynamicApiUrl);
+    console.log('[initializeSkipClient] API Key available:', !!SKIP_API_KEY);
+
+    setClientOptions({
+      apiUrl: SKIP_GO_API_BASE,
+      apiKey: SKIP_API_KEY,
+      // endpointOptions: { /* ... */ },
+      // cacheDurationMs: 300000,
+    });
+
+    console.log('[initializeSkipClient] Skip client initialized successfully');
+  } catch (error) {
+    console.error('[initializeSkipClient] Failed to initialize Skip client:', error);
+    throw error;
+  }
+};
+
+// TODO: standardize.  there must be a skip library variant for this
 export const getSkipSupportedAssets = async (
   chainIds?: string[],
   nativeOnly = false,
@@ -108,7 +150,7 @@ export const getSkipSupportedAssets = async (
       params.append('native_only', 'true');
     }
 
-    const url = `${SKIP_GO_API_BASE}/fungible/assets?${params.toString()}`;
+    const url = `${SKIP_GO_API_BASE}/v2/fungible/assets?${params.toString()}`;
     console.log('[Skip API] Fetching supported assets from:', url);
 
     const response = await fetch(url);
@@ -127,6 +169,7 @@ export const getSkipSupportedAssets = async (
         convertedAssets[skipAsset.denom] = {
           denom: skipAsset.denom,
           amount: '0',
+          displayAmount: '0',
           exchangeRate: undefined,
           isIbc: skipAsset.origin_chain_id !== chainId || !!skipAsset.trace,
           logo: skipAsset.logo_uri || '',
@@ -152,10 +195,11 @@ export const getSkipSupportedAssets = async (
   }
 };
 
+// TODO: standardize.  there must be a skip library variant for this
 // TODO: remove? may not be necessary, given chain ids in function above
 export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   try {
-    const response = await fetch(`${SKIP_GO_API_BASE}/info/chains`);
+    const response = await fetch(`${SKIP_GO_API_BASE}/v2/info/chains`);
     if (!response.ok) throw new Error('Failed to fetch supported chains');
     const data = await response.json();
     return data.chains;
@@ -165,8 +209,7 @@ export const getSupportedChains = async (): Promise<ChainInfo[]> => {
   }
 };
 
-// TODO: enable amount out as an option (to handle billing)
-export const getRoute = async ({
+export const getSkipRoute = async ({
   fromChainId,
   fromDenom,
   toChainId,
@@ -180,38 +223,40 @@ export const getRoute = async ({
   toDenom: string;
   amount: string;
   additionalParams?: Record<string, any>;
-}): Promise<any> => {
+}): Promise<RouteResponse> => {
   try {
-    const requestBody = {
-      source_asset_denom: fromDenom,
-      source_asset_chain_id: fromChainId,
-      dest_asset_denom: toDenom,
-      dest_asset_chain_id: toChainId,
-      amount_in: amount,
-      allow_multi_tx: true,
-      allow_swaps: true,
-      smart_relay: true,
-      cumulative_affiliate_fee_bps: '10', // 0.1%, so $1 for every $1000 transferred
+    console.log('[getSkipRoute] Starting route request with params:', {
+      fromChainId,
+      fromDenom,
+      toChainId,
+      toDenom,
+      amount,
+      additionalParams,
+    });
+
+    const routeParams = {
+      amountIn: amount,
+      sourceAssetDenom: fromDenom,
+      sourceAssetChainId: fromChainId,
+      destAssetDenom: toDenom,
+      destAssetChainId: toChainId,
+      smartRelay: true,
+      allowMultiTx: true,
+      allowSwaps: true,
+      cumulativeAffiliateFeeBps: '10', // 0.1%
       ...additionalParams,
     };
 
-    console.log('[Skip API] Route Request:', JSON.stringify(requestBody, null, 2));
+    console.log('[getSkipRoute] Calling skipRoute with:', JSON.stringify(routeParams, null, 2));
 
-    const response = await fetch(`${SKIP_GO_API_BASE}/fungible/route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await skipRoute(routeParams);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[Skip API] Route Error:', response.status, errorData);
-      throw new Error(errorData.message);
+    if (!response) {
+      throw new Error('No route found - response was empty');
     }
 
-    const responseData = await response.json();
-    console.log('[Skip API] Route Success:', JSON.stringify(responseData, null, 2));
-    return responseData;
+    console.log('[getSkipRoute] Route Success:', JSON.stringify(response, null, 2));
+    return response;
   } catch (error) {
     console.error('Skip Route API Error:', error);
     throw error;
@@ -219,118 +264,119 @@ export const getRoute = async ({
 };
 
 // TODO: enable amount out as an option (to handle billing)
-export const getTransactionMessages = async ({
-  fromChainId,
-  fromDenom,
-  toChainId,
-  toDenom,
-  amount,
-  addressList,
-  operations,
-  estimatedAmountOut,
-  slippageTolerancePercent = '0.25',
-  additionalParams,
-}: {
-  fromChainId: string;
-  fromDenom: string;
-  toChainId: string;
-  toDenom: string;
-  amount: string;
-  addressList: string[];
-  operations: any[];
-  estimatedAmountOut: string;
-  slippageTolerancePercent: string;
-  additionalParams?: Record<string, any>;
-}): Promise<any> => {
+export const executeSkipRoute = async (
+  route: any,
+  userAddresses: UserAddress[],
+  getCosmosSigner?: (
+    chainId: string,
+  ) => Promise<
+    (OfflineAminoSigner & OfflineDirectSigner) | OfflineAminoSigner | OfflineDirectSigner
+  >,
+  getEvmSigner?: (chainId: string) => Promise<WalletClient>,
+  getSvmSigner?: () => Promise<Adapter>,
+) => {
   try {
-    const requestBody = {
-      source_asset_chain_id: fromChainId,
-      source_asset_denom: fromDenom,
-      dest_asset_chain_id: toChainId,
-      dest_asset_denom: toDenom,
-      amount_in: amount,
-      address_list: addressList,
-      operations,
-      estimated_amount_out: estimatedAmountOut,
-      slippage_tolerance_percent: slippageTolerancePercent,
-      timeout_seconds: '5',
-      enable_gas_warnings: false,
-      ...additionalParams,
-    };
+    console.log('🔍 [executeSkipRoute] Starting route execution');
+    console.log(
+      '📋 Route details:',
+      JSON.stringify(
+        {
+          source_chain: route.source_asset_chain_id,
+          dest_chain: route.dest_asset_chain_id,
+          amount_in: route.amount_in,
+          estimated_amount_out: route.estimated_amount_out,
+          operations_count: route.operations?.length || 0,
+          required_chains: route.required_chain_addresses || [],
+        },
+        null,
+        2,
+      ),
+    );
 
-    console.log('[Skip API] Messages Request:', JSON.stringify(requestBody, null, 2));
-
-    const response = await fetch(`${SKIP_GO_API_BASE}/fungible/msgs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
+    console.log('👤 User addresses being passed:');
+    userAddresses.forEach((addr, index) => {
+      console.log(`  ${index + 1}. Chain: ${addr.chainId}, Address: ${addr.address}`);
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[Skip API] Messages Error:', response.status, errorData);
-      throw new Error(errorData.message);
-    }
+    let transactionError: Error | null = null;
+    await executeRoute({
+      route,
+      userAddresses,
+      getCosmosSigner,
+      getEvmSigner,
+      getSvmSigner,
+      onTransactionCompleted: async (txInfo: {
+        chainId: string;
+        txHash: string;
+        status?: any;
+        response?: any;
+      }) => {
+        console.log(
+          '🔄 [executeSkipRoute] Transaction completed callback:',
+          txInfo.chainId,
+          txInfo.txHash,
+          'Full txInfo:',
+          txInfo,
+        );
 
-    const responseData = await response.json();
-    console.log('[Skip API] Messages Success:', JSON.stringify(responseData, null, 2));
-    return responseData;
-  } catch (error) {
-    console.error('Skip Messages API Error:', error);
-    throw error;
-  }
-};
+        console.log('Full txInfo:', txInfo);
 
-// TODO: enable amount out as an option (to handle billing)
-export const submitTransaction = async (
-  chain_id: string,
-  tx: string, // Base64 encoded signed transaction
-  additionalParams?: Record<string, any>,
-): Promise<{
-  success: boolean;
-  message: string;
-  data?: {
-    txHash: string;
-    explorerLink: string;
-  };
-}> => {
-  try {
-    const requestBody = {
-      tx,
-      chain_id,
-      ...additionalParams,
-    };
+        const status = txInfo.status;
+        if (status?.error || status?.state === 'STATE_COMPLETED_ERROR') {
+          console.error(
+            `❌ [executeSkipRoute] ERROR CODE: ${status.error.code}, ERROR MESSAGE: ${status.error.message}`,
+          );
+          throw new Error(status.error.message);
+        }
 
-    console.log('[Skip API] Submit Request:', JSON.stringify(requestBody, null, 2));
-
-    const response = await fetch(`${SKIP_GO_API_BASE}/tx/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('[Skip API] Submit Error:', response.status, errorData);
-      throw new Error(errorData.message);
-    }
-
-    const responseData = await response.json();
-    console.log('[Skip API] Submit Success:', JSON.stringify(responseData, null, 2));
-
-    return {
-      success: true,
-      message: 'Transaction submitted successfully',
-      data: {
-        txHash: responseData.tx_hash,
-        explorerLink: responseData.explorer_link,
+        const response =
+          typeof txInfo.response === 'string' ? JSON.parse(txInfo.response) : txInfo.response;
+        console.log(
+          '🔍 [executeSkipRoute] Parsed response data:',
+          JSON.stringify(response, null, 2),
+        );
       },
-    };
+      onTransactionBroadcast: async ({
+        chainId: broadcastChainId,
+        txHash,
+        response,
+      }: {
+        chainId: string;
+        txHash: string;
+        response?: any;
+      }) => {
+        console.log('Transaction broadcasted', broadcastChainId, txHash, response);
+      },
+      onTransactionTracked: async ({
+        chainId: trackedChainId,
+        txHash,
+        status,
+      }: {
+        chainId: string;
+        txHash: string;
+        status?: any;
+      }) => {
+        console.log('Transaction tracked', trackedChainId, txHash, status);
+
+        // Check for error status in tracked transactions
+        if (status && (status.state === 'STATE_COMPLETED_ERROR' || status.error)) {
+          console.error('Transaction tracked with error:', status.error);
+          throw new Error(status.error?.message || 'Transaction execution failed');
+        }
+      },
+    });
+
+    // Check for errors
+    if (transactionError) {
+      throw transactionError;
+    }
+
+    return { success: true, message: 'Route executed successfully' };
   } catch (error) {
-    console.error('Skip Submit API Error:', error);
+    console.error('Error executing Skip route:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to submit transaction',
+      message: error instanceof Error ? error.message : 'Failed to execute route',
     };
   }
 };
@@ -357,8 +403,8 @@ export const trackTransaction = async (
     console.log('[Skip API] Track Request:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(`${SKIP_GO_API_BASE}/tx/track`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: QueryType.POST,
+      headers: SKIP_HEADERS,
       body: JSON.stringify(requestBody),
     });
 
@@ -406,8 +452,8 @@ export const getTransactionStatus = async (
     console.log('[Skip API] Status Request:', url);
 
     const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      method: QueryType.GET,
+      headers: SKIP_HEADERS,
     });
 
     if (!response.ok) {

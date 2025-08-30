@@ -12,21 +12,19 @@ import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
 import { FeeToken, RPCResponse, SortedValidator, Uri } from '@/types';
 import {
-  createOfflineSignerByPrefix,
   getAddressByChainPrefix,
   getSessionToken,
   getSortedValidators,
   recordQueryResult,
 } from './dataHelpers';
 import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
+import { getCosmosDirectSigner } from './signers';
 
 // Client connection caching
 const clientCache = new Map<string, SigningStargateClient>();
 const CACHE_TTL = FIVE_MINUTES;
 // Sorted URIs caching
 const SORT_CACHE_TTL = ONE_SECOND;
-
-let currentValidatorIndex = new Map<string, number>(); // Tracks current index per chain+type
 
 interface ValidatorCacheEntry {
   validators: SortedValidator[];
@@ -79,7 +77,10 @@ const shouldRecordFailure = (error: any): boolean => {
     errorMessage.includes('ECONNRESET') ||
     errorMessage.includes('ETIMEDOUT');
 
-  return isClientError || isServerError || isIndexerRelated || isConnectionError;
+  // Timeout errors (aborted requests)
+  const isTimeout = errorMessage.includes('timed out') || errorMessage.includes('AbortError');
+
+  return isClientError || isServerError || isIndexerRelated || isConnectionError || isTimeout;
 };
 
 const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
@@ -113,7 +114,7 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        throw new Error(`Request timed out after ${DEFAULT_REST_TIMEOUT}ms`);
+        throw new Error(`Request timed out`);
       }
       throw error;
     }
@@ -219,7 +220,7 @@ const getCachedSigner = async (
     endpoint.startsWith(symphonyEndpoint),
   );
 
-  const offlineSigner = await createOfflineSignerByPrefix(mnemonic, prefix);
+  const offlineSigner = await getCosmosDirectSigner(mnemonic, prefix);
 
   const client = isSymphonyQuery
     ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
@@ -270,34 +271,6 @@ const getSortedUris = (chainId: string, uris: Uri[], commType: CommType): Uri[] 
   return sortUrisWithCache(uris, sortedValidators);
 };
 
-// TODO: move this sorting stuff to the validator sort file
-const getCurrentBestValidator = (chainId: string, uris: Uri[], commType: CommType): Uri | null => {
-  const sortedUris = getSortedUris(chainId, uris, commType);
-  if (sortedUris.length === 0) return null;
-
-  const cacheKey = `${chainId}-${commType}`;
-  const currentIndex = currentValidatorIndex.get(cacheKey) || 0;
-
-  // If current index is out of bounds, reset to 0
-  if (currentIndex >= sortedUris.length) {
-    currentValidatorIndex.set(cacheKey, 0);
-    return sortedUris[0];
-  }
-
-  return sortedUris[currentIndex];
-};
-
-const moveToNextValidator = (chainId: string, commType: CommType): void => {
-  const cacheKey = `${chainId}-${commType}`;
-  const currentIndex = currentValidatorIndex.get(cacheKey) || 0;
-  currentValidatorIndex.set(cacheKey, currentIndex + 1);
-};
-
-const resetValidatorIndex = (chainId: string, commType: CommType): void => {
-  const cacheKey = `${chainId}-${commType}`;
-  currentValidatorIndex.set(cacheKey, 0);
-};
-
 const queryWithRetry = async ({
   endpoint,
   useRPC = false,
@@ -330,15 +303,19 @@ const queryWithRetry = async ({
   // Determine query type for sorting and recording
   const queryTypeCategory: CommType = useRPC ? CommType.RPC : CommType.REST;
 
-  // Get the current best validator for this chain and type
-  let currentUri = getCurrentBestValidator(chainId, uris, queryTypeCategory);
+  // Get sorted validators for this query type
+  const sortedUris = getSortedUris(chainId, uris, queryTypeCategory);
 
-  if (!currentUri) {
+  if (sortedUris.length === 0) {
     throw new Error(`No validators available for ${chainId} ${queryTypeCategory}`);
   }
 
   while (attemptCount < MAX_RETRIES_PER_QUERY) {
     const startTime = Date.now();
+
+    // Get the current validator for this attempt (cycle through the list)
+    const currentIndex = attemptCount % sortedUris.length;
+    const currentUri = sortedUris[currentIndex];
 
     try {
       if (useRPC) {
@@ -362,33 +339,26 @@ const queryWithRetry = async ({
         const queryTime = Date.now() - startTime;
         recordQueryResult(chainId, currentUri.address, queryTime, true, CommType.RPC);
 
-        // Success! Reset to use the best validator for next query
-        resetValidatorIndex(chainId, queryTypeCategory);
+        // Success! Return the result
         return result;
       } else {
         const result = await performRestQuery(currentUri.address, endpoint, queryType);
         recordQueryResult(chainId, currentUri.address, result.queryTime, true, CommType.REST);
 
-        // Success! Reset to use the best validator for next query
-        resetValidatorIndex(chainId, queryTypeCategory);
+        // Success! Return the result
         return result.data;
       }
     } catch (error) {
       const queryTime = Date.now() - startTime;
       console.error(`[queryNodes] Query failed for ${currentUri.address}: ${error}`);
 
-      if (shouldRecordFailure(error)) {
+      // Always record timeouts as failures
+      const isTimeout = error instanceof Error && error.message.includes('timed out');
+
+      if (shouldRecordFailure(error) || isTimeout) {
         recordQueryResult(chainId, currentUri.address, queryTime, false, queryTypeCategory);
-
-        // Move to next validator for subsequent attempts
-        moveToNextValidator(chainId, queryTypeCategory);
-        currentUri = getCurrentBestValidator(chainId, uris, queryTypeCategory);
-
-        if (!currentUri) {
-          throw new Error(`No more validators available after ${attemptCount + 1} attempts`);
-        }
       } else {
-        // Non-serious error, don't move to next validator
+        // Non-serious error, don't record failure
         let errorMessage = 'Unknown error';
         if (error instanceof Error) {
           errorMessage = error.message;
@@ -405,10 +375,10 @@ const queryWithRetry = async ({
       attemptCount++;
       lastError = error;
 
-      if (attemptCount < MAX_RETRIES_PER_QUERY && currentUri) {
+      if (attemptCount < MAX_RETRIES_PER_QUERY) {
         const backoff = Math.min(2 ** attemptCount * 500, 5000);
         console.log(
-          `[queryNodes] Next attempt via ${currentUri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
+          `[queryNodes] Next attempt (${attemptCount}/${MAX_RETRIES_PER_QUERY}) via ${sortedUris[attemptCount % sortedUris.length].address} at ${endpoint}, waiting ${backoff}ms before retry`,
         );
         await delay(backoff);
       }

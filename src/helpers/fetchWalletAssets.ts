@@ -236,11 +236,6 @@ export async function fetchWalletAssets(
     ? Object.keys(assets)
     : networkSubscriptions[chainId]?.subscribedDenoms || [];
 
-  console.log(
-    `[fetchWalletAssets ${chainId}] Subscription status - viewAll: ${shouldFetchAllAssets}, subscribedDenoms:`,
-    thisChainSubscribedDenoms,
-  );
-
   // 3. Process all balances into assets
   console.log(`[fetchWalletAssets ${chainId}] Processing ${rawBalances.length} raw balances...`);
   const processedAssets = await Promise.all(
