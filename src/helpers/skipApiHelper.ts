@@ -299,6 +299,7 @@ export const executeSkipRoute = async (
     });
 
     let transactionError: Error | null = null;
+    let skipResult: { success: boolean; message?: string; data?: any } | null = null;
     await executeRoute({
       route,
       userAddresses,
@@ -319,22 +320,27 @@ export const executeSkipRoute = async (
           txInfo,
         );
 
-        console.log('Full txInfo:', txInfo);
+        console.log('[executeSkipRoute] Transaction completed callback:', txInfo);
 
-        const status = txInfo.status;
-        if (status?.error || status?.state === 'STATE_COMPLETED_ERROR') {
+        if (txInfo.status?.error) {
+          // Extract error code and message for known errors
+          const errorCode = txInfo.status.error.code;
+          const errorMessage = txInfo.status.error.message;
+
           console.error(
-            `❌ [executeSkipRoute] ERROR CODE: ${status.error.code}, ERROR MESSAGE: ${status.error.message}`,
+            `❌ [executeSkipRoute] ERROR CODE: ${errorCode}, ERROR MESSAGE: ${errorMessage}`,
           );
-          throw new Error(status.error.message);
+
+          // Handle specific error codes with cleaner messages
+          if (errorCode === 5) {
+            skipResult = { success: false, message: 'Insufficient funds' };
+          }
+
+          throw new Error(errorMessage);
         }
 
-        const response =
-          typeof txInfo.response === 'string' ? JSON.parse(txInfo.response) : txInfo.response;
-        console.log(
-          '🔍 [executeSkipRoute] Parsed response data:',
-          JSON.stringify(response, null, 2),
-        );
+        // Success case
+        skipResult = { success: true, data: txInfo };
       },
       onTransactionBroadcast: async ({
         chainId: broadcastChainId,
@@ -358,18 +364,23 @@ export const executeSkipRoute = async (
       }) => {
         console.log('Transaction tracked', trackedChainId, txHash, status);
 
-        // Check for error status in tracked transactions
-        if (status && (status.state === 'STATE_COMPLETED_ERROR' || status.error)) {
-          console.error('Transaction tracked with error:', status.error);
-          throw new Error(status.error?.message || 'Transaction execution failed');
+        if (status?.error) {
+          // Extract error code and message for known errors
+          const errorCode = status.error.code;
+          const errorMessage = status.error.message;
+
+          console.error(
+            `❌ [executeSkipRoute] ERROR CODE: ${errorCode}, ERROR MESSAGE: ${errorMessage}`,
+          );
+
+          throw new Error(errorMessage);
         }
       },
     });
 
     // Check for errors
-    if (transactionError) {
-      throw transactionError;
-    }
+    if (transactionError) throw transactionError;
+    if (skipResult != null) return skipResult;
 
     return { success: true, message: 'Route executed successfully' };
   } catch (error) {

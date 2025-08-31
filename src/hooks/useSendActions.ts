@@ -338,7 +338,6 @@ export const useSendActions = () => {
     try {
       const amount = `${sendState.amount}`;
 
-      // Use the new Skip client route function instead of direct API call
       const routeResponse = await getSkipRoute({
         fromChainId: sendState.asset.originChainId,
         fromDenom: sendObject.denom,
@@ -452,7 +451,7 @@ export const useSendActions = () => {
           message: 'Route successfully executed',
           data: {
             code: 0,
-            txHash: 'multi-tx', // Skip handles multiple transactions
+            txHash: 'multi-tx', // TODO: change to array of tx hashes or to final tx hash
             gasWanted: '0',
             route: routeResponse,
           },
@@ -576,35 +575,39 @@ export const useSendActions = () => {
       stepType: step.type,
     });
 
-    switch (step.type) {
-      case TransactionType.SEND:
-        return await executeSend({ sendObject, simulateTransaction: isSimulation });
-      case TransactionType.SWAP:
-        return await executeStablecoinSwap({
-          sendObject,
-          receiveAsset: step.toAsset,
-          simulateTransaction: isSimulation,
-        });
-      case TransactionType.IBC_SEND:
-        return await executeIBC({
-          sendObject,
-          receiveChainId: step.toChain,
-          simulateTransaction: isSimulation,
-        });
-      case TransactionType.EXCHANGE:
-        const skipSendObject: SendObject = {
-          recipientAddress: finalRecipientAddress,
-          amount: sendState.amount.toString(),
-          denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
-          feeToken,
-        };
-        return await executeSkipTx({
-          sendObject: skipSendObject,
-          receiveAssetDenom: step.toAsset.denom,
-          simulateTransaction: isSimulation,
-        });
-      default:
-        throw new Error(`Unsupported transaction type: ${step.type}`);
+    try {
+      switch (step.type) {
+        case TransactionType.SEND:
+          return await executeSend({ sendObject, simulateTransaction: isSimulation });
+        case TransactionType.SWAP:
+          return await executeStablecoinSwap({
+            sendObject,
+            receiveAsset: step.toAsset,
+            simulateTransaction: isSimulation,
+          });
+        case TransactionType.IBC_SEND:
+          return await executeIBC({
+            sendObject,
+            receiveChainId: step.toChain,
+            simulateTransaction: isSimulation,
+          });
+        case TransactionType.EXCHANGE:
+          const skipSendObject: SendObject = {
+            recipientAddress: finalRecipientAddress,
+            amount: sendState.amount.toString(),
+            denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
+            feeToken,
+          };
+          return await executeSkipTx({
+            sendObject: skipSendObject,
+            receiveAssetDenom: step.toAsset.denom,
+            simulateTransaction: isSimulation,
+          });
+        default:
+          throw new Error(`Unsupported transaction type: ${step.type}`);
+      }
+    } catch (error: any) {
+      return { success: false, message: error.message };
     }
   };
 
@@ -642,7 +645,15 @@ export const useSendActions = () => {
           status: TransactionStatus.PENDING,
         });
 
-        result = await executeStep(step, isSimulation);
+        try {
+          result = await executeStep(step, isSimulation);
+        } catch (error) {
+          console.error('[executeTransactionRoute] Step execution threw error:', error);
+          result = {
+            success: false,
+            message: error instanceof Error ? error.message : 'Step execution failed',
+          };
+        }
 
         console.log('[executeTransactionRoute] Step result', {
           stepIndex: i,
@@ -717,7 +728,7 @@ export const useSendActions = () => {
         }
 
         // If false or no results
-        if (!(result?.success || false)) {
+        if (!result.success) {
           console.error('[executeTransactionRoute] Step failed', {
             stepIndex: i,
             error: result.message,
