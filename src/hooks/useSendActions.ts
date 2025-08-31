@@ -264,9 +264,19 @@ export const useSendActions = () => {
     receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[useSendActions] executeIBC - Starting IBC transaction');
+    console.log('[DEBUG][executeIBC] Starting IBC transaction', {
+      sendObject,
+      receiveChainId,
+      simulateTransaction,
+    });
     try {
       const sendChain = getChainInfo(sendState.chainId);
+      console.log('[DEBUG][executeIBC] Getting valid IBC channel for:', {
+        sendChain: sendChain.chain_id,
+        receiveChainId,
+        networkLevel,
+      });
+
       const validChannel = await getValidIBCChannel({
         sendChain,
         receiveChainId,
@@ -275,8 +285,10 @@ export const useSendActions = () => {
         restUris: sendChain.rest_uris,
       });
 
+      console.log('[DEBUG][executeIBC] Valid channel result:', validChannel);
+
       if (!validChannel) {
-        console.error('[useSendActions] No valid IBC channel found');
+        console.error('[DEBUG][executeIBC] No valid IBC channel found');
         return {
           success: false,
           message: 'No valid IBC channel found for this connection',
@@ -292,6 +304,8 @@ export const useSendActions = () => {
         },
       };
 
+      console.log('[DEBUG][executeIBC] Sending IBC transaction with:', ibcObject);
+
       return await sendIBCTransaction({
         ibcObject,
         prefix: sendChain.bech32_prefix,
@@ -300,7 +314,7 @@ export const useSendActions = () => {
         simulateOnly: simulateTransaction,
       });
     } catch (error) {
-      console.error('IBC transaction failed:', error);
+      console.error('[DEBUG][executeIBC] IBC transaction failed:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'IBC transaction failed',
@@ -462,12 +476,105 @@ export const useSendActions = () => {
     const stepLog = txLogs[step.hash];
     const feeToken = stepLog?.fee?.feeToken;
 
+    // TODO: this getAddressForChain code is also used in the skip function.  extract to hook or helper function for use in both places
+    // Helper function to get address for any chain (similar to Skip function)
+    const getAddressForChain = async (chainId: string): Promise<string> => {
+      console.log(`[DEBUG][getAddressForChain] Getting address for chain: ${chainId}`);
+
+      // First try to get from local wallet state
+      const chainWallet = getWalletInfo(chainId);
+
+      if (chainWallet?.address && chainWallet.address.trim() !== '') {
+        console.log(
+          `[DEBUG][getAddressForChain] Using local wallet for ${chainId}: ${chainWallet.address}`,
+        );
+        return chainWallet.address;
+      }
+
+      console.log(
+        `[DEBUG][getAddressForChain] No local wallet found for ${chainId}, generating from mnemonic`,
+      );
+
+      // Fallback: generate address from mnemonic
+      const sessionToken = getSessionToken();
+      if (!sessionToken) {
+        throw new Error("Session token doesn't exist");
+      }
+
+      const chainInfo = getFullRegistryChainInfo(chainId);
+      console.log(`[DEBUG][getAddressForChain] Chain info for ${chainId}:`, chainInfo);
+
+      if (!chainInfo?.bech32_prefix) {
+        console.error(`[DEBUG][getAddressForChain] Prefix not found for chain ${chainId}`);
+        throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId}`);
+      }
+
+      console.log(
+        `[DEBUG][getAddressForChain] Generating address for ${chainId} with prefix: ${chainInfo.bech32_prefix}`,
+      );
+
+      try {
+        const address = await getAddressByChainPrefix(
+          sessionToken.mnemonic,
+          chainInfo.bech32_prefix,
+        );
+        console.log(`[DEBUG][getAddressForChain] Generated address for ${chainId}: ${address}`);
+        return address;
+      } catch (error) {
+        console.error(
+          `[DEBUG][getAddressForChain] Failed to generate address for ${chainId}:`,
+          error,
+        );
+        throw error;
+      }
+    };
+
+    // Determine the correct recipient address
+    let finalRecipientAddress: string;
+    if (step.fromChain !== step.toChain) {
+      // Cross-chain transfer: use the destination chain address
+      console.log(
+        `[DEBUG][executeStep] Cross-chain transfer detected: ${step.fromChain} -> ${step.toChain}`,
+      );
+
+      try {
+        finalRecipientAddress = await getAddressForChain(step.toChain);
+        console.log(
+          `[DEBUG][executeStep] Using destination chain address: ${finalRecipientAddress}`,
+        );
+      } catch (error) {
+        console.error(
+          `[DEBUG][executeStep] Failed to get destination address for ${step.toChain}:`,
+          error,
+        );
+        return {
+          success: false,
+          message: `Failed to get address for destination chain ${step.toChain}`,
+        };
+      }
+    } else {
+      // Same-chain transfer: use the provided recipient or self
+      finalRecipientAddress = recipientAddress || walletState.address;
+      console.log(
+        `[DEBUG][executeStep] Same-chain transfer, using address: ${finalRecipientAddress}`,
+      );
+    }
+
     const sendObject: SendObject = {
-      recipientAddress: recipientAddress || walletState.address,
+      recipientAddress: finalRecipientAddress,
       amount: sendState.amount.toString(),
       denom: step.fromAsset.denom,
       feeToken,
     };
+
+    console.log('[DEBUG][executeStep] Final send object:', {
+      recipientAddress: finalRecipientAddress,
+      amount: sendState.amount.toString(),
+      denom: step.fromAsset.denom,
+      fromChain: step.fromChain,
+      toChain: step.toChain,
+      stepType: step.type,
+    });
 
     switch (step.type) {
       case TransactionType.SEND:
@@ -486,7 +593,7 @@ export const useSendActions = () => {
         });
       case TransactionType.EXCHANGE:
         const skipSendObject: SendObject = {
-          recipientAddress: recipientAddress || walletState.address,
+          recipientAddress: finalRecipientAddress,
           amount: sendState.amount.toString(),
           denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
           feeToken,
