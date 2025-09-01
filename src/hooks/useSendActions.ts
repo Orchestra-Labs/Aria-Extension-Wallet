@@ -41,6 +41,23 @@ import { useGetSigner } from './useGetSigner';
 import { useEffect } from 'react';
 import { UserAddress } from '@skip-go/client/cjs';
 
+interface SkipOperationSimulation {
+  chainId: string;
+  denom: string;
+  operationType: string;
+  success: boolean;
+  estimatedGas: string;
+  feeAmount: number;
+  feeToken: FeeToken;
+  error?: string;
+}
+
+interface SkipSimulationResult {
+  operations: SkipOperationSimulation[];
+  totalEstimatedFees: number;
+  hasSufficientBalances: boolean;
+}
+
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
 export const useSendActions = () => {
@@ -207,25 +224,219 @@ export const useSendActions = () => {
     }
   };
 
+  const runSkipFeeSimulations = async (
+    skipRoute: any,
+    userAddresses: { chainId: string; address: string }[],
+  ): Promise<SkipSimulationResult> => {
+    const simulations: SkipOperationSimulation[] = [];
+    let totalEstimatedFees = 0;
+    let allSufficient = true;
+
+    // Process each operation in the route
+    for (const operation of skipRoute.operations) {
+      let chainId: string;
+      let denom: string;
+      let operationType: string;
+
+      if (operation.transfer) {
+        // For transfer operations, we need to simulate on the source chain
+        chainId = operation.transfer.fromChainId;
+        denom = operation.transfer.denomIn;
+        operationType = 'transfer';
+      } else if (operation.swap) {
+        // For swap operations, we need to simulate on the chain where the swap occurs
+        chainId = operation.swap.fromChainId;
+        denom = operation.swap.denomIn;
+        operationType = 'swap';
+      } else {
+        // Skip unknown operation types
+        continue;
+      }
+
+      console.log(
+        `[runSkipFeeSimulations] Processing ${operationType} operation on ${chainId} with ${denom}`,
+      );
+
+      const chainInfo = getFullRegistryChainInfo(chainId);
+      if (!chainInfo) {
+        simulations.push({
+          chainId,
+          denom,
+          operationType,
+          success: false,
+          estimatedGas: '0',
+          feeAmount: 0,
+          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+          error: `Chain info not found for ${chainId}`,
+        });
+        allSufficient = false;
+        continue;
+      }
+
+      const userAddress = userAddresses.find(addr => addr.chainId === chainId)?.address;
+      if (!userAddress) {
+        simulations.push({
+          chainId,
+          denom,
+          operationType,
+          success: false,
+          estimatedGas: '0',
+          feeAmount: 0,
+          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+          error: `User address not found for chain ${chainId}`,
+        });
+        allSufficient = false;
+        continue;
+      }
+
+      const feeToken = chainInfo.fees?.[0];
+      if (!feeToken) {
+        simulations.push({
+          chainId,
+          denom,
+          operationType,
+          success: false,
+          estimatedGas: '0',
+          feeAmount: 0,
+          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+          error: `No fee tokens available for chain ${chainId}`,
+        });
+        allSufficient = false;
+        continue;
+      }
+
+      // Use the actual amount from the operation for more accurate simulation
+      const simulationAmount = operation.amountIn || '1';
+
+      // Create appropriate send object based on operation type
+      const sendObject: SendObject = {
+        recipientAddress: userAddress, // Send to self for simulation
+        amount: simulationAmount,
+        denom,
+        feeToken,
+      };
+
+      let simulationResult: TransactionResult;
+
+      try {
+        if (operation.transfer) {
+          // Simulate IBC transfer
+          simulationResult = await executeIBC({
+            sendObject,
+            sendChainId: chainId,
+            receiveChainId: operation.transfer.toChainId,
+            simulateTransaction: true,
+          });
+        } else {
+          // Fallback to regular send simulation
+          simulationResult = await executeSend({
+            sendObject,
+            chainId: chainId,
+            simulateTransaction: true,
+          });
+        }
+
+        if (simulationResult.success && simulationResult.data) {
+          const estimatedGas = simulationResult.data.gasWanted || '0';
+          const gasPrice = feeToken.gasPriceStep.average;
+          const feeAmount = Math.ceil(parseInt(estimatedGas) * gasPrice);
+
+          // Use checkGasBalance to verify sufficient funds
+          const balanceCheck = await checkGasBalance({
+            address: userAddress,
+            feeToken,
+            estimatedGas,
+            chainId,
+            restUris: chainInfo.rest_uris,
+          });
+
+          const operationSuccess = balanceCheck.hasSufficientBalance;
+
+          if (!operationSuccess) {
+            allSufficient = false;
+          }
+
+          simulations.push({
+            chainId,
+            denom,
+            operationType,
+            success: operationSuccess,
+            estimatedGas,
+            feeAmount,
+            feeToken,
+            error: operationSuccess
+              ? undefined
+              : `Insufficient ${feeToken.denom} for gas fees. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}`,
+          });
+
+          totalEstimatedFees += feeAmount;
+        } else {
+          simulations.push({
+            chainId,
+            denom,
+            operationType,
+            success: false,
+            estimatedGas: '0',
+            feeAmount: 0,
+            feeToken,
+            error: simulationResult.message,
+          });
+          allSufficient = false;
+        }
+      } catch (error) {
+        console.error(
+          `[runSkipFeeSimulations] Error simulating ${operationType} on ${chainId}:`,
+          error,
+        );
+        simulations.push({
+          chainId,
+          denom,
+          operationType,
+          success: false,
+          estimatedGas: '0',
+          feeAmount: 0,
+          feeToken,
+          error: error instanceof Error ? error.message : 'Simulation failed',
+        });
+        allSufficient = false;
+      }
+    }
+
+    console.log('[runSkipFeeSimulations] Completed simulations:', {
+      totalOperations: simulations.length,
+      totalEstimatedFees,
+      allSufficient,
+      simulations,
+    });
+
+    return {
+      operations: simulations,
+      totalEstimatedFees,
+      hasSufficientBalances: allSufficient,
+    };
+  };
+
   const executeSend = async ({
     sendObject,
+    chainId,
     simulateTransaction,
   }: {
     sendObject: SendObject;
+    chainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[executeSend] Starting standard send transaction', sendObject);
-    const sendChain = getChainInfo(sendState.chainId);
+    const sendChain = getChainInfo(chainId);
     const prefix = sendChain.bech32_prefix;
     const rpcUris = sendChain.rpc_uris;
-    console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendState.chainId}`);
+    console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendChain.chain_id}`);
 
     return await sendTransaction({
       fromAddress: walletState.address,
       sendObject,
       prefix,
       rpcUris,
-      chainId: sendState.chainId,
+      chainId: sendChain.chain_id,
       simulateOnly: simulateTransaction,
     });
   };
@@ -257,20 +468,23 @@ export const useSendActions = () => {
 
   const executeIBC = async ({
     sendObject,
+    sendChainId,
     receiveChainId,
     simulateTransaction,
   }: {
     sendObject: SendObject;
+    sendChainId: string;
     receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[DEBUG][executeIBC] Starting IBC transaction', {
       sendObject,
+      sendChainId,
       receiveChainId,
       simulateTransaction,
     });
     try {
-      const sendChain = getChainInfo(sendState.chainId);
+      const sendChain = getFullRegistryChainInfo(sendChainId);
       console.log('[DEBUG][executeIBC] Getting valid IBC channel for:', {
         sendChain: sendChain.chain_id,
         receiveChainId,
@@ -350,31 +564,8 @@ export const useSendActions = () => {
         throw new Error('No valid IBC route found');
       }
 
-      // For simulation, return early with route info
-      if (simulateTransaction) {
-        const totalFees =
-          routeResponse.estimatedFees?.reduce(
-            (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-            0,
-          ) || 0;
-
-        return {
-          success: true,
-          message: 'Transaction simulation successful',
-          data: {
-            code: 0,
-            txHash: 'simulated',
-            gasWanted: totalFees.toString(),
-            route: routeResponse,
-            estimatedAmountOut: routeResponse.estimatedAmountOut,
-            fees: routeResponse.estimatedFees,
-          },
-        };
-      }
-
       // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
       const requiredChainAddresses = routeResponse.requiredChainAddresses;
-
       const userAddresses: UserAddress[] = await Promise.all(
         requiredChainAddresses.map(async (chainId: string, index: number) => {
           console.log(`🔄 Processing chain ${index}: ${chainId}`);
@@ -429,7 +620,34 @@ export const useSendActions = () => {
       );
 
       if (validAddresses.length !== requiredChainAddresses.length) {
-        throw new Error('Failed to generate valid addresses for all required chains');
+        throw new Error('Missing addresses on Skip path');
+      }
+
+      // TODO: if this works, add the output to logs and fee output
+      // Run fee simulations before proceeding
+      const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
+      console.log('[executeSkipTx] Fee simulation results:', simulationResult);
+
+      // For simulation, return early with route info
+      if (simulateTransaction) {
+        const totalFees =
+          routeResponse.estimatedFees?.reduce(
+            (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
+            0,
+          ) || 0;
+
+        return {
+          success: true,
+          message: 'Transaction simulation successful',
+          data: {
+            code: 0,
+            txHash: 'simulated',
+            gasWanted: totalFees.toString(),
+            route: routeResponse,
+            estimatedAmountOut: routeResponse.estimatedAmountOut,
+            fees: routeResponse.estimatedFees,
+          },
+        };
       }
 
       // Execute the route using Skip's built-in execution
@@ -578,7 +796,11 @@ export const useSendActions = () => {
     try {
       switch (step.type) {
         case TransactionType.SEND:
-          return await executeSend({ sendObject, simulateTransaction: isSimulation });
+          return await executeSend({
+            sendObject,
+            chainId: step.fromChain,
+            simulateTransaction: isSimulation,
+          });
         case TransactionType.SWAP:
           return await executeStablecoinSwap({
             sendObject,
@@ -588,6 +810,7 @@ export const useSendActions = () => {
         case TransactionType.IBC_SEND:
           return await executeIBC({
             sendObject,
+            sendChainId: step.fromChain,
             receiveChainId: step.toChain,
             simulateTransaction: isSimulation,
           });
