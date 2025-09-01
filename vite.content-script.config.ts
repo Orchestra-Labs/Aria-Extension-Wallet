@@ -1,3 +1,4 @@
+import inject from '@rollup/plugin-inject';
 import path from 'path';
 import { defineConfig } from 'vite';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
@@ -6,6 +7,8 @@ import viteTsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig({
   define: {
     global: 'window',
+    'process.env': {},
+    'process.version': '"18.0.0"',
   },
   resolve: {
     alias: {
@@ -23,6 +26,11 @@ export default defineConfig({
         chunkFileNames: '[name].js',
         format: 'iife', // iife is for browser compatibility
       },
+      plugins: [
+        inject({
+          process: 'process/browser',
+        }),
+      ],
     },
   },
 });
