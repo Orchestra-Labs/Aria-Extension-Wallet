@@ -1,24 +1,6 @@
-import { ROUTES } from '@/constants';
-import type { InjectedAria } from '@/types/injected-aria';
+import { Aria } from '@/providers/wallet/core';
+import { injectAriaToWindow } from '@/providers/wallet/inject';
 
-const aria: InjectedAria = {
-  connect: async (uri: string) => {
-    window.postMessage({ action: 'connect', data: { uri } }, '*');
-    return;
-  },
-  openExtension: async (pathname?: string) => {
-    window.postMessage({ action: 'open_extension', data: { pathname } }, '*');
-    return;
-  },
-  signTransaction: async () => {
-    window.postMessage(
-      { action: 'open_extension', data: { pathname: ROUTES.APP.WALLET_CONNECT.LOADER } },
-      '*',
-    );
-    return;
-  },
-};
-
-Object.defineProperty(window, 'aria', {
-  value: aria,
-});
+const aria = new Aria();
+console.log('INJECT: ARIA DEFINE');
+injectAriaToWindow(aria);
