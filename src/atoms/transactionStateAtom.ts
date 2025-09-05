@@ -19,7 +19,7 @@ import {
   transactionRouteFailedAtom,
   transactionRouteHashAtom,
 } from './transactionRouteAtom';
-import { transactionLogsAtom } from './transactionLogsAtom';
+import { resetTransactionLogsAtom, transactionLogsAtom } from './transactionLogsAtom';
 import { addressVerifiedAtom, recipientAddressAtom } from './addressAtom';
 
 type TransactionStateAtom = WritableAtom<
@@ -29,7 +29,6 @@ type TransactionStateAtom = WritableAtom<
 >;
 
 const createTransactionAtom = (
-  defaultState: TransactionState,
   storageAtom: WritableAtom<TransactionState, [TransactionState], void>,
 ) => {
   return atom(
@@ -37,15 +36,11 @@ const createTransactionAtom = (
       const baseState = get(storageAtom);
       const selectedAsset = get(selectedAssetAtom);
 
-      // Only apply defaults if chainId matches default
-      if (baseState.chainId === defaultState.chainId) {
-        return {
-          ...baseState, // Preserve any existing state
-          asset: selectedAsset,
-          chainId: selectedAsset.chainId,
-        };
-      }
-      return baseState;
+      return {
+        ...baseState, // Preserve any existing state
+        asset: selectedAsset,
+        chainId: selectedAsset.chainId,
+      };
     },
     (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
       const current = get(storageAtom);
@@ -61,8 +56,8 @@ const _receiveStateAtom = atom<TransactionState>(DEFAULT_RECEIVE_STATE);
 export const _feeStateAtom = atom<FeeState>(DEFAULT_FEE_STATE);
 
 // Public state atoms
-export const sendStateAtom = createTransactionAtom(DEFAULT_SEND_STATE, _sendStateAtom);
-export const receiveStateAtom = createTransactionAtom(DEFAULT_RECEIVE_STATE, _receiveStateAtom);
+export const sendStateAtom = createTransactionAtom(_sendStateAtom);
+export const receiveStateAtom = createTransactionAtom(_receiveStateAtom);
 
 export const derivedFeeStateAtom = atom<FeeState | null>(get => {
   const transactionRoute = get(transactionRouteAtom);
@@ -245,6 +240,8 @@ export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
 export const resetTransactionStatesAtom = atom(null, (get, set) => {
   const selectedAsset = get(selectedAssetAtom);
 
+  console.log('[resetTransactionStatesAtom] Resetting all transaction states');
+
   // Reset main states
   set(_sendStateAtom, {
     ...DEFAULT_SEND_STATE,
@@ -269,7 +266,9 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
     status: InputStatus.NEUTRAL,
   });
 
-  // TODO: reset transaction logs here too
+  // Reset transaction logs
+  set(resetTransactionLogsAtom);
+
   // Reset transaction route
   set(transactionRouteAtom, {
     steps: [],
@@ -278,7 +277,18 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
     isSimulation: true,
   });
 
-  set(transactionLogsAtom, {});
+  // Reset route hash
+  set(transactionRouteHashAtom, '');
+
+  // Reset simulation invalidation
+  set(simulationInvalidationAtom, {
+    lastRunTimestamp: 0,
+    routeHash: '',
+    shouldInvalidate: false,
+  });
+
+  // Reset fee state
+  set(_feeStateAtom, DEFAULT_FEE_STATE);
 });
 
 // TODO: consider later steps and the maximums inherent to those as well

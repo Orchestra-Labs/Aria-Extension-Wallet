@@ -44,7 +44,13 @@ export const resetTransactionRouteAtom = atom(null, (_, set) => {
     isComplete: false,
     isSimulation: true,
   });
+  set(transactionRouteHashAtom, '');
   set(resetTransactionLogsAtom);
+  set(simulationInvalidationAtom, {
+    lastRunTimestamp: 0,
+    routeHash: '',
+    shouldInvalidate: false,
+  });
 });
 
 export const transactionHasValidRouteAtom = atom<boolean>(get => {
