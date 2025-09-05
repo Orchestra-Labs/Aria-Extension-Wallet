@@ -166,6 +166,15 @@ export const sendIBCTransaction = async ({
   } catch (error: any) {
     console.error('Error during IBC send:', error);
 
+    // For simulation, re-throw account not found errors so they can be handled upstream
+    if (
+      simulateOnly &&
+      (error.message?.includes('does not exist on chain') ||
+        error.message?.includes('account not found'))
+    ) {
+      throw error; // Re-throw for upstream handling
+    }
+
     const errorResponse: RPCResponse = {
       code: error.code || 1,
       message: error.message,

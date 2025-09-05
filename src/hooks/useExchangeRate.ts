@@ -9,13 +9,20 @@ import {
   QueryType,
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
-import { receiveStateAtom, sendStateAtom, networkLevelAtom, chainInfoAtom } from '@/atoms';
-import { getSymphonyChainId, isValidSwap, queryRestNode } from '@/helpers';
+import {
+  receiveStateAtom,
+  sendStateAtom,
+  networkLevelAtom,
+  chainInfoAtom,
+  isValidStablecoinSwapAtom,
+} from '@/atoms';
+import { getSymphonyChainId, queryRestNode } from '@/helpers';
 
 export function useExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const isValidStablecoinSwap = useAtomValue(isValidStablecoinSwapAtom);
   const getChainInfo = useAtomValue(chainInfoAtom);
 
   // Safely get chain info with fallback to DEFAULT_CHAIN_ID
@@ -29,9 +36,6 @@ export function useExchangeRate() {
   const receiveAsset = receiveState.asset;
   const sendDenom = sendAsset.originDenom || sendAsset.denom;
   const receiveDenom = receiveAsset.originDenom || receiveAsset.denom;
-
-  // Check if swap is valid
-  const validSwap = isValidSwap({ sendAsset, receiveAsset });
 
   const queryExchangeRate = useQuery<string | null, Error, string | null>({
     queryKey: ['exchangeRate', sendDenom, receiveDenom],
@@ -70,20 +74,20 @@ export function useExchangeRate() {
 
       return returnExchange;
     },
-    enabled: validSwap && !!sendDenom && !!receiveDenom && !!chainInfo,
+    enabled: isValidStablecoinSwap && !!sendDenom && !!receiveDenom && !!chainInfo,
     staleTime: 30000, // Consider the data stale after 30 seconds
     refetchInterval: 60000, // Refetch every 60 seconds
   });
 
   const exchangeRate = useMemo(() => {
-    if (!validSwap) {
+    if (!isValidStablecoinSwap) {
       return 1;
     }
     if (queryExchangeRate.data) {
       return new BigNumber(queryExchangeRate.data).toNumber();
     }
     return 0;
-  }, [queryExchangeRate.data, validSwap]);
+  }, [queryExchangeRate.data, isValidStablecoinSwap]);
 
   return {
     isLoading: queryExchangeRate.isLoading,

@@ -1,3 +1,5 @@
+import { FeeToken } from '../localStorageTypes';
+
 export interface PreppedSkipTx {
   chainId: string;
   signedTx: string; // Base64 encoded signed transaction
@@ -48,4 +50,29 @@ export interface SignedTransactionData {
 export interface SkipTxResponse {
   txHash?: string;
   explorerLink?: string;
+}
+
+export interface SkipOperationSimulation {
+  chainId: string;
+  denom: string;
+  operationType: string;
+  success: boolean;
+  estimatedGas: string;
+  feeAmount: number;
+  feeToken: FeeToken;
+  error?: string;
+}
+
+export interface SkipOperationFee {
+  amount: string;
+  denom: string;
+  chainId: string;
+  operationType: string;
+}
+
+export interface SkipSimulationResult {
+  operations: SkipOperationSimulation[];
+  totalEstimatedFees: number;
+  hasSufficientBalances: boolean;
+  operationFees: SkipOperationFee[];
 }

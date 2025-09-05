@@ -13,13 +13,19 @@ import {
   transactionLogsAtom,
   fullRegistryChainInfoAtom,
   getChainWalletAtom,
+  allWalletAssetsAtom,
 } from '@/atoms';
-import { TransactionStatus, TransactionType } from '@/constants';
+import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
 import {
   Asset,
+  FeeState,
+  FeeStructure,
   FeeToken,
   IBCObject,
   SendObject,
+  SkipOperationFee,
+  SkipOperationSimulation,
+  SkipSimulationResult,
   TransactionResult,
   TransactionStep,
   Uri,
@@ -40,23 +46,6 @@ import { useRefreshData } from './useRefreshData';
 import { useGetSigner } from './useGetSigner';
 import { useEffect } from 'react';
 import { UserAddress } from '@skip-go/client/cjs';
-
-interface SkipOperationSimulation {
-  chainId: string;
-  denom: string;
-  operationType: string;
-  success: boolean;
-  estimatedGas: string;
-  feeAmount: number;
-  feeToken: FeeToken;
-  error?: string;
-}
-
-interface SkipSimulationResult {
-  operations: SkipOperationSimulation[];
-  totalEstimatedFees: number;
-  hasSufficientBalances: boolean;
-}
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
@@ -79,6 +68,7 @@ export const useSendActions = () => {
   const updateStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
+  const allWalletAssets = useAtomValue(allWalletAssetsAtom);
 
   // TODO: clean up.  not all of these functions need to be in this file
   const checkGasBalance = async ({
@@ -224,33 +214,202 @@ export const useSendActions = () => {
     }
   };
 
+  const resolveAssetFromDenom = (denom: string, chainId: string): Asset => {
+    console.log('[resolveAssetFromDenom] Looking for asset:', { denom, chainId });
+
+    // First, try to find in wallet assets (these should already have resolved IBC assets)
+    const walletAsset = allWalletAssets.find(
+      asset => (asset.denom === denom || asset.originDenom === denom) && asset.chainId === chainId,
+    );
+
+    if (walletAsset) {
+      console.log('[resolveAssetFromDenom] Found in wallet assets:', walletAsset);
+      return walletAsset;
+    }
+
+    // If not found in wallet, try chain registry
+    const chainInfo = getFullRegistryChainInfo(chainId);
+    const registryAsset = chainInfo.assets?.[denom];
+
+    if (registryAsset) {
+      console.log('[resolveAssetFromDenom] Found in chain registry:', registryAsset);
+      return {
+        ...registryAsset,
+        chainId,
+        networkName: chainInfo.pretty_name || chainInfo.chain_name || chainId,
+        amount: '0',
+        displayAmount: '0',
+        price: 0,
+        isIbc: false,
+        originDenom: denom,
+        originChainId: chainId,
+      };
+    }
+
+    // Fallback: create a basic asset object
+    console.warn(`[resolveAssetFromDenom] Asset not found for ${denom}, creating basic asset`);
+
+    return {
+      denom,
+      symbol: denom,
+      name: denom,
+      exponent: GREATER_EXPONENT_DEFAULT,
+      logo: '',
+      isFeeToken: false,
+      coinGeckoId: undefined,
+      chainId,
+      networkName: chainInfo?.pretty_name || chainInfo?.chain_name || chainId,
+      amount: '0',
+      displayAmount: '0',
+      price: 0,
+      isIbc: denom.startsWith('ibc/'),
+      originDenom: denom,
+      originChainId: chainId,
+      trace: '',
+    };
+  };
+
+  const calculateSkipFees = (
+    routeResponse: any, // TODO: should be of type Skip Route Response.  search Skip library for type
+    simulationResult?: SkipSimulationResult,
+  ): SkipOperationFee[] => {
+    const fees: SkipOperationFee[] = [];
+
+    // Process each operation to collect fees
+    routeResponse.operations.forEach((operation: any, index: any) => {
+      let operationFee: SkipOperationFee | null = null;
+      let simulationFee: SkipOperationSimulation | null = null;
+
+      // Get corresponding simulation result if available
+      if (simulationResult && simulationResult.operations[index]) {
+        simulationFee = simulationResult.operations[index];
+      }
+
+      // Check if operation has a transfer with fee amount
+      if (operation.transfer && operation.transfer.feeAmount) {
+        operationFee = {
+          denom: operation.transfer.feeDenom || operation.transfer.denomIn,
+          amount: operation.transfer.feeAmount,
+          chainId: operation.transfer.fromChainId,
+          operationType: 'transfer',
+        };
+      }
+
+      // For swap operations, prioritize simulation results over affiliate fees
+      if (operation.swap) {
+        // First, check if we have a valid simulation result
+        if (simulationFee && simulationFee.success) {
+          operationFee = {
+            denom: simulationFee.feeToken.denom,
+            amount: simulationFee.feeAmount.toString(),
+            chainId: simulationFee.chainId,
+            operationType: 'swap',
+          };
+        }
+        // Only use affiliate fee if no simulation result and it's non-zero
+        else if (operation.swap.estimatedAffiliateFee) {
+          const affiliateFee = operation.swap.estimatedAffiliateFee;
+
+          if (affiliateFee && affiliateFee !== '0') {
+            // Find the index where numbers end and letters begin
+            let splitIndex = 0;
+            while (splitIndex < affiliateFee.length && !isNaN(parseInt(affiliateFee[splitIndex]))) {
+              splitIndex++;
+            }
+
+            const amount = affiliateFee.substring(0, splitIndex);
+            const denom = affiliateFee.substring(splitIndex);
+
+            if (amount !== '0') {
+              operationFee = {
+                denom: denom || operation.swap.denomOut,
+                amount: amount,
+                chainId: operation.swap.fromChainId,
+                operationType: 'swap',
+              };
+            }
+          }
+        }
+      }
+
+      // Use simulation result as fallback if no fee found yet
+      if ((!operationFee || operationFee.amount === '0') && simulationFee) {
+        operationFee = {
+          denom: simulationFee.feeToken.denom,
+          amount: simulationFee.feeAmount.toString(),
+          chainId: simulationFee.chainId,
+          operationType: simulationFee.operationType || 'transfer',
+        };
+      }
+
+      // Check if we still don't have a fee
+      if (!operationFee) {
+        // Final fallback: use a conservative default estimate
+        const defaultGasEstimate = operation.swap ? 200000 : 250000; // Different defaults for swap vs transfer
+        const chainInfo = getFullRegistryChainInfo(
+          operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
+        );
+        const feeToken = chainInfo?.fees?.[0];
+
+        if (feeToken) {
+          const gasPrice = feeToken.gasPriceStep.average;
+          const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+
+          operationFee = {
+            denom: feeToken.denom,
+            amount: feeAmount.toString(),
+            chainId: operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
+            operationType: operation.swap ? 'swap' : 'transfer',
+          };
+        }
+      }
+
+      // Add the fee to the list if valid
+      if (operationFee && operationFee.amount !== '0') {
+        // Ensure denoms match when summing fees for the same chain
+        const existingFeeIndex = fees.findIndex(
+          f => f.chainId === operationFee!.chainId && f.denom === operationFee!.denom,
+        );
+
+        if (existingFeeIndex >= 0) {
+          // Sum fees with matching denoms and chainIds
+          const existingAmount = BigInt(fees[existingFeeIndex].amount);
+          const newAmount = BigInt(operationFee.amount);
+          const totalAmount = (existingAmount + newAmount).toString();
+
+          fees[existingFeeIndex].amount = totalAmount;
+        } else {
+          fees.push(operationFee);
+        }
+      }
+    });
+
+    return fees;
+  };
+
   const runSkipFeeSimulations = async (
     skipRoute: any,
     userAddresses: { chainId: string; address: string }[],
   ): Promise<SkipSimulationResult> => {
     const simulations: SkipOperationSimulation[] = [];
+    const operationFees: SkipOperationFee[] = [];
     let totalEstimatedFees = 0;
     let allSufficient = true;
 
     // Process each operation in the route
-    for (const operation of skipRoute.operations) {
+    for (const operation of skipRoute.operations.values()) {
       let chainId: string;
       let denom: string;
       let operationType: string;
 
-      if (operation.transfer) {
-        // For transfer operations, we need to simulate on the source chain
-        chainId = operation.transfer.fromChainId;
-        denom = operation.transfer.denomIn;
-        operationType = 'transfer';
-      } else if (operation.swap) {
-        // For swap operations, we need to simulate on the chain where the swap occurs
+      if (operation.swap) {
         chainId = operation.swap.fromChainId;
         denom = operation.swap.denomIn;
         operationType = 'swap';
       } else {
-        // Skip unknown operation types
-        continue;
+        chainId = operation.transfer.fromChainId;
+        denom = operation.transfer.denomIn;
+        operationType = 'transfer';
       }
 
       console.log(
@@ -269,10 +428,12 @@ export const useSendActions = () => {
           feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
           error: `Chain info not found for ${chainId}`,
         });
+        operationFees.push({ amount: '0', denom, chainId, operationType });
         allSufficient = false;
         continue;
       }
 
+      // Get the correct address for this specific chain
       const userAddress = userAddresses.find(addr => addr.chainId === chainId)?.address;
       if (!userAddress) {
         simulations.push({
@@ -285,6 +446,7 @@ export const useSendActions = () => {
           feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
           error: `User address not found for chain ${chainId}`,
         });
+        operationFees.push({ amount: '0', denom, chainId, operationType });
         allSufficient = false;
         continue;
       }
@@ -301,34 +463,33 @@ export const useSendActions = () => {
           feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
           error: `No fee tokens available for chain ${chainId}`,
         });
+        operationFees.push({ amount: '0', denom, chainId, operationType });
         allSufficient = false;
         continue;
       }
 
-      // Use the actual amount from the operation for more accurate simulation
       const simulationAmount = operation.amountIn || '1';
-
-      // Create appropriate send object based on operation type
       const sendObject: SendObject = {
-        recipientAddress: userAddress, // Send to self for simulation
+        recipientAddress: userAddress,
         amount: simulationAmount,
         denom,
         feeToken,
       };
 
       let simulationResult: TransactionResult;
+      let operationFeeAmount = 0;
+      let isDefaultEstimate = false;
 
       try {
         if (operation.transfer) {
-          // Simulate IBC transfer
           simulationResult = await executeIBC({
+            fromAddress: userAddress,
             sendObject,
             sendChainId: chainId,
             receiveChainId: operation.transfer.toChainId,
             simulateTransaction: true,
           });
         } else {
-          // Fallback to regular send simulation
           simulationResult = await executeSend({
             sendObject,
             chainId: chainId,
@@ -340,54 +501,79 @@ export const useSendActions = () => {
           const estimatedGas = simulationResult.data.gasWanted || '0';
           const gasPrice = feeToken.gasPriceStep.average;
           const feeAmount = Math.ceil(parseInt(estimatedGas) * gasPrice);
+          operationFeeAmount = feeAmount;
 
-          // Use checkGasBalance to verify sufficient funds
-          const balanceCheck = await checkGasBalance({
-            address: userAddress,
-            feeToken,
-            estimatedGas,
-            chainId,
-            restUris: chainInfo.rest_uris,
-          });
+          // Check if this is a default estimate
+          isDefaultEstimate = simulationResult.message?.includes('default gas estimate') || false;
 
-          const operationSuccess = balanceCheck.hasSufficientBalance;
+          if (!isDefaultEstimate) {
+            // Only check balance for actual simulations, not default estimates
+            const balanceCheck = await checkGasBalance({
+              address: userAddress,
+              feeToken,
+              estimatedGas,
+              chainId,
+              restUris: chainInfo.rest_uris,
+            });
 
-          if (!operationSuccess) {
-            allSufficient = false;
+            const operationSuccess = balanceCheck.hasSufficientBalance;
+            if (!operationSuccess) {
+              allSufficient = false;
+            }
+
+            simulations.push({
+              chainId,
+              denom,
+              operationType,
+              success: operationSuccess,
+              estimatedGas,
+              feeAmount,
+              feeToken,
+              error: operationSuccess
+                ? undefined
+                : `Insufficient ${feeToken.denom} for gas fees. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}`,
+            });
+          } else {
+            // For default estimates, assume insufficient balance
+            simulations.push({
+              chainId,
+              denom,
+              operationType,
+              success: false,
+              estimatedGas,
+              feeAmount,
+              feeToken,
+            });
           }
-
-          simulations.push({
-            chainId,
-            denom,
-            operationType,
-            success: operationSuccess,
-            estimatedGas,
-            feeAmount,
-            feeToken,
-            error: operationSuccess
-              ? undefined
-              : `Insufficient ${feeToken.denom} for gas fees. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}`,
-          });
 
           totalEstimatedFees += feeAmount;
         } else {
+          // If simulation fails completely, use conservative default (with IBC being higher)
+          const defaultGasEstimate = operationType === 'transfer' ? 250000 : 200000;
+          const gasPrice = feeToken.gasPriceStep.average;
+          const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+          operationFeeAmount = feeAmount;
+          isDefaultEstimate = true;
+
           simulations.push({
             chainId,
             denom,
             operationType,
             success: false,
-            estimatedGas: '0',
-            feeAmount: 0,
+            estimatedGas: defaultGasEstimate.toString(),
+            feeAmount,
             feeToken,
-            error: simulationResult.message,
+            error: simulationResult?.message || 'Simulation failed',
           });
-          allSufficient = false;
+
+          totalEstimatedFees += feeAmount;
         }
       } catch (error) {
         console.error(
           `[runSkipFeeSimulations] Error simulating ${operationType} on ${chainId}:`,
           error,
         );
+
         simulations.push({
           chainId,
           denom,
@@ -398,8 +584,30 @@ export const useSendActions = () => {
           feeToken,
           error: error instanceof Error ? error.message : 'Simulation failed',
         });
+        operationFees.push({ amount: '0', denom, chainId, operationType });
         allSufficient = false;
+        continue;
       }
+
+      // Calculate final fee amount for this operation
+      let finalFeeAmount = operationFeeAmount;
+
+      // Add estimated affiliate fee if it exists (for swaps)
+      if (operation.swap && operation.swap.estimatedAffiliateFee) {
+        const affiliateFee = operation.swap.estimatedAffiliateFee;
+        const [affiliateAmount, affiliateDenom] = affiliateFee.split(/(?=\D+$)/); // Split at the first non-digit
+
+        if (affiliateDenom === denom) {
+          finalFeeAmount += parseInt(affiliateAmount) || 0;
+        }
+      }
+
+      operationFees.push({
+        amount: finalFeeAmount.toString(),
+        denom: isDefaultEstimate ? feeToken.denom : denom, // Use fee token denom for default estimates
+        chainId,
+        operationType,
+      });
     }
 
     console.log('[runSkipFeeSimulations] Completed simulations:', {
@@ -407,12 +615,14 @@ export const useSendActions = () => {
       totalEstimatedFees,
       allSufficient,
       simulations,
+      operationFees,
     });
 
     return {
       operations: simulations,
       totalEstimatedFees,
       hasSufficientBalances: allSufficient,
+      operationFees,
     };
   };
 
@@ -426,19 +636,63 @@ export const useSendActions = () => {
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
     console.log('[executeSend] Starting standard send transaction', sendObject);
-    const sendChain = getChainInfo(chainId);
+    const sendChain = getFullRegistryChainInfo(chainId);
     const prefix = sendChain.bech32_prefix;
     const rpcUris = sendChain.rpc_uris;
     console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendChain.chain_id}`);
 
-    return await sendTransaction({
-      fromAddress: walletState.address,
-      sendObject,
-      prefix,
-      rpcUris,
-      chainId: sendChain.chain_id,
-      simulateOnly: simulateTransaction,
-    });
+    try {
+      return await sendTransaction({
+        fromAddress: walletState.address,
+        sendObject,
+        prefix,
+        rpcUris,
+        chainId: sendChain.chain_id,
+        simulateOnly: simulateTransaction,
+      });
+    } catch (error: any) {
+      // Handle unfunded account error during simulation
+      if (
+        simulateTransaction &&
+        (error.message?.includes('does not exist on chain') ||
+          error.message?.includes('account not found'))
+      ) {
+        console.log('[executeSend] Account not funded, using default gas estimation');
+
+        const feeToken = sendObject.feeToken;
+        if (!feeToken) {
+          return {
+            success: false,
+            message: 'No fee token available for default estimation',
+          };
+        }
+
+        const defaultGasEstimate = 200000; // Conservative default
+        const gasPrice = feeToken.gasPriceStep.average;
+        const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+
+        return {
+          success: true,
+          message: 'Simulation completed with default gas estimate',
+          data: {
+            code: 0,
+            gasWanted: defaultGasEstimate.toString(),
+            fees: {
+              amount: [
+                {
+                  denom: feeToken.denom,
+                  amount: feeAmount.toString(),
+                },
+              ],
+              gas: defaultGasEstimate.toString(),
+            },
+          },
+        };
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
   };
 
   const executeStablecoinSwap = async ({
@@ -467,11 +721,13 @@ export const useSendActions = () => {
   };
 
   const executeIBC = async ({
+    fromAddress,
     sendObject,
     sendChainId,
     receiveChainId,
     simulateTransaction,
   }: {
+    fromAddress: string;
     sendObject: SendObject;
     sendChainId: string;
     receiveChainId: string;
@@ -483,6 +739,7 @@ export const useSendActions = () => {
       receiveChainId,
       simulateTransaction,
     });
+
     try {
       const sendChain = getFullRegistryChainInfo(sendChainId);
       console.log('[DEBUG][executeIBC] Getting valid IBC channel for:', {
@@ -510,7 +767,7 @@ export const useSendActions = () => {
       }
 
       const ibcObject: IBCObject = {
-        fromAddress: walletState.address,
+        fromAddress,
         sendObject,
         ibcChannel: {
           channel_id: validChannel.channel_id,
@@ -527,7 +784,46 @@ export const useSendActions = () => {
         chainId: sendState.chainId,
         simulateOnly: simulateTransaction,
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Handle unfunded account error during simulation
+      if (
+        simulateTransaction &&
+        (error.message?.includes('does not exist on chain') ||
+          error.message?.includes('account not found'))
+      ) {
+        console.log('[executeIBC] Account not funded, using default gas estimation');
+
+        const feeToken = sendObject.feeToken;
+        if (!feeToken) {
+          return {
+            success: false,
+            message: 'No fee token available for default estimation',
+          };
+        }
+
+        const defaultGasEstimate = 250000; // IBC transactions typically need more gas
+        const gasPrice = feeToken.gasPriceStep.average;
+        const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+
+        return {
+          success: true,
+          message: 'Simulation completed with default gas estimate',
+          data: {
+            code: 0,
+            gasWanted: defaultGasEstimate.toString(),
+            fees: {
+              amount: [
+                {
+                  denom: feeToken.denom,
+                  amount: feeAmount.toString(),
+                },
+              ],
+              gas: defaultGasEstimate.toString(),
+            },
+          },
+        };
+      }
+
       console.error('[DEBUG][executeIBC] IBC transaction failed:', error);
       return {
         success: false,
@@ -623,18 +919,20 @@ export const useSendActions = () => {
         throw new Error('Missing addresses on Skip path');
       }
 
-      // TODO: if this works, add the output to logs and fee output
       // Run fee simulations before proceeding
       const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
+      const calculatedFees = calculateSkipFees(routeResponse, simulationResult);
       console.log('[executeSkipTx] Fee simulation results:', simulationResult);
 
       // For simulation, return early with route info
       if (simulateTransaction) {
-        const totalFees =
-          routeResponse.estimatedFees?.reduce(
-            (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-            0,
-          ) || 0;
+        const feeStructure: FeeStructure = {
+          amount: calculatedFees.map(fee => ({
+            denom: fee.denom,
+            amount: fee.amount,
+          })),
+          gas: calculatedFees[0]?.amount || '0',
+        };
 
         return {
           success: true,
@@ -642,10 +940,10 @@ export const useSendActions = () => {
           data: {
             code: 0,
             txHash: 'simulated',
-            gasWanted: totalFees.toString(),
+            gasWanted: calculatedFees[0]?.amount || '0',
             route: routeResponse,
             estimatedAmountOut: routeResponse.estimatedAmountOut,
-            fees: routeResponse.estimatedFees,
+            fees: feeStructure,
           },
         };
       }
@@ -691,7 +989,7 @@ export const useSendActions = () => {
     isSimulation: boolean,
   ): Promise<TransactionResult> => {
     const stepLog = txLogs[step.hash];
-    const feeToken = stepLog?.fee?.feeToken;
+    const feeToken = stepLog?.fees?.[0].feeToken;
 
     // TODO: this getAddressForChain code is also used in the skip function.  extract to hook or helper function for use in both places
     // Helper function to get address for any chain (similar to Skip function)
@@ -809,6 +1107,7 @@ export const useSendActions = () => {
           });
         case TransactionType.IBC_SEND:
           return await executeIBC({
+            fromAddress: walletState.address,
             sendObject,
             sendChainId: step.fromChain,
             receiveChainId: step.toChain,
@@ -844,13 +1143,11 @@ export const useSendActions = () => {
     resetRouteStatus(isSimulation);
 
     let result: TransactionResult = { success: true, message: '' };
-
     try {
       // Execute steps sequentially
       for (let i = 0; i < txRoute.steps.length; i++) {
         const step = txRoute.steps[i];
         const stepLog = txLogs[step.hash];
-        const feeToken = stepLog?.fee?.feeToken;
 
         console.log('[executeTransactionRoute] Processing step', {
           stepIndex: i,
@@ -892,6 +1189,7 @@ export const useSendActions = () => {
         ) {
           try {
             const fromChainInfo = getChainInfo(step.fromChain);
+            const feeToken = stepLog?.fees?.[0].feeToken;
 
             if (!feeToken) {
               throw new Error('No fee token available for gas balance check');
@@ -975,42 +1273,72 @@ export const useSendActions = () => {
           break;
         }
 
-        let feeData = undefined;
+        let feeData: FeeState[] = [];
+        // TODO: resolve to one format.  is gaswanted being used?
 
-        if (result.data) {
-          // Handle different fee structures
-          if (result.data.fee) {
-            // For the structure shown in your logs {fee: {amount: Array, gas: string}}
+        if (result.data?.fees) {
+          const fees = result.data.fees;
+          const feeToken = stepLog?.fees?.[0].feeToken;
+
+          // Handle FeeStructure type (amount array)
+          if (fees.amount && Array.isArray(fees.amount)) {
+            for (const feeAmount of fees.amount) {
+              // Use the helper function to resolve the asset
+              let asset = resolveAssetFromDenom(feeAmount.denom, step.fromChain);
+
+              console.log('[executeTransactionRoute] resolved asset for fees.amount:', asset);
+              const feeState: FeeState = {
+                asset,
+                amount: parseInt(feeAmount.amount, 10),
+                chainId: step.fromChain,
+                feeToken: feeToken!,
+                gasWanted: parseInt(result.data?.gasWanted || '0', 10),
+                gasPrice: feeToken?.gasPriceStep?.average || 0,
+              };
+
+              feeData.push(feeState);
+            }
+          }
+          // Handle simple gasWanted/amount structure
+          else if (result.data.gasWanted) {
+            const feeDenom = feeToken?.denom || '';
+
+            // Use the helper function to resolve the asset
+            let asset = resolveAssetFromDenom(feeDenom, step.fromChain);
+
+            console.log(
+              '[executeTransactionRoute] resolved asset for result.data.gaswanted:',
+              asset,
+            );
             const feeAmount =
-              result.data.fee.amount?.reduce(
-                (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-                0,
-              ) || 0;
+              parseInt(result.data.gasWanted, 10) * (feeToken?.gasPriceStep?.average || 0);
 
-            feeData = {
-              gasWanted: result.data.fee.gas || result.data.gasWanted,
+            const feeState: FeeState = {
+              asset,
               amount: feeAmount,
+              chainId: step.fromChain,
+              feeToken: feeToken!,
+              gasWanted: parseInt(result.data.gasWanted, 10),
+              gasPrice: feeToken?.gasPriceStep?.average || 0,
             };
-          } else {
-            // For the expected structure {gasWanted: string, gasPrice: string}
-            feeData = {
-              gasWanted: result.data.gasWanted,
-              amount: result.data.fees
-                ? result.data.fees.reduce(
-                    (total: number, fee: any) => total + parseInt(fee.amount || '0', 10),
-                    0,
-                  )
-                : undefined,
-            };
+
+            feeData.push(feeState);
           }
         }
 
-        updateStepLog({
-          stepIndex: i,
-          status: result?.success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
-          txHash: result.data?.txHash,
-          feeData: feeData,
-        });
+        if (i < txRoute.steps.length) {
+          updateStepLog({
+            stepIndex: i,
+            status: result?.success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
+            txHash: result.data?.txHash,
+            ...(feeData.length > 0 && { feeData: feeData }),
+          });
+        } else {
+          console.error('[executeTransactionRoute] Attempted to update non-existent step:', {
+            stepIndex: i,
+            totalSteps: txRoute.steps.length,
+          });
+        }
       }
 
       // Complete transaction if it was successful

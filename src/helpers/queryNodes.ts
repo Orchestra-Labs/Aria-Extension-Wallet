@@ -169,7 +169,7 @@ const performRpcQuery = async (
       return {
         code: 0,
         message: 'Simulation success',
-        fee: calculatedFee,
+        fees: calculatedFee,
         gasWanted: calculatedFee.gas,
       };
     }

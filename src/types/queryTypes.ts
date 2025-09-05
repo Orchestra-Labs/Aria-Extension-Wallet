@@ -7,6 +7,17 @@ import {
   ValidatorReward,
 } from './validatorData';
 
+export interface FeeAmount {
+  denom: string;
+  amount: string;
+}
+
+export interface FeeStructure {
+  amount: FeeAmount[];
+  gas?: string;
+  gasWanted?: string;
+}
+
 export interface Pagination {
   next_key: string | null;
   total: string;
@@ -32,7 +43,7 @@ export interface TransactionRPCResponse extends BaseRPCResponse {
   route?: any;
   estimatedAmountOut?: string;
   fee?: any;
-  fees?: any[];
+  fees?: FeeStructure;
   messages?: any[];
   minAmountOut?: string;
   height?: number;

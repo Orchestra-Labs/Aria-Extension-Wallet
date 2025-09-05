@@ -35,7 +35,6 @@ export const processIbcData = (
   ibcFiles: any[], // Always an array of IBC connection objects
   chainRegistry: LocalChainRegistry,
 ): IbcRegistry => {
-  console.log('[IBC] IBC data:', ibcFiles);
   const result: IbcRegistry = {};
 
   for (const fileData of ibcFiles) {

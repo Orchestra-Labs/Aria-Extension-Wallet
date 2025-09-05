@@ -13,6 +13,7 @@ export * from './passwordAtom';
 export * from './processCompletedAtom';
 export * from './searchFilterAtom';
 export * from './swiperIndexAtom';
+export * from './symphonyStablecoinsAtom';
 export * from './transactionLogsAtom';
 export * from './transactionRouteAtom';
 export * from './transactionStateAtom';

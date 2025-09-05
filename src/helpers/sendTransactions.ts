@@ -80,6 +80,15 @@ export const sendTransaction = async ({
   } catch (error: any) {
     console.error('Error during send:', error);
 
+    // For simulation, re-throw account not found errors so they can be handled upstream
+    if (
+      simulateOnly &&
+      (error.message?.includes('does not exist on chain') ||
+        error.message?.includes('account not found'))
+    ) {
+      throw error; // Re-throw for upstream handling
+    }
+
     // Construct error response in RPCResponse type
     const errorResponse: RPCResponse = {
       code: error.code || 1,

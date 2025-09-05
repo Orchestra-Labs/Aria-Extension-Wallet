@@ -1,6 +1,8 @@
 import { atom, WritableAtom } from 'jotai';
 import {
+  DEFAULT_DENOM,
   DEFAULT_FEE_STATE,
+  DEFAULT_FEE_TOKEN,
   DEFAULT_RECEIVE_STATE,
   DEFAULT_SEND_STATE,
   InputStatus,
@@ -62,12 +64,19 @@ export const _feeStateAtom = atom<FeeState>(DEFAULT_FEE_STATE);
 export const sendStateAtom = createTransactionAtom(DEFAULT_SEND_STATE, _sendStateAtom);
 export const receiveStateAtom = createTransactionAtom(DEFAULT_RECEIVE_STATE, _receiveStateAtom);
 
-// In transactionStateAtom.ts or a new feeAtoms.ts
 export const derivedFeeStateAtom = atom<FeeState | null>(get => {
   const transactionRoute = get(transactionRouteAtom);
   const transactionLogs = get(transactionLogsAtom);
 
+  console.log('[derivedFeeStateAtom] Evaluating...', {
+    hasSteps: transactionRoute.steps.length > 0,
+    stepCount: transactionRoute.steps.length,
+    stepHashes: transactionRoute.steps.map(s => s.hash),
+    logsKeys: Object.keys(transactionLogs),
+  });
+
   if (transactionRoute.steps.length === 0) {
+    console.log('[derivedFeeStateAtom] No steps in route, returning null');
     return null;
   }
 
@@ -75,21 +84,45 @@ export const derivedFeeStateAtom = atom<FeeState | null>(get => {
   const firstStep = transactionRoute.steps[0];
   const firstStepLog = transactionLogs[firstStep.hash];
 
-  if (!firstStepLog?.fee) {
+  console.log('[derivedFeeStateAtom] First step details:', {
+    stepHash: firstStep.hash,
+    stepType: firstStep.type,
+    fromChain: firstStep.fromChain,
+    fromAsset: firstStep.fromAsset,
+    logExists: !!firstStepLog,
+    logFees: firstStepLog?.fees,
+  });
+
+  if (!firstStepLog?.fees || firstStepLog.fees.length === 0) {
+    console.log('[derivedFeeStateAtom] No fees in first step log, returning null');
     return null;
   }
 
-  // Ensure feeToken is defined by providing a fallback
-  const feeToken = firstStepLog.fee.feeToken;
+  const originalFeeToken = firstStepLog.fees[0];
 
-  return {
-    asset: firstStepLog.fee.asset,
-    amount: firstStepLog.fee.amount,
-    chainId: firstStepLog.fee.chainId,
-    feeToken: feeToken,
-    gasWanted: firstStepLog.fee.gasWanted || 0,
-    gasPrice: firstStepLog.fee.gasPrice || 0,
+  if (!originalFeeToken || typeof originalFeeToken !== 'object') {
+    console.log('[derivedFeeStateAtom] Invalid fee token structure, returning null');
+    return null;
+  }
+
+  const feeToken = originalFeeToken.feeToken || DEFAULT_FEE_TOKEN;
+  const asset = originalFeeToken.asset || firstStep.fromAsset;
+  const amount = originalFeeToken.amount || 0;
+  const chainId = originalFeeToken.chainId || firstStep.fromChain;
+  const gasWanted = originalFeeToken.gasWanted || 0;
+  const gasPrice = originalFeeToken.gasPrice || 0;
+
+  const result = {
+    asset,
+    amount,
+    chainId,
+    feeToken,
+    gasWanted,
+    gasPrice,
   };
+
+  console.log('[derivedFeeStateAtom] Returning fee state:', result);
+  return result;
 });
 
 export const totalFeesAtom = atom(get => {
@@ -97,20 +130,64 @@ export const totalFeesAtom = atom(get => {
   const transactionLogs = get(transactionLogsAtom);
   const derivedFeeState = get(derivedFeeStateAtom);
 
+  console.log('[totalFeesAtom] Evaluating...', {
+    stepCount: transactionRoute.steps.length,
+    derivedFeeState: derivedFeeState,
+    derivedFeeAsset: derivedFeeState?.asset?.denom || DEFAULT_DENOM,
+    derivedOriginDenom: derivedFeeState?.asset?.originDenom,
+  });
+
+  if (!derivedFeeState || !derivedFeeState.asset) {
+    console.log('[totalFeesAtom] No derived fee state, returning zero');
+    return { totalFee: 0, feeAsset: null };
+  }
+
   let totalFee = 0;
   let feeAsset: Asset | null = derivedFeeState?.asset || null;
-
-  transactionRoute.steps.forEach(step => {
+  transactionRoute.steps.forEach((step, index) => {
     const log = transactionLogs[step.hash];
-    if (log?.fee) {
-      // Only sum fees that use the same asset as the derived fee state
-      if (feeAsset && log.fee.asset.denom === feeAsset.denom) {
-        totalFee += log.fee.amount;
-      }
+    console.log(`[totalFeesAtom] Processing step ${index}:`, {
+      stepHash: step.hash,
+      stepType: step.type,
+      logExists: !!log,
+      logFees: log?.fees,
+    });
+
+    if (log?.fees) {
+      const feesArray = Array.isArray(log.fees) ? log.fees : [log.fees];
+
+      feesArray.forEach((fee, feeIndex) => {
+        if (!fee.asset || typeof fee.asset !== 'object') {
+          console.warn(
+            `[totalFeesAtom] Invalid fee.asset at step ${index}, fee index ${feeIndex}:`,
+            fee,
+          );
+          return;
+        }
+
+        console.log(`[totalFeesAtom] Processing fee ${feeIndex} in step ${index}:`, {
+          feeAmount: fee.amount,
+          feeAssetDenom: fee.asset.denom,
+          feeAssetOriginDenom: fee.asset.originDenom,
+          derivedAssetDenom: feeAsset?.denom,
+          derivedOriginDenom: feeAsset?.originDenom,
+          matchesByDenom: feeAsset && fee.asset.denom === feeAsset.denom,
+          matchesByOriginDenom: feeAsset && fee.asset.originDenom === feeAsset.originDenom,
+        });
+
+        // Only sum fees that use the same asset as the derived fee state
+        // TODO: correlate on Asset type via originalDenom, not via denom
+        if (feeAsset && fee.asset.originDenom === feeAsset.originDenom) {
+          totalFee += fee.amount;
+          console.log(`[totalFeesAtom] Added fee: ${fee.amount}, new total: ${totalFee}`);
+        }
+      });
     }
   });
 
-  return { totalFee, feeAsset };
+  const result = { totalFee, feeAsset };
+  console.log('[totalFeesAtom] Final result:', result);
+  return result;
 });
 
 export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
@@ -118,6 +195,14 @@ export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
   const { totalFee, feeAsset } = get(totalFeesAtom);
   const transactionHasValidRoute = get(transactionHasValidRouteAtom);
   const derivedFeeState = get(derivedFeeStateAtom);
+
+  console.log('[calculatedTotalFeeDisplayAtom] Evaluating...', {
+    sendStateAmount: sendState.amount,
+    totalFee,
+    feeAsset: feeAsset?.denom,
+    hasValidRoute: transactionHasValidRoute,
+    derivedFeeState,
+  });
 
   const defaultReturn: CalculatedFeeDisplay = {
     feeAmount: 0,
@@ -130,6 +215,11 @@ export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
   };
 
   if (!sendState.asset || !transactionHasValidRoute || !feeAsset) {
+    console.log('[calculatedTotalFeeDisplayAtom] Missing required data, returning default:', {
+      hasSendAsset: !!sendState.asset,
+      hasValidRoute: transactionHasValidRoute,
+      hasFeeAsset: !!feeAsset,
+    });
     return defaultReturn;
   }
 
@@ -137,7 +227,7 @@ export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
   const calculatedFee = totalFee / Math.pow(10, exponent);
   const percentage = sendState.amount > 0 ? (calculatedFee / sendState.amount) * 100 : 0;
 
-  return {
+  const result = {
     feeAmount: totalFee,
     feeUnit: feeAsset.symbol,
     textClass: percentage > 0.1 ? TextClass.WARNING : TextClass.GOOD,
@@ -146,6 +236,9 @@ export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
     gasWanted: derivedFeeState?.gasWanted || 0,
     gasPrice: derivedFeeState?.gasPrice || 0,
   };
+
+  console.log('[calculatedTotalFeeDisplayAtom] Final result:', result);
+  return result;
 });
 
 // Reset function

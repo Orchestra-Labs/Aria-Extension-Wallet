@@ -26,12 +26,13 @@ import {
   SendDataInputSection,
   TransactionInfoPanel,
 } from '@/components';
-import { useSendActions } from '@/hooks/';
+import { useSendActions, useSymphonyStablecoins } from '@/hooks/';
 
 // TODO: handle bridges to non-cosmos chains (Axelar to Ethereum and others)
 export const Send = () => {
   const location = useLocation();
   const { runTransaction } = useSendActions();
+  const { triggerSymphonyStablecoinsRefresh } = useSymphonyStablecoins();
 
   // const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   // TODO: set send state from selected asset
@@ -80,6 +81,7 @@ export const Send = () => {
     setRecipientAddress(walletState.address);
     loadFullRegistry();
     loadSkipChains();
+    triggerSymphonyStablecoinsRefresh();
 
     return () => {
       // Reset the states when the component is unmounted (user leaves the page)

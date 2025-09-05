@@ -151,7 +151,6 @@ export const allReceivableAssetsAtom = atom(get => {
     const isSubscribed = subscribedChainIds.has(chainId);
 
     if (!isSkipSupportedChain && !isSubscribed) {
-      console.log('[allReceivableAssetsAtom] Skipping - neither Skip-supported nor subscribed');
       continue;
     }
 
@@ -220,6 +219,5 @@ export const allReceivableAssetsAtom = atom(get => {
     }
   }
 
-  console.log('[allReceivableAssetsAtom] Unique assets returned:', finalAssets);
   return finalAssets;
 });

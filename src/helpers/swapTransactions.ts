@@ -1,24 +1,9 @@
-import { SwapObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
+import { SwapObject, TransactionResult, RPCResponse, Uri } from '@/types';
 import { COSMOS_CHAIN_ENDPOINTS, SYMPHONY_PREFIX } from '@/constants';
 import { symphony } from '@orchestra-labs/symphonyjs';
 import { queryRpcNode } from './queryNodes';
 
 const { swapSend } = symphony.market.v1beta1.MessageComposer.withTypeUrl;
-
-export const isValidSwap = ({
-  sendAsset,
-  receiveAsset,
-}: {
-  sendAsset: Asset;
-  receiveAsset: Asset;
-}) => {
-  const result =
-    !sendAsset.isIbc &&
-    !receiveAsset.isIbc &&
-    (sendAsset.originDenom || sendAsset.denom) !== (receiveAsset.originDenom || receiveAsset.denom);
-
-  return result;
-};
 
 // TODO: merge in with queryNodes.  add message object to query and parameter to determine which signer to use
 // const queryWithRetry = async ({

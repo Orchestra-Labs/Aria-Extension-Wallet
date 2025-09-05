@@ -61,7 +61,7 @@ const fetchAssetPrices = async (
   }
 };
 
-const resolveIbcAsset = async (
+export const resolveIbcAsset = async (
   ibcDenom: string,
   prefix: string,
   restUris: Uri[],

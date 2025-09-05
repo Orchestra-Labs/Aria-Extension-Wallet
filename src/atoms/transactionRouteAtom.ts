@@ -1,14 +1,8 @@
 import { atom } from 'jotai';
 import { TransactionType, TransactionStatus, TransferMethod } from '@/constants';
-import { TransactionRoute, TransactionStep, TransactionState, Asset } from '@/types';
+import { TransactionRoute, TransactionStep, TransactionState, Asset, FeeState } from '@/types';
 import { fullRegistryChainInfoAtom, skipChainsAtom } from './chainRegistryAtom';
-import {
-  createRouteHash,
-  createStepHash,
-  getStepDescription,
-  getValidIBCChannel,
-  isValidSwap,
-} from '@/helpers';
+import { createRouteHash, createStepHash, getStepDescription, getValidIBCChannel } from '@/helpers';
 import {
   receiveStateAtom,
   sendStateAtom,
@@ -22,6 +16,7 @@ import {
   transactionLogsAtom,
   updateStepLogAtom,
 } from './transactionLogsAtom';
+import { isValidStablecoinSwapAtom } from './symphonyStablecoinsAtom';
 
 export const transactionRouteHashAtom = atom<string>('');
 export const transactionRouteAtom = atom<TransactionRoute>({
@@ -82,16 +77,20 @@ export const updateTxStepLogAtom = atom(
       status: TransactionStatus;
       txHash?: string;
       error?: string;
-      feeData?: {
-        gasWanted?: string;
-        gasPrice?: string;
-        amount?: number;
-      };
+      feeData?: FeeState[];
     },
   ) => {
     const currentRoute = get(transactionRouteAtom);
-    const step = currentRoute.steps[params.stepIndex];
+    if (params.stepIndex >= currentRoute.steps.length) {
+      console.error('[updateRouteStepStatusAtom] Step index out of bounds:', {
+        stepIndex: params.stepIndex,
+        totalSteps: currentRoute.steps.length,
+        steps: currentRoute.steps.map((s, idx) => ({ index: idx, type: s.type })),
+      });
+      return;
+    }
 
+    const step = currentRoute.steps[params.stepIndex];
     if (!step) {
       console.error('[updateRouteStepStatusAtom] Step not found:', params.stepIndex);
       return;
@@ -104,15 +103,7 @@ export const updateTxStepLogAtom = atom(
         ...(params.txHash && { txHash: params.txHash }),
         ...(params.error && { error: params.error }),
       },
-      feeData: params.feeData,
-    });
-
-    console.log('[updateRouteStepStatusAtom] Updating step status:', {
-      stepIndex: params.stepIndex,
-      stepHash: step.hash,
-      newStatus: params.status,
-      txHash: params.txHash,
-      error: params.error,
+      ...(params.feeData !== undefined && { feeData: params.feeData }),
     });
 
     set(transactionRouteAtom, {
@@ -128,20 +119,23 @@ export const updateTxStepLogAtom = atom(
   },
 );
 
+// TODO: add optional index.  if index is provided only that step updates to idle
 export const resetRouteStatusAtom = atom(null, (get, set, isSimulation: boolean = false) => {
   const currentRoute = get(transactionRouteAtom);
   const logs = get(transactionLogsAtom);
   console.log('[resetRouteStatusAtom] Resetting route status');
 
-  // Reset all step statuses to PENDING
+  // Reset all step statuses to IDLE
   currentRoute.steps.forEach(step => {
-    const existingLog = logs[step.hash];
+    const existingLog = logs[step.hash] || {};
+
     set(updateStepLogAtom, {
       stepHash: step.hash,
       log: {
         ...existingLog,
         status: TransactionStatus.IDLE,
         error: undefined,
+        txHash: undefined,
       },
     });
   });
@@ -179,9 +173,8 @@ export const updateTransactionRouteAtom = atom(
     const receiveAddress = get(recipientAddressAtom);
     const skipChains = get(skipChainsAtom);
     const skipAssets = get(skipAssetsAtom);
+    const isValidStablecoinSwap = get(isValidStablecoinSwapAtom);
     set(resetTransactionLogsAtom);
-
-    sendState.amount;
 
     if (!sendState.asset || !receiveState.asset) {
       console.error('[updateTransactionRouteAtom] Missing assets');
@@ -198,71 +191,30 @@ export const updateTransactionRouteAtom = atom(
       return;
     }
 
-    console.log('[updateTransactionRouteAtom] Chain info:', {
-      sendChain,
-      receiveChain,
-    });
-
     // Create a Set of all Skip-supported denoms
     const skipSupportedDenoms = new Set<string>();
     for (const asset of Object.values(skipAssets)) {
       skipSupportedDenoms.add(asset.originDenom || asset.denom);
     }
 
-    console.log('[updateTransactionRouteAtom] Skip assets:', {
-      skipAssetsCount: Object.keys(skipAssets).length,
-      skipAssetsList: Object.values(skipAssets).map(a => ({
-        denom: a.denom,
-        originDenom: a.originDenom,
-        symbol: a.symbol,
-        chainId: a.chainId,
-      })),
-      lookingFor: 'uusdc',
-    });
-
     // Check denom support
-    const isCurrentSendDenomSupported = skipSupportedDenoms.has(sendState.asset.denom);
     const isOriginalSendDenomSupported = skipSupportedDenoms.has(sendState.asset.originDenom);
-    const isCurrentReceiveDenomSupported = skipSupportedDenoms.has(receiveState.asset.denom);
-
-    console.log('[updateTransactionRouteAtom] Denom support:', {
-      currentSendDenom: sendState.asset.denom,
-      isCurrentSendDenomSupported,
-      originSendDenom: sendState.asset.originDenom,
-      isOriginalSendDenomSupported,
-      currentReceiveDenom: receiveState.asset.denom,
-      isCurrentReceiveDenomSupported,
-    });
+    const isOriginalReceiveDenomSupported = skipSupportedDenoms.has(receiveState.asset.originDenom);
 
     // Check chain support
     const areChainsSkipSupported =
       skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
 
-    console.log('[updateTransactionRouteAtom] Chain support:', {
-      sendChainInSkip: skipChains.includes(sendState.chainId),
-      receiveChainInSkip: skipChains.includes(receiveState.chainId),
-      areChainsSkipSupported,
-    });
-
     const sendAndReceiveAssetsMatch =
       sendState.asset.originDenom === receiveState.asset.originDenom;
     const sendAndReceiveChainsMatch = sendState.chainId === receiveState.chainId;
 
+    // Check if assets are on their native chains
+    const isSendAssetOnNativeChain = sendState.chainId === sendState.asset.originChainId;
+    const isReceiveAssetOnNativeChain = receiveState.chainId === receiveState.asset.originChainId;
+
     // Check if this is a simple send (same asset on same chain)
     const isSimpleSend = sendAndReceiveChainsMatch && sendAndReceiveAssetsMatch;
-
-    // Check if this is a valid swap
-    const isValidStablecoinSwapTx = isValidSwap({
-      sendAsset: sendState.asset,
-      receiveAsset: receiveState.asset,
-    });
-
-    console.log('[updateTransactionRouteAtom] Transaction type checks:', {
-      sendAndReceiveAssetsMatch,
-      sendAndReceiveChainsMatch,
-      isSimpleSend,
-      isValidStablecoinSwapTx,
-    });
 
     // Helper function to create a transaction step (without log)
     const createStep = (
@@ -286,21 +238,28 @@ export const updateTransactionRouteAtom = atom(
 
       return {
         ...step,
-        // Pass sendState.amount for the first step only
         hash: createStepHash(step, isFirstStep ? sendState.amount : undefined),
       };
     };
 
     // Create steps and logs separately
-    const createAndDescribeStep = (
-      type: TransactionType,
-      via: TransferMethod,
-      fromChainId: string,
-      toChainId: string,
-      fromAsset: Asset,
-      toAsset: Asset,
-      isFirstStep: boolean = false,
-    ): TransactionStep => {
+    const createAndDescribeStep = ({
+      type,
+      via,
+      fromChainId,
+      toChainId,
+      fromAsset,
+      toAsset,
+      isFirstStep = false,
+    }: {
+      type: TransactionType;
+      via: TransferMethod;
+      fromChainId: string;
+      toChainId: string;
+      fromAsset: Asset;
+      toAsset: Asset;
+      isFirstStep: boolean;
+    }): TransactionStep => {
       const fromChain = getChainInfo(fromChainId);
       const toChain = getChainInfo(toChainId);
 
@@ -322,7 +281,6 @@ export const updateTransactionRouteAtom = atom(
         receiveChainInfo: toChain,
       });
 
-      // Create log entry for this step
       set(createStepLogAtom, {
         step,
         description,
@@ -331,106 +289,37 @@ export const updateTransactionRouteAtom = atom(
       return step;
     };
 
-    // Case 1: Simple send
+    // Case 1: Simple send (same asset, same chain)
     if (isSimpleSend) {
       console.log('[updateTransactionRouteAtom] Creating simple send route');
       steps.push(
-        createAndDescribeStep(
-          TransactionType.SEND,
-          TransferMethod.STANDARD,
-          sendState.chainId,
-          receiveState.chainId,
-          sendState.asset,
-          receiveState.asset,
-          true,
-        ),
+        createAndDescribeStep({
+          type: TransactionType.SEND,
+          via: TransferMethod.STANDARD,
+          fromChainId: sendState.chainId,
+          toChainId: receiveState.chainId,
+          fromAsset: sendState.asset,
+          toAsset: receiveState.asset,
+          isFirstStep: true,
+        }),
       );
     }
-    // Case 2: Local swap
-    else if (isValidStablecoinSwapTx && sendAndReceiveChainsMatch) {
+    // Case 2: Local swap (different assets, same chain, Symphony stablecoins)
+    else if (isValidStablecoinSwap && sendAndReceiveChainsMatch) {
       console.log('[updateTransactionRouteAtom] Creating local swap route');
       steps.push(
-        createAndDescribeStep(
-          TransactionType.SWAP,
-          TransferMethod.STANDARD,
-          sendState.chainId,
-          receiveState.chainId,
-          sendState.asset,
-          receiveState.asset,
-          true,
-        ),
+        createAndDescribeStep({
+          type: TransactionType.SWAP,
+          via: TransferMethod.STANDARD,
+          fromChainId: sendState.chainId,
+          toChainId: receiveState.chainId,
+          fromAsset: sendState.asset,
+          toAsset: receiveState.asset,
+          isFirstStep: true,
+        }),
       );
     }
-    // Case 3: Direct exchange possible via Skip
-    else if (
-      isCurrentSendDenomSupported &&
-      isCurrentReceiveDenomSupported &&
-      areChainsSkipSupported &&
-      !sendAndReceiveAssetsMatch
-    ) {
-      console.log('[updateTransactionRouteAtom] Creating Skip exchange route');
-      steps.push(
-        createAndDescribeStep(
-          TransactionType.EXCHANGE,
-          TransferMethod.SKIP,
-          sendState.chainId,
-          receiveState.chainId,
-          sendState.asset,
-          receiveState.asset,
-          true,
-        ),
-      );
-    }
-    // Case 4: Need to bridge first (IBC to native then exchange via Skip)
-    else if (
-      !isCurrentSendDenomSupported &&
-      isOriginalSendDenomSupported &&
-      areChainsSkipSupported &&
-      !sendAndReceiveAssetsMatch
-    ) {
-      console.log('[updateTransactionRouteAtom] Creating bridge + exchange route');
-      console.log('[updateTransactionRouteAtom] Sending asset, case 4:', sendState);
-      // Step 1: Bridge to native chain via IBC
-      const useSkipForIBC =
-        skipChains.includes(sendState.chainId) &&
-        skipChains.includes(sendState.asset.originChainId);
-
-      steps.push(
-        createAndDescribeStep(
-          TransactionType.IBC_SEND,
-          useSkipForIBC ? TransferMethod.SKIP : TransferMethod.STANDARD,
-          sendState.chainId,
-          sendState.asset.originChainId,
-          sendState.asset,
-          {
-            ...sendState.asset,
-            denom: sendState.asset.originDenom,
-            chainId: sendState.asset.originChainId,
-          },
-          true,
-        ),
-      );
-
-      console.log('[updateTransactionRouteAtom] Steps, case 4:', steps);
-
-      // Step 2: Then exchange via Skip
-      steps.push(
-        createAndDescribeStep(
-          TransactionType.EXCHANGE,
-          TransferMethod.SKIP,
-          sendState.asset.originChainId,
-          receiveState.chainId,
-          {
-            ...sendState.asset,
-            denom: sendState.asset.originDenom,
-            chainId: sendState.asset.originChainId,
-          },
-          receiveState.asset,
-          false,
-        ),
-      );
-    }
-    // Case 5: Standard IBC transfer
+    // Case 3: IBC transfer (same asset, different chains)
     else if (!sendAndReceiveChainsMatch && sendAndReceiveAssetsMatch) {
       console.log('[updateTransactionRouteAtom] Checking IBC channel');
       const isValidIbcTx = await getValidIBCChannel({
@@ -441,23 +330,88 @@ export const updateTransactionRouteAtom = atom(
         restUris,
       });
 
-      console.log('[updateTransactionRouteAtom] IBC channel validation:', { isValidIbcTx });
-
       if (isValidIbcTx) {
-        const useSkip =
-          skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
-
+        const useSkip = areChainsSkipSupported;
         console.log('[updateTransactionRouteAtom] Creating IBC transfer route', { useSkip });
         steps.push(
-          createAndDescribeStep(
-            TransactionType.IBC_SEND,
-            useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
-            sendState.chainId,
-            receiveState.chainId,
-            sendState.asset,
-            receiveState.asset,
-            true,
-          ),
+          createAndDescribeStep({
+            type: TransactionType.IBC_SEND,
+            via: useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
+            fromChainId: sendState.chainId,
+            toChainId: receiveState.chainId,
+            fromAsset: sendState.asset,
+            toAsset: receiveState.asset,
+            isFirstStep: true,
+          }),
+        );
+      }
+    }
+    // Case 4: Exchange (different assets) - handle bridge before/after as needed
+    else if (!sendAndReceiveAssetsMatch && areChainsSkipSupported) {
+      console.log('[updateTransactionRouteAtom] Creating exchange route with bridge logic');
+
+      const needsBridgeBefore = !isSendAssetOnNativeChain && isOriginalSendDenomSupported;
+      const needsBridgeAfter = !isReceiveAssetOnNativeChain && isOriginalReceiveDenomSupported;
+
+      const exchangeFromAsset = {
+        ...sendState.asset,
+        denom: sendState.asset.originDenom,
+        chainId: sendState.asset.originChainId,
+      };
+      const exchangeToAsset = {
+        ...receiveState.asset,
+        denom: receiveState.asset.originDenom,
+        chainId: receiveState.asset.originChainId,
+      };
+
+      // Step 1: Bridge to native chain (if needed)
+      if (needsBridgeBefore) {
+        const useSkip =
+          skipChains.includes(sendState.chainId) &&
+          skipChains.includes(sendState.asset.originChainId);
+
+        steps.push(
+          createAndDescribeStep({
+            type: TransactionType.IBC_SEND,
+            via: useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
+            fromChainId: sendState.chainId,
+            toChainId: sendState.asset.originChainId,
+            fromAsset: sendState.asset,
+            toAsset: exchangeFromAsset,
+            isFirstStep: true,
+          }),
+        );
+      }
+
+      // Step 2: Exchange on native chains
+      steps.push(
+        createAndDescribeStep({
+          type: TransactionType.EXCHANGE,
+          via: TransferMethod.SKIP,
+          fromChainId: sendState.asset.originChainId,
+          toChainId: receiveState.asset.originChainId,
+          fromAsset: exchangeFromAsset,
+          toAsset: exchangeToAsset,
+          isFirstStep: !needsBridgeBefore,
+        }),
+      );
+
+      // Step 3: Bridge to destination chain (if needed)
+      if (needsBridgeAfter) {
+        const useSkip =
+          skipChains.includes(receiveState.asset.originChainId) &&
+          skipChains.includes(receiveState.chainId);
+
+        steps.push(
+          createAndDescribeStep({
+            type: TransactionType.IBC_SEND,
+            via: useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
+            fromChainId: receiveState.asset.originChainId,
+            toChainId: receiveState.chainId,
+            fromAsset: exchangeToAsset,
+            toAsset: receiveState.asset,
+            isFirstStep: false,
+          }),
         );
       }
     }
@@ -483,7 +437,7 @@ export const updateTransactionRouteAtom = atom(
       set(simulationInvalidationAtom, prev => ({
         ...prev,
         shouldInvalidate: true,
-        routeHash: newHash, // Reset route hash to force new simulation
+        routeHash: newHash,
       }));
     }
   },

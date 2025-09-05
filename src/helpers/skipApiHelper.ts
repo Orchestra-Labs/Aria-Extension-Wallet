@@ -244,6 +244,14 @@ export const getSkipRoute = async ({
       allowMultiTx: true,
       allowSwaps: true,
       cumulativeAffiliateFeeBps: '10', // 0.1%
+      // TODO: enable elys or others if the user has a balance on those, since they can pay the fees
+      swapVenues: [
+        {
+          name: 'osmosis-poolmanager',
+          chainId: 'osmosis-1',
+        },
+      ],
+
       ...additionalParams,
     };
 
@@ -277,22 +285,6 @@ export const executeSkipRoute = async (
 ) => {
   try {
     console.log('🔍 [executeSkipRoute] Starting route execution');
-    console.log(
-      '📋 Route details:',
-      JSON.stringify(
-        {
-          source_chain: route.source_asset_chain_id,
-          dest_chain: route.dest_asset_chain_id,
-          amount_in: route.amount_in,
-          estimated_amount_out: route.estimated_amount_out,
-          operations_count: route.operations?.length || 0,
-          required_chains: route.required_chain_addresses || [],
-        },
-        null,
-        2,
-      ),
-    );
-
     console.log('👤 User addresses being passed:');
     userAddresses.forEach((addr, index) => {
       console.log(`  ${index + 1}. Chain: ${addr.chainId}, Address: ${addr.address}`);

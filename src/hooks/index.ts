@@ -1,7 +1,7 @@
 export { useDebounce } from './useDebounce';
 export * from './useGetSigner';
 export * from './useAddressGenerator';
-export * from './useExchangeAssets';
+export * from './useSymphonyStablecoins';
 export * from './useExchangePoolBalance';
 export * from './useExchangeRate';
 export * from './useExchangeRequirements';
