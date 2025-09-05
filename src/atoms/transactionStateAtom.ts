@@ -28,27 +28,37 @@ type TransactionStateAtom = WritableAtom<
   void
 >;
 
-const createTransactionAtom = (
-  storageAtom: WritableAtom<TransactionState, [TransactionState], void>,
-) => {
-  return atom(
-    get => {
-      const baseState = get(storageAtom);
-      const selectedAsset = get(selectedAssetAtom);
+export const resetReceiveChainAtom = atom(null, (get, set) => {
+  const selectedAsset = get(selectedAssetAtom);
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    chainId: selectedAsset.chainId,
+  }));
+});
 
-      return {
-        ...baseState, // Preserve any existing state
-        asset: selectedAsset,
-        chainId: selectedAsset.chainId,
-      };
-    },
-    (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
-      const current = get(storageAtom);
-      const newValue = typeof update === 'function' ? update(current) : update;
-      set(storageAtom, newValue);
-    },
-  ) as TransactionStateAtom;
-};
+export const updateReceiveChainAtom = atom(null, (_, set, newChainId: string) => {
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    chainId: newChainId,
+  }));
+});
+
+export const updateReceiveAssetAndChainAtom = atom(null, (_, set, asset: Asset) => {
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    asset: asset,
+    chainId: asset.chainId,
+  }));
+});
+
+export const updateReceiveStateAtom = atom(
+  null,
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_receiveStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_receiveStateAtom, newValue);
+  },
+);
 
 // Base storage atoms
 const _sendStateAtom = atom<TransactionState>(DEFAULT_SEND_STATE);
@@ -56,8 +66,34 @@ const _receiveStateAtom = atom<TransactionState>(DEFAULT_RECEIVE_STATE);
 export const _feeStateAtom = atom<FeeState>(DEFAULT_FEE_STATE);
 
 // Public state atoms
-export const sendStateAtom = createTransactionAtom(_sendStateAtom);
-export const receiveStateAtom = createTransactionAtom(_receiveStateAtom);
+export const sendStateAtom = atom(
+  get => {
+    const baseState = get(_sendStateAtom);
+    const selectedAsset = get(selectedAssetAtom);
+
+    return {
+      ...baseState, // Preserve any existing state
+      asset: selectedAsset,
+      chainId: selectedAsset.chainId, // ALWAYS override
+    };
+  },
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_sendStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_sendStateAtom, newValue);
+  },
+) as TransactionStateAtom;
+
+export const receiveStateAtom = atom(
+  get => {
+    return get(_receiveStateAtom);
+  },
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_receiveStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_receiveStateAtom, newValue);
+  },
+) as TransactionStateAtom;
 
 export const derivedFeeStateAtom = atom<FeeState | null>(get => {
   const transactionRoute = get(transactionRouteAtom);

@@ -491,6 +491,7 @@ export const useSendActions = () => {
           });
         } else {
           simulationResult = await executeSend({
+            fromAddress: userAddress,
             sendObject,
             chainId: chainId,
             simulateTransaction: true,
@@ -627,10 +628,12 @@ export const useSendActions = () => {
   };
 
   const executeSend = async ({
+    fromAddress,
     sendObject,
     chainId,
     simulateTransaction,
   }: {
+    fromAddress: string;
     sendObject: SendObject;
     chainId: string;
     simulateTransaction: boolean;
@@ -643,7 +646,7 @@ export const useSendActions = () => {
 
     try {
       return await sendTransaction({
-        fromAddress: walletState.address,
+        fromAddress,
         sendObject,
         prefix,
         rpcUris,
@@ -696,10 +699,12 @@ export const useSendActions = () => {
   };
 
   const executeStablecoinSwap = async ({
+    fromAddress,
     sendObject,
     receiveAsset,
     simulateTransaction,
   }: {
+    fromAddress: string;
     sendObject: SendObject;
     receiveAsset: Asset;
     simulateTransaction: boolean;
@@ -712,7 +717,7 @@ export const useSendActions = () => {
     const restUris = sendChain.rest_uris;
 
     return await swapTransaction({
-      fromAddress: walletState.address,
+      fromAddress,
       swapObject: swapParams,
       rpcUris: restUris,
       chainId: sendState.chainId,
@@ -1091,16 +1096,19 @@ export const useSendActions = () => {
       stepType: step.type,
     });
 
+    // TODO: may need to source address from outside walletState, given this is a step, not the start of the route
     try {
       switch (step.type) {
         case TransactionType.SEND:
           return await executeSend({
+            fromAddress: walletState.address,
             sendObject,
             chainId: step.fromChain,
             simulateTransaction: isSimulation,
           });
         case TransactionType.SWAP:
           return await executeStablecoinSwap({
+            fromAddress: walletState.address,
             sendObject,
             receiveAsset: step.toAsset,
             simulateTransaction: isSimulation,

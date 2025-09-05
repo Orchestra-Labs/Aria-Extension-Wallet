@@ -9,6 +9,7 @@ import {
   recipientAddressAtom,
   resetTransactionRouteAtom,
   selectedAssetAtom,
+  updateReceiveChainAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
 import { InputStatus } from '@/constants';
@@ -29,8 +30,9 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   const selectedAsset = useAtomValue(selectedAssetAtom);
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
+  const updateReceiveChain = useSetAtom(updateReceiveChainAtom);
   const [addressValidation, setAddressValidation] = useAtom(addressValidationAtom);
-  const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
+  const receiveState = useAtomValue(receiveStateAtom);
   const fullRegistry = useAtomValue(fullChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
   const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
@@ -91,23 +93,21 @@ export const AddressInput: React.FC<AddressInputProps> = ({
 
       setStatus(InputStatus.SUCCESS);
       console.log(
-        '[AddressInput] Current receive chain id',
+        '[DEBUG][AddressInput] Current receive chain id',
         receiveState.chainId,
         'and matched',
         matchedChain.chain_id,
       );
       if (receiveState.chainId !== matchedChain.chain_id) {
         console.log(
-          '[AddressInput] Updating receive chain from',
+          '[DEBUG][AddressInput] Updating receive chain from',
           receiveState.chainId,
           'to',
           matchedChain.chain_id,
         );
+
         resetTxRoute();
-        setReceiveState(prevState => ({
-          ...prevState,
-          chainId: matchedChain.chain_id,
-        }));
+        updateReceiveChain(matchedChain.chain_id);
       }
     } catch (error) {
       setStatus(InputStatus.ERROR, 'Invalid Bech32 encoding.');

@@ -52,8 +52,8 @@ export const getStepDescription = ({
       description = `${fromChainName}: ${fromAssetSymbol} => ${toAssetSymbol}`;
       break;
     case TransactionType.EXCHANGE:
-      const chainSuffix = fromChainName !== toChainName ? `, ${toChainName}` : '';
-      description = `${fromChainName}: ${fromAssetSymbol} => ${toAssetSymbol}${chainSuffix}`;
+      const toChain = fromChainName !== toChainName ? `, ${toChainName}` : '';
+      description = `${fromChainName}: ${fromAssetSymbol} => ${toAssetSymbol}${toChain}`;
       break;
     case TransactionType.IBC_SEND:
       description = `${fromChainName}: ${fromAssetSymbol} => ${toChainName}`;

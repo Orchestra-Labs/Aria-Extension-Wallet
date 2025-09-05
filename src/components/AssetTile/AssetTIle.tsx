@@ -14,6 +14,7 @@ import {
   receiveStateAtom,
   chainWalletAtom,
   chainInfoAtom,
+  updateReceiveAssetAndChainAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
 import { IconContainer, VerifySuccess } from '@/assets/icons';
@@ -44,6 +45,8 @@ export const AssetTile = ({
 
   // TODO: dialogSelectedAssetAtom only used here.  make state instead of atom
   const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
+  // const setReceiveState = useSetAtom(receiveStateAtom);
+  const updateReceiveAssetAndChain = useSetAtom(updateReceiveAssetAndChainAtom);
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
@@ -92,6 +95,7 @@ export const AssetTile = ({
 
   const handleSendClick = () => {
     setSelectedAsset(asset);
+    updateReceiveAssetAndChain(asset);
     navigate(ROUTES.APP.SEND);
   };
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
 
@@ -15,6 +15,8 @@ import {
   userAccountAtom,
   isFetchingWalletDataAtom,
   chainInfoAtom,
+  selectedAssetAtom,
+  resetReceiveChainAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -53,6 +55,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
+  const setSelectedAsset = useSetAtom(selectedAssetAtom);
+  const resetReceiveChain = useSetAtom(resetReceiveChainAtom);
 
   const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
   const accountViewChainId = defaultChainId || getSymphonyChainId(networkLevel);
@@ -173,6 +177,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     disabled:border-none disabled:text-neutral-3 disabled:bg-transparent disabled:cursor-default`;
 
   const handleSendClick = () => {
+    setSelectedAsset(balanceDisplayUnit);
+    resetReceiveChain();
     navigate(ROUTES.APP.SEND);
   };
 

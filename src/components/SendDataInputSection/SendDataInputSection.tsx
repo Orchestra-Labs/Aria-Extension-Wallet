@@ -19,6 +19,7 @@ import {
   transactionRouteHashAtom,
   canRunSimulationAtom,
   maxAvailableDisplayAtom,
+  updateReceiveStateAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
 import { useExchangeRate, useSendActions } from '@/hooks';
@@ -34,7 +35,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
   // Atom state
   const [sendState, setSendState] = useAtom(sendStateAtom);
-  const [receiveState, setReceiveState] = useAtom(receiveStateAtom);
+  const receiveState = useAtomValue(receiveStateAtom);
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const maxDisplayAvailable = useAtomValue(maxAvailableDisplayAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
@@ -48,6 +49,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const [simulationInvalidation, setSimulationInvalidation] = useAtom(simulationInvalidationAtom);
   const transactionRouteHash = useAtomValue(transactionRouteHashAtom);
   const canRunSimulation = useAtomValue(canRunSimulationAtom);
+  const updateReceiveState = useSetAtom(updateReceiveStateAtom);
 
   // Refs for tracking
   const simulationIntervalRef = useRef<NodeJS.Timeout>();
@@ -138,7 +140,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
     if (newReceiveAmount !== receiveState.amount || newReceiveAsset !== receiveState.asset) {
       console.log('[AssetInputSection] Updating receive state');
-      setReceiveState(prev => ({
+      updateReceiveState(prev => ({
         ...prev,
         amount: newReceiveAmount,
         displayAmount: newReceiveDisplayAmount,
@@ -201,12 +203,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       if (!walletState.address) return;
 
       try {
-        await updateTransactionRoute({
-          sendState,
-          receiveState,
-          walletAddress: walletState.address,
-          isUserAction: true,
-        });
+        await updateTransactionRoute();
       } catch (error) {
         console.error('Error updating transaction type:', error);
       }
