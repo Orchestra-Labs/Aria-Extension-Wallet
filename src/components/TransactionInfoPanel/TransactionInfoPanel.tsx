@@ -83,6 +83,7 @@ export const TransactionInfoPanel = () => {
           </>
         ) : (
           <>
+            {/* TODO: add % estimate for skip here */}
             <p>Estimated Fee</p>
             <p className={calculatedFee.textClass}>
               {calculatedFee && calculatedFee.feeAmount > 0

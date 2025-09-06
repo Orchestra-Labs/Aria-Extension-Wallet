@@ -862,7 +862,7 @@ export const useSendActions = () => {
       });
 
       if (!routeResponse.operations?.length) {
-        throw new Error('No valid IBC route found');
+        throw new Error('No valid Skip route found');
       }
 
       // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
@@ -1310,8 +1310,6 @@ export const useSendActions = () => {
           // Handle simple gasWanted/amount structure
           else if (result.data.gasWanted) {
             const feeDenom = feeToken?.denom || '';
-
-            // Use the helper function to resolve the asset
             let asset = resolveAssetFromDenom(feeDenom, step.fromChain);
 
             console.log(

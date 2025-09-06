@@ -166,6 +166,7 @@ export const AssetTile = ({
   return isSelectable ? (
     scrollTile
   ) : (
+    // TODO: add another copy button next to the title
     <SlideTray ref={slideTrayRef} triggerComponent={scrollTile} title={title} showBottomBorder>
       <div className="text-center mb-2">
         <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">

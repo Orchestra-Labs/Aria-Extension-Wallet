@@ -92,20 +92,8 @@ export const AddressInput: React.FC<AddressInputProps> = ({
       console.log('[AddressInput] Matched chain:', matchedChain);
 
       setStatus(InputStatus.SUCCESS);
-      console.log(
-        '[DEBUG][AddressInput] Current receive chain id',
-        receiveState.chainId,
-        'and matched',
-        matchedChain.chain_id,
-      );
-      if (receiveState.chainId !== matchedChain.chain_id) {
-        console.log(
-          '[DEBUG][AddressInput] Updating receive chain from',
-          receiveState.chainId,
-          'to',
-          matchedChain.chain_id,
-        );
 
+      if (receiveState.chainId !== matchedChain.chain_id) {
         resetTxRoute();
         updateReceiveChain(matchedChain.chain_id);
       }
