@@ -16,7 +16,8 @@ import {
   isFetchingWalletDataAtom,
   chainInfoAtom,
   selectedAssetAtom,
-  resetReceiveChainAtom,
+  updateReceiveAssetAndChainAtom,
+  updateSendAssetAndChainAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -56,7 +57,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
-  const resetReceiveChain = useSetAtom(resetReceiveChainAtom);
+  const updateReceiveAssetAndChain = useSetAtom(updateReceiveAssetAndChainAtom);
+  const updateSendAssetAndChain = useSetAtom(updateSendAssetAndChainAtom);
 
   const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
   const accountViewChainId = defaultChainId || getSymphonyChainId(networkLevel);
@@ -178,7 +180,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const handleSendClick = () => {
     setSelectedAsset(balanceDisplayUnit);
-    resetReceiveChain();
+    updateSendAssetAndChain(balanceDisplayUnit);
+    updateReceiveAssetAndChain(balanceDisplayUnit);
     navigate(ROUTES.APP.SEND);
   };
 

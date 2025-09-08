@@ -20,9 +20,12 @@ import {
   canRunSimulationAtom,
   maxAvailableDisplayAtom,
   updateReceiveStateAtom,
+  transactionRouteExchangeRateAtom,
+  transactionRouteAtom,
+  transactionLogsAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
-import { useExchangeRate, useSendActions } from '@/hooks';
+import { useSendActions } from '@/hooks';
 import { AddressInput } from '../AddressInput';
 import { InputStatus, SIM_TX_FRESHNESS_TIMEOUT } from '@/constants';
 import { formatBalanceDisplay } from '@/helpers';
@@ -30,7 +33,7 @@ import { formatBalanceDisplay } from '@/helpers';
 interface SendDataInputSectionProps {}
 
 export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
-  const { exchangeRate = 1 } = useExchangeRate();
+  // const { exchangeRate = 1 } = useStablecoinSwapExchangeRate();
   const { runSimulation } = useSendActions();
 
   // Atom state
@@ -50,6 +53,9 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const transactionRouteHash = useAtomValue(transactionRouteHashAtom);
   const canRunSimulation = useAtomValue(canRunSimulationAtom);
   const updateReceiveState = useSetAtom(updateReceiveStateAtom);
+  const routeExchangeRate = useAtomValue(transactionRouteExchangeRateAtom);
+  const transactionRoute = useAtomValue(transactionRouteAtom);
+  const transactionLogs = useAtomValue(transactionLogsAtom);
 
   // Refs for tracking
   const simulationIntervalRef = useRef<NodeJS.Timeout>();
@@ -60,38 +66,81 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const placeHolder = `Max: ${formatBalanceDisplay(`${maxDisplayAvailable}`, sendState.asset.symbol)}`;
 
   // Pure calculation function for derived state
+  // Pure calculation function for derived state
   const calculateDerivedState = (update: {
     newSendAmount?: number;
     newReceiveAmount?: number;
     newSendAsset?: Asset;
     newReceiveAsset?: Asset;
   }) => {
+    // Special handling for switch operation
+    if (update.newSendAsset === receiveState.asset && update.newReceiveAsset === sendState.asset) {
+      // This is a switch operation, return the swapped values directly
+      return {
+        sendAmount: update.newSendAmount ?? receiveState.displayAmount,
+        receiveAmount: update.newReceiveAmount ?? sendState.displayAmount,
+        sendAsset: update.newSendAsset ?? receiveState.asset,
+        receiveAsset: update.newReceiveAsset ?? sendState.asset,
+      };
+    }
+
     const newSendAsset = update.newSendAsset || sendState.asset;
     const newReceiveAsset = update.newReceiveAsset || receiveState.asset;
 
     const isSameAsset =
       (newSendAsset.originDenom || newSendAsset.denom) ===
       (newReceiveAsset.originDenom || newReceiveAsset.denom);
-    const effectiveRate = isSameAsset ? 1 : exchangeRate;
 
     let newSendAmount = update.newSendAmount ?? sendState.displayAmount;
     let newReceiveAmount = update.newReceiveAmount ?? receiveState.displayAmount;
 
     // Determine which value was user-updated
     const isSendUpdate = update.newSendAmount !== undefined;
-    const isReceiveUpdate = update.newReceiveAmount !== undefined;
 
-    // Calculate derived amounts
-    if (isSendUpdate) {
-      newReceiveAmount = newSendAmount * effectiveRate;
-    } else if (isReceiveUpdate) {
-      newSendAmount = newReceiveAmount / effectiveRate;
+    // Check if we have a valid simulation result
+    const hasValidSimulation = transactionRoute.steps.length > 0;
+    const finalStep = transactionRoute.steps[transactionRoute.steps.length - 1];
+    const finalStepLog = transactionLogs[finalStep?.hash];
+    const hasSimulationResult = finalStepLog?.outputAmount && finalStepLog.outputAmount !== '0';
+
+    if (hasValidSimulation && hasSimulationResult) {
+      // After simulation: use the actual output amount from the route
+      if (isSendUpdate) {
+        // When send amount changes after simulation, we need to re-run simulation
+        // For now, keep the receive amount as is until new simulation completes
+        newReceiveAmount = receiveState.displayAmount;
+      } else {
+        // When receive amount changes, calculate equivalent send amount
+        const simulationOutput =
+          parseFloat(finalStepLog.outputAmount) / Math.pow(10, newReceiveAsset.exponent);
+        const simulationInput = sendState.displayAmount;
+        const effectiveRate = simulationInput > 0 ? simulationInput / simulationOutput : 1;
+        newSendAmount = newReceiveAmount * effectiveRate;
+      }
+    } else {
+      // Before simulation: use exchange rate for estimation
+      const effectiveRate = isSameAsset ? 1 : routeExchangeRate;
+
+      if (isSendUpdate) {
+        newReceiveAmount = newSendAmount * effectiveRate;
+      } else {
+        newSendAmount = newReceiveAmount / effectiveRate;
+      }
     }
 
     // Apply max available constraints
     if (newSendAmount > maxDisplayAvailable) {
       newSendAmount = maxDisplayAvailable;
-      newReceiveAmount = newSendAmount * effectiveRate;
+
+      if (hasValidSimulation && hasSimulationResult) {
+        // Scale the receive amount proportionally after simulation
+        const scaleFactor = newSendAmount / sendState.displayAmount;
+        newReceiveAmount = receiveState.displayAmount * scaleFactor;
+      } else {
+        // Use exchange rate before simulation
+        const effectiveRate = isSameAsset ? 1 : routeExchangeRate;
+        newReceiveAmount = newSendAmount * effectiveRate;
+      }
 
       setSendError({
         message: `Amount exceeded available balance.`,
@@ -186,7 +235,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         (sendAsset.originDenom || sendAsset.denom) ===
         (receiveAsset.originDenom || receiveAsset.denom)
           ? 1
-          : exchangeRate;
+          : routeExchangeRate;
       handleStateUpdate({ newReceiveAmount: maxAvailable * effectiveRate });
     }
   };
@@ -258,6 +307,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     };
   }, [simulationInvalidation, canRunSimulation]);
 
+  // Prevent re-running simulations on error
   useEffect(() => {
     if (hasSendError) {
       const timer = setTimeout(() => {
@@ -266,6 +316,31 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       return () => clearTimeout(timer);
     }
   }, [hasSendError]);
+
+  useEffect(() => {
+    if (transactionRoute.steps.length > 0 && sendState.displayAmount > 0) {
+      console.log('[DEBUG] Route changed, updating receive amount based on actual output');
+
+      // Get the final output amount from the route (last step's output)
+      const finalStep = transactionRoute.steps[transactionRoute.steps.length - 1];
+      const finalStepLog = transactionLogs[finalStep.hash];
+
+      if (finalStepLog?.outputAmount && finalStepLog.outputAmount !== '0') {
+        const finalOutputAmount =
+          parseFloat(finalStepLog.outputAmount) / Math.pow(10, receiveState.asset.exponent);
+
+        // Only update if the amount is significantly different to avoid flickering
+        if (Math.abs(finalOutputAmount - receiveState.displayAmount) > 0.0001) {
+          console.log('[DEBUG] Updating receive amount from route:', finalOutputAmount);
+          updateReceiveState(prev => ({
+            ...prev,
+            amount: parseFloat(finalStepLog.outputAmount),
+            displayAmount: finalOutputAmount,
+          }));
+        }
+      }
+    }
+  }, [transactionLogs]);
 
   // TODO: highlight on send dialog assets which can reach the selected receive asset
   return (

@@ -14,6 +14,7 @@ import {
   fullRegistryChainInfoAtom,
   getChainWalletAtom,
   allWalletAssetsAtom,
+  updateStepLogAtom,
 } from '@/atoms';
 import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
 import {
@@ -65,7 +66,8 @@ export const useSendActions = () => {
 
   const txRoute = useAtomValue(transactionRouteAtom);
   const txLogs = useAtomValue(transactionLogsAtom);
-  const updateStepLog = useSetAtom(updateTxStepLogAtom);
+  const updateStepLog = useSetAtom(updateStepLogAtom);
+  const updateTxStepLog = useSetAtom(updateTxStepLogAtom);
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
   const allWalletAssets = useAtomValue(allWalletAssetsAtom);
@@ -738,21 +740,8 @@ export const useSendActions = () => {
     receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeIBC] Starting IBC transaction', {
-      sendObject,
-      sendChainId,
-      receiveChainId,
-      simulateTransaction,
-    });
-
     try {
       const sendChain = getFullRegistryChainInfo(sendChainId);
-      console.log('[DEBUG][executeIBC] Getting valid IBC channel for:', {
-        sendChain: sendChain.chain_id,
-        receiveChainId,
-        networkLevel,
-      });
-
       const validChannel = await getValidIBCChannel({
         sendChain,
         receiveChainId,
@@ -761,10 +750,7 @@ export const useSendActions = () => {
         restUris: sendChain.rest_uris,
       });
 
-      console.log('[DEBUG][executeIBC] Valid channel result:', validChannel);
-
       if (!validChannel) {
-        console.error('[DEBUG][executeIBC] No valid IBC channel found');
         return {
           success: false,
           message: 'No valid IBC channel found for this connection',
@@ -779,8 +765,6 @@ export const useSendActions = () => {
           port_id: validChannel.port_id,
         },
       };
-
-      console.log('[DEBUG][executeIBC] Sending IBC transaction with:', ibcObject);
 
       return await sendIBCTransaction({
         ibcObject,
@@ -829,7 +813,6 @@ export const useSendActions = () => {
         };
       }
 
-      console.error('[DEBUG][executeIBC] IBC transaction failed:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'IBC transaction failed',
@@ -840,10 +823,12 @@ export const useSendActions = () => {
   // TODO: enable amount out as an option (to handle billing)
   // In useSendActions.ts
   const executeSkipTx = async ({
+    step,
     sendObject,
     receiveAssetDenom,
     simulateTransaction,
   }: {
+    step: TransactionStep;
     sendObject: SendObject;
     receiveAssetDenom: string;
     simulateTransaction: boolean;
@@ -851,14 +836,13 @@ export const useSendActions = () => {
     console.log('[executeSkipTx] Starting Skip Tx');
 
     try {
-      const amount = `${sendState.amount}`;
-
+      // TODO: remove previously simulated fees from send amount before querying for route
       const routeResponse = await getSkipRoute({
         fromChainId: sendState.asset.originChainId,
         fromDenom: sendObject.denom,
         toChainId: receiveState.chainId,
         toDenom: receiveAssetDenom,
-        amount,
+        amount: sendObject.amount,
       });
 
       if (!routeResponse.operations?.length) {
@@ -927,7 +911,6 @@ export const useSendActions = () => {
       // Run fee simulations before proceeding
       const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
       const calculatedFees = calculateSkipFees(routeResponse, simulationResult);
-      console.log('[executeSkipTx] Fee simulation results:', simulationResult);
 
       // For simulation, return early with route info
       if (simulateTransaction) {
@@ -939,6 +922,30 @@ export const useSendActions = () => {
           gas: calculatedFees[0]?.amount || '0',
         };
 
+        updateStepLog({
+          stepHash: step.hash,
+          log: {
+            skipRoute: routeResponse,
+            inputAmount: sendObject.amount,
+            outputAmount: routeResponse.estimatedAmountOut || '0',
+            // Also update fees if available from simulation
+            fees: calculatedFees.map(fee => {
+              const asset = resolveAssetFromDenom(fee.denom, fee.chainId);
+              return {
+                asset,
+                amount: parseInt(fee.amount, 10),
+                chainId: fee.chainId,
+                feeToken: getFullRegistryChainInfo(fee.chainId)?.fees?.[0] || {
+                  denom: fee.denom,
+                  gasPriceStep: { low: 0, average: 0, high: 0 },
+                },
+                gasWanted: 0, // This will be updated with actual simulation results
+                gasPrice: 0, // This will be updated with actual simulation results
+              };
+            }),
+          },
+        });
+
         return {
           success: true,
           message: 'Transaction simulation successful',
@@ -947,7 +954,7 @@ export const useSendActions = () => {
             txHash: 'simulated',
             gasWanted: calculatedFees[0]?.amount || '0',
             route: routeResponse,
-            estimatedAmountOut: routeResponse.estimatedAmountOut,
+            estimatedAmountOut: routeResponse.amountOut,
             fees: feeStructure,
           },
         };
@@ -989,31 +996,27 @@ export const useSendActions = () => {
     }
   };
 
-  const executeStep = async (
-    step: TransactionStep,
-    isSimulation: boolean,
-  ): Promise<TransactionResult> => {
+  const executeStep = async ({
+    step,
+    inputAmount,
+    isSimulation,
+  }: {
+    step: TransactionStep;
+    inputAmount: string;
+    isSimulation: boolean;
+  }): Promise<TransactionResult> => {
     const stepLog = txLogs[step.hash];
     const feeToken = stepLog?.fees?.[0].feeToken;
 
     // TODO: this getAddressForChain code is also used in the skip function.  extract to hook or helper function for use in both places
     // Helper function to get address for any chain (similar to Skip function)
     const getAddressForChain = async (chainId: string): Promise<string> => {
-      console.log(`[DEBUG][getAddressForChain] Getting address for chain: ${chainId}`);
-
       // First try to get from local wallet state
       const chainWallet = getWalletInfo(chainId);
 
       if (chainWallet?.address && chainWallet.address.trim() !== '') {
-        console.log(
-          `[DEBUG][getAddressForChain] Using local wallet for ${chainId}: ${chainWallet.address}`,
-        );
         return chainWallet.address;
       }
-
-      console.log(
-        `[DEBUG][getAddressForChain] No local wallet found for ${chainId}, generating from mnemonic`,
-      );
 
       // Fallback: generate address from mnemonic
       const sessionToken = getSessionToken();
@@ -1022,29 +1025,19 @@ export const useSendActions = () => {
       }
 
       const chainInfo = getFullRegistryChainInfo(chainId);
-      console.log(`[DEBUG][getAddressForChain] Chain info for ${chainId}:`, chainInfo);
 
       if (!chainInfo?.bech32_prefix) {
-        console.error(`[DEBUG][getAddressForChain] Prefix not found for chain ${chainId}`);
         throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId}`);
       }
-
-      console.log(
-        `[DEBUG][getAddressForChain] Generating address for ${chainId} with prefix: ${chainInfo.bech32_prefix}`,
-      );
 
       try {
         const address = await getAddressByChainPrefix(
           sessionToken.mnemonic,
           chainInfo.bech32_prefix,
         );
-        console.log(`[DEBUG][getAddressForChain] Generated address for ${chainId}: ${address}`);
+
         return address;
       } catch (error) {
-        console.error(
-          `[DEBUG][getAddressForChain] Failed to generate address for ${chainId}:`,
-          error,
-        );
         throw error;
       }
     };
@@ -1053,20 +1046,9 @@ export const useSendActions = () => {
     let finalRecipientAddress: string;
     if (step.fromChain !== step.toChain) {
       // Cross-chain transfer: use the destination chain address
-      console.log(
-        `[DEBUG][executeStep] Cross-chain transfer detected: ${step.fromChain} -> ${step.toChain}`,
-      );
-
       try {
         finalRecipientAddress = await getAddressForChain(step.toChain);
-        console.log(
-          `[DEBUG][executeStep] Using destination chain address: ${finalRecipientAddress}`,
-        );
       } catch (error) {
-        console.error(
-          `[DEBUG][executeStep] Failed to get destination address for ${step.toChain}:`,
-          error,
-        );
         return {
           success: false,
           message: `Failed to get address for destination chain ${step.toChain}`,
@@ -1075,26 +1057,14 @@ export const useSendActions = () => {
     } else {
       // Same-chain transfer: use the provided recipient or self
       finalRecipientAddress = recipientAddress || walletState.address;
-      console.log(
-        `[DEBUG][executeStep] Same-chain transfer, using address: ${finalRecipientAddress}`,
-      );
     }
 
     const sendObject: SendObject = {
       recipientAddress: finalRecipientAddress,
-      amount: sendState.amount.toString(),
+      amount: inputAmount,
       denom: step.fromAsset.denom,
       feeToken,
     };
-
-    console.log('[DEBUG][executeStep] Final send object:', {
-      recipientAddress: finalRecipientAddress,
-      amount: sendState.amount.toString(),
-      denom: step.fromAsset.denom,
-      fromChain: step.fromChain,
-      toChain: step.toChain,
-      stepType: step.type,
-    });
 
     // TODO: may need to source address from outside walletState, given this is a step, not the start of the route
     try {
@@ -1124,11 +1094,12 @@ export const useSendActions = () => {
         case TransactionType.EXCHANGE:
           const skipSendObject: SendObject = {
             recipientAddress: finalRecipientAddress,
-            amount: sendState.amount.toString(),
+            amount: inputAmount,
             denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
             feeToken,
           };
           return await executeSkipTx({
+            step,
             sendObject: skipSendObject,
             receiveAssetDenom: step.toAsset.denom,
             simulateTransaction: isSimulation,
@@ -1142,39 +1113,54 @@ export const useSendActions = () => {
   };
 
   const executeTransactionRoute = async (isSimulation: boolean): Promise<TransactionResult> => {
-    console.log('[executeTransactionRoute] Starting', {
+    console.log('[DEBUG] [executeTransactionRoute] Starting', {
       isSimulation,
       txRouteSteps: txRoute.steps.length,
+      initialInputAmount: sendState.amount.toString(),
       txRoute: txRoute,
     });
 
     resetRouteStatus(isSimulation);
 
     let result: TransactionResult = { success: true, message: '' };
+    let currentInputAmount = sendState.amount.toString();
+
+    console.log(
+      '[DEBUG] [executeTransactionRoute] Initial currentInputAmount:',
+      currentInputAmount,
+    );
+
     try {
       // Execute steps sequentially
       for (let i = 0; i < txRoute.steps.length; i++) {
         const step = txRoute.steps[i];
         const stepLog = txLogs[step.hash];
 
-        console.log('[executeTransactionRoute] Processing step', {
+        console.log('[DEBUG] [executeTransactionRoute] Processing step:', {
           stepIndex: i,
           stepType: step.type,
-          stepVia: step.via,
+          stepHash: step.hash,
           fromChain: step.fromChain,
           toChain: step.toChain,
-          fromAsset: step.fromAsset,
-          toAsset: step.toAsset,
+          fromAsset: step.fromAsset.symbol,
+          toAsset: step.toAsset.symbol,
+          currentInputAmount,
         });
 
         // Update step to pending
-        updateStepLog({
+        updateTxStepLog({
           stepIndex: i,
           status: TransactionStatus.PENDING,
         });
 
         try {
-          result = await executeStep(step, isSimulation);
+          result = await executeStep({ step, inputAmount: currentInputAmount, isSimulation }); // Use output from previous step as input
+
+          console.log('[DEBUG] [executeTransactionRoute] Step execution result:', {
+            success: result.success,
+            estimatedAmountOut: result.data?.estimatedAmountOut,
+            gasWanted: result.data?.gasWanted,
+          });
         } catch (error) {
           console.error('[executeTransactionRoute] Step execution threw error:', error);
           result = {
@@ -1264,7 +1250,7 @@ export const useSendActions = () => {
           });
 
           // Update failed step to ERROR
-          updateStepLog({
+          updateTxStepLog({
             stepIndex: i,
             status: TransactionStatus.ERROR,
             error: result.message,
@@ -1272,7 +1258,7 @@ export const useSendActions = () => {
 
           // Mark all remaining steps as IDLE
           for (let j = i + 1; j < txRoute.steps.length; j++) {
-            updateStepLog({
+            updateTxStepLog({
               stepIndex: j,
               status: TransactionStatus.IDLE,
             });
@@ -1332,8 +1318,75 @@ export const useSendActions = () => {
           }
         }
 
+        let netOutput = currentInputAmount;
+
+        if (result.success) {
+          // Calculate total fees
+          const totalFees = feeData.reduce((sum, fee) => sum + BigInt(fee.amount), BigInt(0));
+
+          console.log('[DEBUG] [executeTransactionRoute] Fee calculation:', {
+            totalFees: totalFees.toString(),
+            feeDataLength: feeData.length,
+          });
+
+          // Get the expected output amount
+          let expectedOutput = BigInt(currentInputAmount);
+          if (result.data?.estimatedAmountOut) {
+            expectedOutput = BigInt(result.data.estimatedAmountOut);
+            console.log(
+              '[DEBUG] [executeTransactionRoute] Using estimatedAmountOut:',
+              expectedOutput.toString(),
+            );
+          } else if (step.type === TransactionType.SWAP || step.type === TransactionType.EXCHANGE) {
+            // For swaps/exchanges, if no explicit output, we might need to estimate
+            // This would ideally come from the route response or simulation
+            expectedOutput = BigInt(currentInputAmount); // Fallback
+          }
+
+          console.log('[DEBUG] [executeTransactionRoute] Before net output calculation:', {
+            currentInputAmount,
+            expectedOutput: expectedOutput.toString(),
+            totalFees: totalFees.toString(),
+            stepType: step.type,
+          });
+
+          // Calculate net output based on transaction type
+          switch (step.type) {
+            case TransactionType.SEND:
+            case TransactionType.IBC_SEND:
+              // For sends: output = input - fees
+              netOutput = (BigInt(currentInputAmount) - totalFees).toString();
+              break;
+
+            case TransactionType.SWAP:
+            case TransactionType.EXCHANGE:
+              // For swaps: output = expected_output - fees
+              netOutput = (expectedOutput - totalFees).toString();
+              break;
+
+            default:
+              netOutput = expectedOutput.toString();
+          }
+        }
+
+        console.log('[DEBUG] [executeTransactionRoute] Updating step log:', {
+          stepHash: step.hash,
+          inputAmount: currentInputAmount,
+          outputAmount: netOutput,
+        });
+
+        // Update the step log with net output and fees
+        updateStepLog({
+          stepHash: step.hash,
+          log: {
+            inputAmount: currentInputAmount,
+            outputAmount: netOutput,
+          },
+          feeData: feeData,
+        });
+
         if (i < txRoute.steps.length) {
-          updateStepLog({
+          updateTxStepLog({
             stepIndex: i,
             status: result?.success ? TransactionStatus.SUCCESS : TransactionStatus.ERROR,
             txHash: result.data?.txHash,
@@ -1345,6 +1398,9 @@ export const useSendActions = () => {
             totalSteps: txRoute.steps.length,
           });
         }
+
+        // Update current input for next step
+        currentInputAmount = netOutput; // This will be the input for the next step
       }
 
       // Complete transaction if it was successful

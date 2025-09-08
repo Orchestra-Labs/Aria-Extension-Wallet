@@ -11,6 +11,7 @@ interface ExchangeRequirementsResponse {
   };
 }
 
+// TODO: rename. useStablecoinSwapRates?
 export const useExchangeRequirements = () => {
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);

@@ -3,7 +3,7 @@ export * from './useGetSigner';
 export * from './useAddressGenerator';
 export * from './useSymphonyStablecoins';
 export * from './useExchangePoolBalance';
-export * from './useExchangeRate';
+export * from './useStablecoinSwapExchangeRate';
 export * from './useExchangeRequirements';
 export * from './useGetModuleAccountsQuery';
 export * from './useGetSigner';

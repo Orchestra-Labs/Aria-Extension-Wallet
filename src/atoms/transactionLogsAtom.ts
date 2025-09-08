@@ -1,14 +1,14 @@
 import { atom } from 'jotai';
 import { FeeState, TransactionLog, TransactionLogs, TransactionStep } from '@/types';
-import { DEFAULT_FEE_TOKEN, TransactionStatus } from '@/constants';
+import { DEFAULT_FEE_TOKEN, TransactionStatus, TransactionType } from '@/constants';
 import { chainInfoAtom } from './chainRegistryAtom';
 import { determineFeeToken } from '@/helpers';
+import { transactionRouteAtom } from './transactionRouteAtom';
 
 export const transactionLogsAtom = atom<TransactionLogs>({});
 
 export const getStepLogAtom = (stepHash: string) => atom(get => get(transactionLogsAtom)[stepHash]);
 
-// TODO: add the log index to update
 export const updateStepLogAtom = atom(
   null,
   (
@@ -22,17 +22,139 @@ export const updateStepLogAtom = atom(
   ) => {
     const currentLogs = get(transactionLogsAtom);
     const existingLog = currentLogs[params.stepHash] || {};
+    const route = get(transactionRouteAtom);
+    const step = route.steps.find(s => s.hash === params.stepHash);
 
-    // Preserve existing fees if feeData is not provided
-    const finalFeeData = params.feeData !== undefined ? params.feeData : existingLog.fees;
+    console.log('[DEBUG][updateStepLogAtom] Detailed analysis:', {
+      stepHash: params.stepHash,
+      stepType: step?.type,
+      stepExists: !!step,
+      paramsLog: params.log,
+      existingInput: existingLog.inputAmount,
+      existingOutput: existingLog.outputAmount,
+      existingExchangeRate: existingLog.exchangeRate,
+      newInput: params.log.inputAmount,
+      newOutput: params.log.outputAmount,
+      explicitExchangeRate: params.log.exchangeRate,
+    });
+
+    // Handle fee data update - preserve existing if not provided
+    let finalFeeData = existingLog.fees || [];
+    if (params.feeData !== undefined) {
+      finalFeeData = params.feeData;
+    } else if (params.log.fees !== undefined) {
+      finalFeeData = params.log.fees;
+    }
+
+    // Handle feeSymbol update - preserve existing if not provided
+    let finalFeeSymbol = existingLog.feeSymbol || '';
+    if (params.log.feeSymbol !== undefined) {
+      finalFeeSymbol = params.log.feeSymbol;
+    }
+
+    // Handle inputAmount update - preserve existing if not provided
+    let finalInputAmount = existingLog.inputAmount || '0';
+    if (params.log.inputAmount !== undefined) {
+      finalInputAmount = params.log.inputAmount;
+    }
+
+    // Handle outputAmount update - preserve existing if not provided
+    let finalOutputAmount = existingLog.outputAmount || '0';
+    if (params.log.outputAmount !== undefined) {
+      finalOutputAmount = params.log.outputAmount;
+    }
+
+    let finalExchangeRate = existingLog.exchangeRate;
+    // Only recalculate exchange rate if explicitly provided or if we have new amounts
+    if (params.log.exchangeRate !== undefined) {
+      finalExchangeRate = params.log.exchangeRate;
+      console.log('[DEBUG][updateStepLogAtom] Using explicit exchange rate:', finalExchangeRate);
+    } else if (
+      finalInputAmount !== '0' &&
+      finalOutputAmount !== '0' &&
+      (finalInputAmount !== existingLog.inputAmount ||
+        finalOutputAmount !== existingLog.outputAmount)
+    ) {
+      console.log(
+        '[DEBUG][updateStepLogAtom] Amounts changed, checking if we should recalculate exchange rate:',
+        {
+          finalInputAmount,
+          finalOutputAmount,
+          existingInput: existingLog.inputAmount,
+          existingOutput: existingLog.outputAmount,
+          stepType: step?.type,
+        },
+      );
+
+      // Only recalculate if amounts actually changed
+      const exchangeTypeTransactions = [
+        TransactionType.EXCHANGE,
+        TransactionType.SWAP,
+        TransactionType.IBC_SWAP,
+      ];
+      if (step && exchangeTypeTransactions.includes(step.type)) {
+        const inputAmount = Number(finalInputAmount);
+        const outputAmount = Number(finalOutputAmount);
+        if (inputAmount > 0 && outputAmount > 0) {
+          finalExchangeRate = inputAmount / outputAmount;
+          console.log(
+            '[DEBUG][updateStepLogAtom] Recalculated exchange rate for',
+            step.type,
+            ':',
+            finalExchangeRate,
+          );
+        } else {
+          console.log('[DEBUG][updateStepLogAtom] Cannot calculate exchange rate - zero amounts:', {
+            inputAmount,
+            outputAmount,
+          });
+        }
+      } else {
+        // For non-exchange steps, preserve existing exchange rate or set to 1 if none exists
+        finalExchangeRate = existingLog.exchangeRate !== undefined ? existingLog.exchangeRate : 1;
+        console.log(
+          '[DEBUG][updateStepLogAtom] Preserving exchange rate for non-exchange step:',
+          finalExchangeRate,
+        );
+      }
+    } else {
+      // Preserve existing exchange rate
+      finalExchangeRate = existingLog.exchangeRate;
+      console.log(
+        '[DEBUG][updateStepLogAtom] Preserving existing exchange rate:',
+        finalExchangeRate,
+      );
+    }
+
+    // Merge all properties with proper preservation logic
+    const updatedLog: TransactionLog = {
+      description:
+        params.log.description !== undefined
+          ? params.log.description
+          : existingLog.description || '',
+      status:
+        params.log.status !== undefined
+          ? params.log.status
+          : existingLog.status || TransactionStatus.IDLE,
+      txHash: params.log.txHash !== undefined ? params.log.txHash : existingLog.txHash,
+      error: params.log.error !== undefined ? params.log.error : existingLog.error,
+      skipRoute: params.log.skipRoute !== undefined ? params.log.skipRoute : existingLog.skipRoute,
+      fees: finalFeeData,
+      feeSymbol: finalFeeSymbol,
+      inputAmount: finalInputAmount,
+      outputAmount: finalOutputAmount,
+      exchangeRate: finalExchangeRate,
+    };
+
+    console.log('[DEBUG][updateStepLogAtom] Final log values:', {
+      inputAmount: updatedLog.inputAmount,
+      outputAmount: updatedLog.outputAmount,
+      exchangeRate: updatedLog.exchangeRate,
+    });
 
     set(transactionLogsAtom, {
       ...currentLogs,
-      [params.stepHash]: {
-        ...existingLog,
-        ...params.log,
-        fees: finalFeeData || [],
-      },
+      [params.stepHash]: updatedLog,
     });
   },
 );
@@ -44,7 +166,15 @@ export const resetTransactionLogsAtom = atom(null, (_, set) => {
 
 export const createStepLogAtom = atom(
   null,
-  (get, set, params: { step: TransactionStep; description: string }) => {
+  (
+    get,
+    set,
+    params: {
+      step: TransactionStep;
+      description: string;
+      initialAmounts?: { inputAmount?: string; outputAmount?: string };
+    },
+  ) => {
     const stepHash = params.step.hash;
     const currentLogs = get(transactionLogsAtom);
     const getChainInfo = get(chainInfoAtom);
@@ -76,6 +206,8 @@ export const createStepLogAtom = atom(
           status: TransactionStatus.IDLE,
           fees: [feeObject],
           feeSymbol: feeSymbol,
+          inputAmount: params.initialAmounts?.inputAmount || '0',
+          outputAmount: params.initialAmounts?.outputAmount || '0',
         },
       });
     }
@@ -83,3 +215,16 @@ export const createStepLogAtom = atom(
     return stepHash;
   },
 );
+
+export const getExchangeRateAtom = atom(get => {
+  const logs = get(transactionLogsAtom);
+  const exchangeRates: { [stepHash: string]: number } = {};
+
+  Object.entries(logs).forEach(([stepHash, log]) => {
+    if (log.exchangeRate !== undefined && log.exchangeRate !== 1) {
+      exchangeRates[stepHash] = log.exchangeRate;
+    }
+  });
+
+  return exchangeRates;
+});

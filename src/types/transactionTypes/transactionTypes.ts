@@ -1,5 +1,6 @@
 import { InputStatus, TextClass, TransactionStatus, TransactionType } from '@/constants';
 import { Asset, FeeToken } from '../localStorageTypes';
+import { RouteResponse } from '@skip-go/client/cjs';
 
 // TODO: cut this down?  doubt all these fields are needed
 export interface FeeState {
@@ -29,6 +30,10 @@ export interface TransactionStep {
   fromAsset: Asset;
   toAsset: Asset;
   hash: string;
+  toAddress?: string;
+  fromAddress?: string;
+  intendedInputAmount?: string;
+  intendedOutputAmount?: string;
 }
 
 export interface TransactionLog {
@@ -38,6 +43,10 @@ export interface TransactionLog {
   error?: string;
   fees: FeeState[];
   feeSymbol: string;
+  inputAmount: string;
+  outputAmount: string;
+  skipRoute?: RouteResponse;
+  exchangeRate?: number;
 }
 
 export interface TransactionLogs {

@@ -54,6 +54,34 @@ export const resetTransactionRouteAtom = atom(null, (_, set) => {
   });
 });
 
+export const finalOutputAmountAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
+
+  const routeFinalIndex = route.steps.length - 1;
+  const finalStepLog = logs[route.steps[routeFinalIndex].hash];
+  const estimatedAmountOut = finalStepLog.outputAmount;
+
+  return finalStepLog.status === TransactionStatus.SUCCESS ? estimatedAmountOut : null;
+});
+
+export const transactionRouteExchangeRateAtom = atom(get => {
+  const transactionRoute = get(transactionRouteAtom);
+  const transactionLogs = get(transactionLogsAtom);
+
+  let overallExchangeRate = 1;
+
+  // Multiply exchange rates from all steps that have them
+  transactionRoute.steps.forEach(step => {
+    const stepLog = transactionLogs[step.hash];
+    if (stepLog?.exchangeRate && stepLog.exchangeRate !== 1) {
+      overallExchangeRate *= stepLog.exchangeRate;
+    }
+  });
+
+  return overallExchangeRate;
+});
+
 export const transactionHasValidRouteAtom = atom<boolean>(get => {
   const route = get(transactionRouteAtom);
   const isValid = route.steps.length > 0;
@@ -166,12 +194,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     return;
   }
 
-  console.log('[DEBUG][updateTransactionRouteAtom] Starting route update with params:', {
-    walletAddress,
-    sendState,
-    receiveState,
-  });
-
   const getChainInfo = get(fullRegistryChainInfoAtom);
   const receiveAddress = get(recipientAddressAtom);
   const skipChains = get(skipChainsAtom);
@@ -223,12 +245,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     toAsset: Asset,
     isFirstStep: boolean = false,
   ): TransactionStep => {
-    console.log('[DEBUG] Creating Transaction Step.  From chain and to chain info:', {
-      fromChain,
-      toChain,
-      fromAsset,
-    });
-
     const step = {
       type,
       via,
@@ -288,6 +304,10 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     set(createStepLogAtom, {
       step,
       description,
+      initialAmounts: {
+        inputAmount: sendState.amount.toString(),
+        outputAmount: '0', // Will be updated after execution
+      },
     });
 
     return step;

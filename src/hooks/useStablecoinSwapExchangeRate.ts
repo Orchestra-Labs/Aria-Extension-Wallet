@@ -18,7 +18,8 @@ import {
 } from '@/atoms';
 import { getSymphonyChainId, queryRestNode } from '@/helpers';
 
-export function useExchangeRate() {
+// TODO: currently unused.  remove?
+export function useStablecoinSwapExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
