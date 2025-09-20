@@ -5,6 +5,8 @@ import {
   DEFAULT_MAINNET_ASSET,
   DEFAULT_TESTNET_ASSET,
   NetworkLevel,
+  OSMOSIS_MAINNET_ID,
+  OSMOSIS_TESTNET_ID,
   SYMPHONY_MAINNET_ID,
   SYMPHONY_TESTNET_ID,
   TextFieldStatus,
@@ -104,6 +106,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   return null;
 };
 
+// TODO: move these to hook and use full chain registry
 export function getSymphonyChainId(networkLevel: NetworkLevel): string {
   return networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
 }
@@ -111,3 +114,7 @@ export function getSymphonyChainId(networkLevel: NetworkLevel): string {
 export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
+
+export const getOsmosisChainId = (networkLevel: NetworkLevel): string => {
+  return networkLevel === NetworkLevel.MAINNET ? OSMOSIS_MAINNET_ID : OSMOSIS_TESTNET_ID;
+};

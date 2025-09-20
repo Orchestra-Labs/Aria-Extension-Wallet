@@ -22,6 +22,23 @@ export interface CalculatedFeeDisplay {
   gasPrice: number;
 }
 
+export interface ExchangeStep extends TransactionStep {
+  type: TransactionType.EXCHANGE;
+  poolId: string;
+  routes: string[];
+  expectedOutput: string;
+  priceImpact?: string;
+  swapFee?: string;
+  liquidity?: string;
+  // Add Osmosis-specific fields
+  osmosisPool?: {
+    id: string;
+    type: 'balancer' | 'concentrated' | 'stable';
+    swapFee: string;
+    totalLiquidity: string;
+  };
+}
+
 export interface TransactionStep {
   type: TransactionType;
   via: 'skip' | 'standard';

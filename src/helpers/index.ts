@@ -1,4 +1,5 @@
 export * from './closeAllExtensionPopups';
+export * from './exchangeTransactions';
 export * from './feeUtils';
 export * from './dataHelpers';
 export * from './fetchAccountInfo';
@@ -12,8 +13,10 @@ export * from './ibcTransactions';
 export * from './openExtensionWindow';
 export * from './openMediaOnboardingTab';
 export * from './openPageInNewTab';
+export * from './osmosisApiHelper';
 export * from './priceCache';
 export * from './queryNodes';
+export * from './reachabilityHelper';
 export * from './sendTransactions';
 export * from './signers';
 export * from './skipApiHelper';

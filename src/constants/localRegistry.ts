@@ -171,22 +171,22 @@ export const DEFAULT_MAINNET_REGISTRY: LocalChainRegistry = {
     staking_denoms: ['note'],
     rpc_uris: [
       {
-        address: 'https://symphony.rpc.nodeshub.online/',
-        provider: 'Nodes Hub',
-      },
-      {
         address: 'https://symphony-rpc.cogwheel.zone/',
         provider: 'Cogwheel ⚙️',
+      },
+      {
+        address: 'https://symphony.rpc.nodeshub.online/',
+        provider: 'Nodes Hub',
       },
     ],
     rest_uris: [
       {
-        address: 'https://symphony.api.nodeshub.online/',
-        provider: 'Nodes Hub',
-      },
-      {
         address: 'https://symphony-api.cogwheel.zone/',
         provider: 'Cogwheel ⚙️',
+      },
+      {
+        address: 'https://symphony.api.nodeshub.online/',
+        provider: 'Nodes Hub',
       },
     ],
     logo_uri:

@@ -42,6 +42,7 @@ import {
   executeSkipRoute,
   initializeSkipClient,
   getSkipRoute,
+  simulateOsmosisSwap,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
 import { useGetSigner } from './useGetSigner';
@@ -399,7 +400,7 @@ export const useSendActions = () => {
     let allSufficient = true;
 
     // Process each operation in the route
-    for (const operation of skipRoute.operations.values()) {
+    for (const operation of skipRoute.operations) {
       let chainId: string;
       let denom: string;
       let operationType: string;
@@ -418,6 +419,7 @@ export const useSendActions = () => {
         `[runSkipFeeSimulations] Processing ${operationType} operation on ${chainId} with ${denom}`,
       );
 
+      // TODO: start here.  logs show processing line above, but not code walkthrough below. find out if going through correct process, then test and clean up
       const chainInfo = getFullRegistryChainInfo(chainId);
       if (!chainInfo) {
         simulations.push({
@@ -470,7 +472,8 @@ export const useSendActions = () => {
         continue;
       }
 
-      const simulationAmount = operation.amountIn || '1';
+      // Use a smaller amount for simulation to avoid insufficient funds errors
+      const simulationAmount = '1000';
       const sendObject: SendObject = {
         recipientAddress: userAddress,
         amount: simulationAmount,
@@ -483,10 +486,37 @@ export const useSendActions = () => {
       let isDefaultEstimate = false;
 
       try {
-        if (operation.transfer) {
+        // NOTE: swapVenue name will be osmosis-poolmanager
+        if (operation.swap) {
+          // TODO: don't use hard indexing
+          const swapOperations = operation.swap.swapIn?.swapOperations;
+          if (swapOperations && swapOperations.length > 0) {
+            // Use the unified swap simulation function for both single and multi-hop
+            simulationResult = await simulateOsmosisSwap({
+              sender: userAddress,
+              swapOperations,
+              tokenInAmount: simulationAmount,
+              chainId,
+              restUris: chainInfo.rest_uris,
+              feeToken,
+            });
+          } else {
+            simulationResult = await executeSend({
+              fromAddress: userAddress,
+              sendObject,
+              chainId: chainId,
+              simulateTransaction: true,
+            });
+          }
+        } else if (operation.transfer) {
+          const ibcSendObject: SendObject = {
+            ...sendObject,
+            amount: simulationAmount,
+          };
+
           simulationResult = await executeIBC({
             fromAddress: userAddress,
-            sendObject,
+            sendObject: ibcSendObject,
             sendChainId: chainId,
             receiveChainId: operation.transfer.toChainId,
             simulateTransaction: true,
@@ -640,21 +670,38 @@ export const useSendActions = () => {
     chainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[executeSend] Starting standard send transaction', sendObject);
+    console.log('[DEBUG][executeSend] Starting standard send transaction', {
+      fromAddress,
+      sendObject,
+      chainId,
+      simulateTransaction,
+      originalAmount: sendObject.amount,
+      denom: sendObject.denom,
+    });
     const sendChain = getFullRegistryChainInfo(chainId);
     const prefix = sendChain.bech32_prefix;
     const rpcUris = sendChain.rpc_uris;
     console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendChain.chain_id}`);
 
     try {
-      return await sendTransaction({
+      const result = await sendTransaction({
         fromAddress,
         sendObject,
-        prefix,
-        rpcUris,
+        prefix: sendChain.bech32_prefix,
+        rpcUris: rpcUris,
         chainId: sendChain.chain_id,
         simulateOnly: simulateTransaction,
       });
+
+      console.log('[DEBUG][executeSend] Transaction result:', {
+        success: result.success,
+        gasWanted: result.data?.gasWanted,
+        fees: result.data?.fees,
+        originalAmount: sendObject.amount,
+        denom: sendObject.denom,
+      });
+
+      return result;
     } catch (error: any) {
       // Handle unfunded account error during simulation
       if (
@@ -711,6 +758,16 @@ export const useSendActions = () => {
     receiveAsset: Asset;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
+    console.log('[DEBUG][executeStablecoinSwap] Starting swap transaction', {
+      fromAddress,
+      sendObject,
+      receiveAsset: receiveAsset.denom,
+      originalAmount: sendObject.amount,
+      inputDenom: sendObject.denom,
+      outputDenom: receiveAsset.denom,
+      simulateTransaction,
+    });
+
     const swapParams = {
       sendObject,
       resultDenom: receiveAsset.denom, // need to use current denom here so it fails if ibc
@@ -740,6 +797,16 @@ export const useSendActions = () => {
     receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
+    console.log('[DEBUG][executeIBC] Starting IBC transaction', {
+      fromAddress,
+      sendObject,
+      sendChainId,
+      receiveChainId,
+      originalAmount: sendObject.amount,
+      denom: sendObject.denom,
+      simulateTransaction,
+    });
+
     try {
       const sendChain = getFullRegistryChainInfo(sendChainId);
       const validChannel = await getValidIBCChannel({
@@ -821,7 +888,7 @@ export const useSendActions = () => {
   };
 
   // TODO: enable amount out as an option (to handle billing)
-  // In useSendActions.ts
+  // TODO: use call to Osmosis for exchange after getting pool from route
   const executeSkipTx = async ({
     step,
     sendObject,
@@ -833,10 +900,17 @@ export const useSendActions = () => {
     receiveAssetDenom: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[executeSkipTx] Starting Skip Tx');
+    console.log('[DEBUG][executeSkipTx] Starting Skip transaction', {
+      stepType: step.type,
+      stepHash: step.hash,
+      originalAmount: sendObject.amount,
+      inputDenom: sendObject.denom,
+      outputDenom: receiveAssetDenom,
+      simulateTransaction,
+    });
 
     try {
-      // TODO: remove previously simulated fees from send amount before querying for route
+      // First, get the initial route to calculate fees
       const routeResponse = await getSkipRoute({
         fromChainId: sendState.asset.originChainId,
         fromDenom: sendObject.denom,
@@ -845,10 +919,25 @@ export const useSendActions = () => {
         amount: sendObject.amount,
       });
 
+      console.log('[DEBUG][executeSkipTx] Route response:', {
+        operationsCount: routeResponse.operations?.length,
+        amountIn: routeResponse.amountIn,
+        amountOut: routeResponse.amountOut,
+        operations: routeResponse.operations?.map((op: any, index: number) => ({
+          index,
+          type: op.swap ? 'swap' : 'transfer',
+          fromChain: op.swap ? op.swap.fromChainId : op.transfer?.fromChainId,
+          toChain: op.swap ? op.swap.toChainId : op.transfer?.toChainId,
+          inputDenom: op.swap ? op.swap.denomIn : op.transfer?.denomIn,
+          outputDenom: op.swap ? op.swap.denomOut : op.transfer?.denomOut,
+        })),
+      });
+
       if (!routeResponse.operations?.length) {
         throw new Error('No valid Skip route found');
       }
 
+      // Get user addresses for all required chains
       // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
       const requiredChainAddresses = routeResponse.requiredChainAddresses;
       const userAddresses: UserAddress[] = await Promise.all(
@@ -899,7 +988,7 @@ export const useSendActions = () => {
 
       console.log('👥 Final user addresses:', userAddresses);
 
-      // FIX: Validate that all addresses are properly defined
+      // Validate that all addresses are properly defined
       const validAddresses = userAddresses.filter(
         addr => addr && addr.chainId && addr.address && addr.address.trim() !== '',
       );
@@ -911,6 +1000,57 @@ export const useSendActions = () => {
       // Run fee simulations before proceeding
       const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
       const calculatedFees = calculateSkipFees(routeResponse, simulationResult);
+
+      // Calculate fees for the initial chain (first operation)
+      const initialChainFees = calculatedFees.filter(
+        fee => fee.chainId === sendState.asset.originChainId,
+      );
+
+      let adjustedInputAmount = BigInt(sendObject.amount);
+
+      // Subtract fees from the initial amount for the first chain
+      if (initialChainFees.length > 0) {
+        const totalFees = initialChainFees.reduce(
+          (sum, fee) => sum + BigInt(fee.amount),
+          BigInt(0),
+        );
+
+        // Ensure we don't subtract more than available
+        if (totalFees > adjustedInputAmount) {
+          throw new Error(
+            `Insufficient funds: ${sendObject.amount}${sendObject.denom} available, but ${totalFees.toString()}${initialChainFees[0].denom} needed for fees`,
+          );
+        }
+
+        adjustedInputAmount -= totalFees;
+
+        console.log('[DEBUG][executeSkipTx] Adjusted input amount after fee deduction:', {
+          originalAmount: sendObject.amount,
+          totalFees: totalFees.toString(),
+          adjustedAmount: adjustedInputAmount.toString(),
+          feeDenom: initialChainFees[0].denom,
+        });
+      }
+
+      // Get a new route with the adjusted amount if we subtracted fees
+      let finalRouteResponse = routeResponse;
+      if (adjustedInputAmount !== BigInt(sendObject.amount)) {
+        console.log('[DEBUG][executeSkipTx] Requesting new route with adjusted amount');
+
+        finalRouteResponse = await getSkipRoute({
+          fromChainId: sendState.asset.originChainId,
+          fromDenom: sendObject.denom,
+          toChainId: receiveState.chainId,
+          toDenom: receiveAssetDenom,
+          amount: adjustedInputAmount.toString(),
+        });
+
+        console.log('[DEBUG][executeSkipTx] Adjusted route response:', {
+          operationsCount: finalRouteResponse.operations?.length,
+          amountIn: finalRouteResponse.amountIn,
+          amountOut: finalRouteResponse.amountOut,
+        });
+      }
 
       // For simulation, return early with route info
       if (simulateTransaction) {
@@ -925,25 +1065,47 @@ export const useSendActions = () => {
         updateStepLog({
           stepHash: step.hash,
           log: {
-            skipRoute: routeResponse,
+            skipRoute: finalRouteResponse,
             inputAmount: sendObject.amount,
-            outputAmount: routeResponse.estimatedAmountOut || '0',
+            outputAmount: finalRouteResponse.estimatedAmountOut || '0',
             // Also update fees if available from simulation
             fees: calculatedFees.map(fee => {
+              const chainRegistryFeeInfo = getFullRegistryChainInfo(fee.chainId)?.fees?.[0];
               const asset = resolveAssetFromDenom(fee.denom, fee.chainId);
+
+              // Parse the fee amount to ensure it's a number
+              const feeAmount = parseInt(fee.amount, 10);
+
               return {
                 asset,
-                amount: parseInt(fee.amount, 10),
+                amount: feeAmount,
                 chainId: fee.chainId,
-                feeToken: getFullRegistryChainInfo(fee.chainId)?.fees?.[0] || {
+                feeToken: chainRegistryFeeInfo || {
                   denom: fee.denom,
                   gasPriceStep: { low: 0, average: 0, high: 0 },
                 },
-                gasWanted: 0, // This will be updated with actual simulation results
-                gasPrice: 0, // This will be updated with actual simulation results
+                gasWanted: feeAmount,
+                gasPrice: chainRegistryFeeInfo?.gasPriceStep?.average || 0,
               };
             }),
           },
+        });
+
+        console.log('[DEBUG][executeSkipTx] Simulation completed:', {
+          originalInput: sendObject.amount,
+          finalOutput: finalRouteResponse.estimatedAmountOut,
+          fees: calculatedFees.map(fee => ({
+            chainId: fee.chainId,
+            denom: fee.denom,
+            amount: fee.amount,
+            operationType: fee.operationType,
+          })),
+          operations: finalRouteResponse.operations?.map((op: any, index: number) => ({
+            index,
+            type: op.swap ? 'swap' : 'transfer',
+            inputAmount: op.swap ? op.swap.amountIn : op.transfer?.amount,
+            outputAmount: op.swap ? op.swap.amountOut : op.transfer?.amount,
+          })),
         });
 
         return {
@@ -953,8 +1115,8 @@ export const useSendActions = () => {
             code: 0,
             txHash: 'simulated',
             gasWanted: calculatedFees[0]?.amount || '0',
-            route: routeResponse,
-            estimatedAmountOut: routeResponse.amountOut,
+            route: finalRouteResponse,
+            estimatedAmountOut: finalRouteResponse.amountOut,
             fees: feeStructure,
           },
         };
@@ -962,7 +1124,7 @@ export const useSendActions = () => {
 
       // Execute the route using Skip's built-in execution
       const result = await executeSkipRoute(
-        routeResponse,
+        finalRouteResponse,
         userAddresses,
         async (chainId: string) => {
           console.log(`🖊️  Getting signer for chain: ${chainId}`);
@@ -1005,6 +1167,18 @@ export const useSendActions = () => {
     inputAmount: string;
     isSimulation: boolean;
   }): Promise<TransactionResult> => {
+    console.log('[DEBUG][executeStep] Executing step:', {
+      stepIndex: txRoute.steps.indexOf(step),
+      stepType: step.type,
+      stepHash: step.hash,
+      fromChain: step.fromChain,
+      toChain: step.toChain,
+      inputAmount,
+      inputDenom: step.fromAsset.denom,
+      outputDenom: step.toAsset.denom,
+      isSimulation,
+    });
+
     const stepLog = txLogs[step.hash];
     const feeToken = stepLog?.fees?.[0].feeToken;
 
@@ -1068,29 +1242,33 @@ export const useSendActions = () => {
 
     // TODO: may need to source address from outside walletState, given this is a step, not the start of the route
     try {
+      let result;
       switch (step.type) {
         case TransactionType.SEND:
-          return await executeSend({
+          result = await executeSend({
             fromAddress: walletState.address,
             sendObject,
             chainId: step.fromChain,
             simulateTransaction: isSimulation,
           });
+          break;
         case TransactionType.SWAP:
-          return await executeStablecoinSwap({
+          result = await executeStablecoinSwap({
             fromAddress: walletState.address,
             sendObject,
             receiveAsset: step.toAsset,
             simulateTransaction: isSimulation,
           });
+          break;
         case TransactionType.IBC_SEND:
-          return await executeIBC({
+          result = await executeIBC({
             fromAddress: walletState.address,
             sendObject,
             sendChainId: step.fromChain,
             receiveChainId: step.toChain,
             simulateTransaction: isSimulation,
           });
+          break;
         case TransactionType.EXCHANGE:
           const skipSendObject: SendObject = {
             recipientAddress: finalRecipientAddress,
@@ -1098,26 +1276,41 @@ export const useSendActions = () => {
             denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
             feeToken,
           };
-          return await executeSkipTx({
+          result = await executeSkipTx({
             step,
             sendObject: skipSendObject,
             receiveAssetDenom: step.toAsset.denom,
             simulateTransaction: isSimulation,
           });
+          break;
         default:
           throw new Error(`Unsupported transaction type: ${step.type}`);
       }
+
+      console.log('[DEBUG][executeStep] Step completed:', {
+        stepIndex: txRoute.steps.indexOf(step),
+        success: result.success,
+        gasWanted: result.data?.gasWanted,
+        fees: result.data?.fees,
+        estimatedOutput: result.data?.estimatedAmountOut,
+        inputAmount,
+        outputAmount: result.data?.estimatedAmountOut || '0',
+      });
+
+      return result;
     } catch (error: any) {
       return { success: false, message: error.message };
     }
   };
 
   const executeTransactionRoute = async (isSimulation: boolean): Promise<TransactionResult> => {
-    console.log('[DEBUG] [executeTransactionRoute] Starting', {
+    console.log('[DEBUG][executeTransactionRoute] Starting transaction route', {
       isSimulation,
-      txRouteSteps: txRoute.steps.length,
-      initialInputAmount: sendState.amount.toString(),
-      txRoute: txRoute,
+      totalSteps: txRoute.steps.length,
+      originalAmount: sendState.amount.toString(),
+      originalDenom: sendState.asset.denom,
+      targetChain: receiveState.chainId,
+      targetDenom: receiveState.asset.denom,
     });
 
     resetRouteStatus(isSimulation);
@@ -1125,26 +1318,20 @@ export const useSendActions = () => {
     let result: TransactionResult = { success: true, message: '' };
     let currentInputAmount = sendState.amount.toString();
 
-    console.log(
-      '[DEBUG] [executeTransactionRoute] Initial currentInputAmount:',
-      currentInputAmount,
-    );
-
     try {
       // Execute steps sequentially
       for (let i = 0; i < txRoute.steps.length; i++) {
         const step = txRoute.steps[i];
         const stepLog = txLogs[step.hash];
 
-        console.log('[DEBUG] [executeTransactionRoute] Processing step:', {
+        console.log('[DEBUG][executeTransactionRoute] Processing step:', {
           stepIndex: i,
           stepType: step.type,
-          stepHash: step.hash,
           fromChain: step.fromChain,
           toChain: step.toChain,
-          fromAsset: step.fromAsset.symbol,
-          toAsset: step.toAsset.symbol,
-          currentInputAmount,
+          inputAmount: currentInputAmount,
+          inputDenom: step.fromAsset.denom,
+          outputDenom: step.toAsset.denom,
         });
 
         // Update step to pending
@@ -1155,12 +1342,6 @@ export const useSendActions = () => {
 
         try {
           result = await executeStep({ step, inputAmount: currentInputAmount, isSimulation }); // Use output from previous step as input
-
-          console.log('[DEBUG] [executeTransactionRoute] Step execution result:', {
-            success: result.success,
-            estimatedAmountOut: result.data?.estimatedAmountOut,
-            gasWanted: result.data?.gasWanted,
-          });
         } catch (error) {
           console.error('[executeTransactionRoute] Step execution threw error:', error);
           result = {
@@ -1324,31 +1505,15 @@ export const useSendActions = () => {
           // Calculate total fees
           const totalFees = feeData.reduce((sum, fee) => sum + BigInt(fee.amount), BigInt(0));
 
-          console.log('[DEBUG] [executeTransactionRoute] Fee calculation:', {
-            totalFees: totalFees.toString(),
-            feeDataLength: feeData.length,
-          });
-
           // Get the expected output amount
           let expectedOutput = BigInt(currentInputAmount);
           if (result.data?.estimatedAmountOut) {
             expectedOutput = BigInt(result.data.estimatedAmountOut);
-            console.log(
-              '[DEBUG] [executeTransactionRoute] Using estimatedAmountOut:',
-              expectedOutput.toString(),
-            );
           } else if (step.type === TransactionType.SWAP || step.type === TransactionType.EXCHANGE) {
             // For swaps/exchanges, if no explicit output, we might need to estimate
             // This would ideally come from the route response or simulation
             expectedOutput = BigInt(currentInputAmount); // Fallback
           }
-
-          console.log('[DEBUG] [executeTransactionRoute] Before net output calculation:', {
-            currentInputAmount,
-            expectedOutput: expectedOutput.toString(),
-            totalFees: totalFees.toString(),
-            stepType: step.type,
-          });
 
           // Calculate net output based on transaction type
           switch (step.type) {
@@ -1369,10 +1534,19 @@ export const useSendActions = () => {
           }
         }
 
-        console.log('[DEBUG] [executeTransactionRoute] Updating step log:', {
-          stepHash: step.hash,
+        console.log('[DEBUG][executeTransactionRoute] Step completed:', {
+          stepIndex: i,
+          success: result.success,
           inputAmount: currentInputAmount,
           outputAmount: netOutput,
+          fees: feeData.map(fee => ({
+            chainId: fee.chainId,
+            denom: fee.asset.denom,
+            amount: fee.amount,
+            gasWanted: fee.gasWanted,
+            gasPrice: fee.gasPrice,
+          })),
+          stepType: step.type,
         });
 
         // Update the step log with net output and fees

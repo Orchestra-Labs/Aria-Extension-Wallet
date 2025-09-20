@@ -214,7 +214,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   // Create a Set of all Skip-supported denoms
   const skipSupportedDenoms = new Set<string>();
   for (const asset of Object.values(skipAssets)) {
-    skipSupportedDenoms.add(asset.originDenom || asset.denom);
+    skipSupportedDenoms.add(asset.originDenom);
   }
 
   // Check denom support

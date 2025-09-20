@@ -319,8 +319,6 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
   useEffect(() => {
     if (transactionRoute.steps.length > 0 && sendState.displayAmount > 0) {
-      console.log('[DEBUG] Route changed, updating receive amount based on actual output');
-
       // Get the final output amount from the route (last step's output)
       const finalStep = transactionRoute.steps[transactionRoute.steps.length - 1];
       const finalStepLog = transactionLogs[finalStep.hash];
@@ -331,7 +329,6 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
         // Only update if the amount is significantly different to avoid flickering
         if (Math.abs(finalOutputAmount - receiveState.displayAmount) > 0.0001) {
-          console.log('[DEBUG] Updating receive amount from route:', finalOutputAmount);
           updateReceiveState(prev => ({
             ...prev,
             amount: parseFloat(finalStepLog.outputAmount),

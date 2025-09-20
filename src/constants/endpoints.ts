@@ -50,7 +50,19 @@ export const SYMPHONY_ENDPOINTS = {
   getTobinTaxRate: '/symphony/treasury/v1beta1/tax_rate',
 };
 
-// TODO: get real info for this
-// export const SPECIALIZED_ENDPOINTS: Record<string, Record<string, string>> = {
-//   'stargaze-1': { mint: '/publicawesome/mint/v1beta1' },
-// };
+export const OSMOSIS_ENDPOINTS = {
+  pools: '/osmosis/gamm/v1beta1/pools',
+  poolDetail: '/osmosis/gamm/v1beta1/pools/',
+  quote: '/osmosis/poolmanager/v1beta1/quote',
+  spotPrice: '/osmosis/poolmanager/v1beta1/spot_price',
+  totalLiquidity: '/osmosis/poolmanager/v1beta1/total_liquidity',
+  exchangeTransactions: '/osmosis/poolmanager/v1beta1/all_txs',
+  poolTransactions: '/osmosis/poolmanager/v1beta1/pools/{poolId}/txs',
+  txDetails: '/cosmos/tx/v1beta1/txs/{txHash}',
+  getOsmosisPools: '/osmosis/gamm/v1beta1/pools',
+  getOsmosisAssetList: '/osmosis/tokenfactory/v1beta1/denoms_from_creator/',
+  singleSwapSimulation: '/osmosis/poolmanager/v1beta1/estimate/single_pool_swap_exact_amount_in',
+  multiHopSimulation: '/osmosis/poolmanager/v1beta1/estimate/swap_exact_amount_in',
+  simulation: '/osmosis/poolmanager/v1beta1/estimate/swap_exact_amount_in',
+  swap: '/osmosis/poolmanager/v1beta1/swap_exact_amount_in',
+};

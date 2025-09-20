@@ -83,13 +83,28 @@ const shouldRecordFailure = (error: any): boolean => {
   return isClientError || isServerError || isIndexerRelated || isConnectionError || isTimeout;
 };
 
-const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
+const performRestQuery = async (
+  uri: string,
+  endpoint: string,
+  queryType: QueryType,
+  data?: any,
+) => {
   const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
   const uriEndpoint = `${adjustedUri}${endpoint}`;
 
   const startTime = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
+
+  const options: RequestInit = {
+    method: queryType,
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+  };
+
+  if (queryType === 'POST' && data) {
+    options.body = JSON.stringify(data);
+  }
 
   try {
     const response = await fetch(`${uriEndpoint}`, {
@@ -133,7 +148,7 @@ const performRpcQuery = async (
     amount: { denom: string; amount: string }[];
     gas: string;
   },
-  memo: string = 'wallet',
+  memo: string = 'aria wallet',
 ): Promise<RPCResponse> => {
   try {
     let calculatedFee = fee;
@@ -282,6 +297,7 @@ const queryWithRetry = async ({
   prefix,
   uris,
   chainId,
+  data,
 }: {
   endpoint: string;
   useRPC?: boolean;
@@ -296,6 +312,7 @@ const queryWithRetry = async ({
   prefix: string;
   uris: Uri[];
   chainId: string;
+  data?: any;
 }): Promise<RPCResponse> => {
   let attemptCount = 0;
   let lastError: any = null;
@@ -342,7 +359,7 @@ const queryWithRetry = async ({
         // Success! Return the result
         return result;
       } else {
-        const result = await performRestQuery(currentUri.address, endpoint, queryType);
+        const result = await performRestQuery(currentUri.address, endpoint, queryType, data);
         recordQueryResult(chainId, currentUri.address, result.queryTime, true, CommType.REST);
 
         // Success! Return the result
@@ -402,12 +419,14 @@ export const queryRestNode = async ({
   prefix,
   restUris,
   chainId,
+  data,
 }: {
   endpoint: string;
   queryType?: QueryType;
   prefix: string;
   restUris: Uri[];
   chainId: string;
+  data?: any;
 }) =>
   queryWithRetry({
     endpoint,
@@ -416,6 +435,7 @@ export const queryRestNode = async ({
     prefix,
     uris: restUris,
     chainId,
+    data,
   });
 
 export const queryRpcNode = async ({

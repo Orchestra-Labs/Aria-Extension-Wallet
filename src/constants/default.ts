@@ -17,6 +17,9 @@ export const SYMPHONY_MAINNET_NAME = 'symphony';
 export const SYMPHONY_MAINNET_ID = 'symphony-1';
 export const SYMPHONY_CHAIN_ID_LIST = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID];
 
+export const OSMOSIS_MAINNET_ID = 'osmosis-1';
+export const OSMOSIS_TESTNET_ID = 'osmo-test-5';
+
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
 export const GAMM_PREFIX = 'gamm/';
