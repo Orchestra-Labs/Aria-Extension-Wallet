@@ -533,13 +533,6 @@ export async function executeOsmosisSwap({
       const routeData = await getSwapRoutes(tokenIn.amount, tokenIn.denom, tokenOutDenom);
       finalRoutes = routeData.routes;
       finalTokenOutMinAmount = routeData.tokenOutMinAmount;
-
-      console.log('[DEBUG][osmosisApiHelper] Fetched routes:', finalRoutes);
-      console.log('[DEBUG][osmosisApiHelper] Expected amount out:', routeData.amountOut);
-      console.log(
-        '[DEBUG][osmosisApiHelper] Minimum amount out (with 1% slippage):',
-        finalTokenOutMinAmount,
-      );
     } else {
       throw new Error('No exchange route found');
     }
@@ -660,7 +653,7 @@ export async function executeOsmosisSwap({
       };
     }
   } catch (error) {
-    console.error('[DEBUG][osmosisApiHelper] Error executing swap:', error);
+    console.error('[osmosisApiHelper] Error executing swap:', error);
     throw error;
   }
 }

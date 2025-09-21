@@ -1,7 +1,6 @@
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   sendStateAtom,
-  receiveStateAtom,
   chainWalletAtom,
   recipientAddressAtom,
   networkLevelAtom,
@@ -17,12 +16,7 @@ import {
   updateStepLogAtom,
   osmosisFeeTokenByDenomAtom,
 } from '@/atoms';
-import {
-  DEFAULT_OSMOSIS_DENOM,
-  GREATER_EXPONENT_DEFAULT,
-  TransactionStatus,
-  TransactionType,
-} from '@/constants';
+import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
 import {
   Asset,
   FeeState,
@@ -55,7 +49,6 @@ export const useSendActions = () => {
 
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
-  const receiveState = useAtomValue(receiveStateAtom);
   const getWalletInfo = useAtomValue(getChainWalletAtom);
   const walletState = useAtomValue(chainWalletAtom(sendState.chainId));
   const recipientAddress = useAtomValue(recipientAddressAtom);
@@ -669,18 +662,8 @@ export const useSendActions = () => {
     chainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeSend] Starting standard send transaction', {
-      fromAddress,
-      sendObject,
-      chainId,
-      simulateTransaction,
-      originalAmount: sendObject.amount,
-      denom: sendObject.denom,
-    });
     const sendChain = getFullRegistryChainInfo(chainId);
-    const prefix = sendChain.bech32_prefix;
     const rpcUris = sendChain.rpc_uris;
-    console.log(`[executeSend] Using prefix: ${prefix} for chain: ${sendChain.chain_id}`);
 
     try {
       const result = await sendTransaction({
@@ -692,14 +675,6 @@ export const useSendActions = () => {
         simulateOnly: simulateTransaction,
       });
 
-      console.log('[DEBUG][executeSend] Transaction result:', {
-        success: result.success,
-        gasWanted: result.data?.gasWanted,
-        fees: result.data?.fees,
-        originalAmount: sendObject.amount,
-        denom: sendObject.denom,
-      });
-
       return result;
     } catch (error: any) {
       // Handle unfunded account error during simulation
@@ -708,7 +683,7 @@ export const useSendActions = () => {
         (error.message?.includes('does not exist on chain') ||
           error.message?.includes('account not found'))
       ) {
-        console.log('[executeSend] Account not funded, using default gas estimation');
+        console.warn('[executeSend] Account not funded, using default gas estimation');
 
         const feeToken = sendObject.feeToken;
         if (!feeToken) {
@@ -757,16 +732,6 @@ export const useSendActions = () => {
     receiveAsset: Asset;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeStablecoinSwap] Starting swap transaction', {
-      fromAddress,
-      sendObject,
-      receiveAsset: receiveAsset.denom,
-      originalAmount: sendObject.amount,
-      inputDenom: sendObject.denom,
-      outputDenom: receiveAsset.denom,
-      simulateTransaction,
-    });
-
     const swapParams = {
       sendObject,
       resultDenom: receiveAsset.denom, // need to use current denom here so it fails if ibc
@@ -796,16 +761,6 @@ export const useSendActions = () => {
     receiveChainId: string;
     simulateTransaction: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeIBC] Starting IBC transaction', {
-      fromAddress,
-      sendObject,
-      sendChainId,
-      receiveChainId,
-      originalAmount: sendObject.amount,
-      denom: sendObject.denom,
-      simulateTransaction,
-    });
-
     try {
       const sendChain = getFullRegistryChainInfo(sendChainId);
       const validChannel = await getValidIBCChannel({
@@ -895,14 +850,6 @@ export const useSendActions = () => {
     inputAmount: string;
     isSimulation: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeOsmosisExchange] Starting Osmosis exchange', {
-      stepHash: step.hash,
-      inputAmount,
-      inputDenom: step.fromAsset.denom,
-      outputDenom: step.toAsset.denom,
-      isSimulation,
-    });
-
     try {
       // Get session token for mnemonic
       const sessionToken = getSessionToken();
@@ -937,18 +884,6 @@ export const useSendActions = () => {
         throw new Error('No fee tokens available for Osmosis chain');
       }
 
-      console.log('[DEBUG][executeOsmosisExchange] Selected fee token:', {
-        inputToken: inputTokenDenom,
-        selectedFeeToken: selectedFeeToken.denom,
-        gasPriceStep: selectedFeeToken.gasPriceStep,
-        selectionType:
-          selectedFeeToken.denom === inputTokenDenom
-            ? 'Input token matches fee token'
-            : selectedFeeToken.denom === DEFAULT_OSMOSIS_DENOM
-              ? `Fell back to default: ${DEFAULT_OSMOSIS_DENOM}`
-              : 'Fell back to first available fee token',
-      });
-
       // Execute the Osmosis swap
       const result = await executeOsmosisSwap({
         mnemonic: mnemonic,
@@ -961,13 +896,6 @@ export const useSendActions = () => {
         tokenOutDenom: step.toAsset.denom,
         feeToken: selectedFeeToken,
         simulateOnly: isSimulation,
-      });
-
-      console.log('[DEBUG][executeOsmosisExchange] Osmosis swap result:', {
-        success: result.success,
-        simulated: result.simulated,
-        estimatedGas: result.estimatedGas,
-        transactionHash: result.transactionHash,
       });
 
       // Format the result to match the expected TransactionResult format
@@ -1299,18 +1227,6 @@ export const useSendActions = () => {
     inputAmount: string;
     isSimulation: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeStep] Executing step:', {
-      stepIndex: txRoute.steps.indexOf(step),
-      stepType: step.type,
-      stepHash: step.hash,
-      fromChain: step.fromChain,
-      toChain: step.toChain,
-      inputAmount,
-      inputDenom: step.fromAsset.denom,
-      outputDenom: step.toAsset.denom,
-      isSimulation,
-    });
-
     const stepLog = txLogs[step.hash];
     const feeToken = stepLog?.fees?.[0].feeToken;
 
@@ -1414,7 +1330,6 @@ export const useSendActions = () => {
           //   receiveAssetDenom: step.toAsset.denom,
           //   simulateTransaction: isSimulation,
           // });
-          console.log('[DEBUG][executeStep] Using Osmosis for exchange');
           result = await executeOsmosisExchange({
             step,
             inputAmount,
@@ -1425,16 +1340,6 @@ export const useSendActions = () => {
           throw new Error(`Unsupported transaction type: ${step.type}`);
       }
 
-      console.log('[DEBUG][executeStep] Step completed:', {
-        stepIndex: txRoute.steps.indexOf(step),
-        success: result.success,
-        gasWanted: result.data?.gasWanted,
-        fees: result.data?.fees,
-        estimatedOutput: result.data?.estimatedAmountOut,
-        inputAmount,
-        outputAmount: result.data?.estimatedAmountOut || '0',
-      });
-
       return result;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -1442,15 +1347,6 @@ export const useSendActions = () => {
   };
 
   const executeTransactionRoute = async (isSimulation: boolean): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeTransactionRoute] Starting transaction route', {
-      isSimulation,
-      totalSteps: txRoute.steps.length,
-      originalAmount: sendState.amount.toString(),
-      originalDenom: sendState.asset.denom,
-      targetChain: receiveState.chainId,
-      targetDenom: receiveState.asset.denom,
-    });
-
     resetRouteStatus(isSimulation);
 
     let result: TransactionResult = { success: true, message: '' };
@@ -1461,16 +1357,6 @@ export const useSendActions = () => {
       for (let i = 0; i < txRoute.steps.length; i++) {
         const step = txRoute.steps[i];
         const stepLog = txLogs[step.hash];
-
-        console.log('[DEBUG][executeTransactionRoute] Processing step:', {
-          stepIndex: i,
-          stepType: step.type,
-          fromChain: step.fromChain,
-          toChain: step.toChain,
-          inputAmount: currentInputAmount,
-          inputDenom: step.fromAsset.denom,
-          outputDenom: step.toAsset.denom,
-        });
 
         // Update step to pending
         updateTxStepLog({
@@ -1593,29 +1479,12 @@ export const useSendActions = () => {
           const fees = result.data.fees;
           const feeToken = stepLog?.fees?.[0].feeToken;
 
-          console.log('[DEBUG][executeTransactionRoute] Processing fees:', {
-            feesData: fees,
-            feeToken: feeToken?.denom,
-            stepType: step.type,
-            stepIndex: i,
-          });
-
           // Handle FeeStructure type (amount array)
           if (fees.amount && Array.isArray(fees.amount)) {
-            console.log(
-              '[DEBUG][executeTransactionRoute] Processing fee amount array:',
-              fees.amount,
-            );
             for (const feeAmount of fees.amount) {
-              console.log('[DEBUG][executeTransactionRoute] Processing individual fee amount:', {
-                denom: feeAmount.denom,
-                amount: feeAmount.amount,
-                amountType: typeof feeAmount.amount,
-              });
               // Use the helper function to resolve the asset
               let asset = resolveAssetFromDenom(feeAmount.denom, step.fromChain);
 
-              console.log('[executeTransactionRoute] resolved asset for fees.amount:', asset);
               const feeState: FeeState = {
                 asset,
                 amount: parseInt(feeAmount.amount, 10),
@@ -1630,10 +1499,6 @@ export const useSendActions = () => {
           }
           // Handle simple gasWanted/amount structure
           else if (result.data.gasWanted) {
-            console.log('[DEBUG][executeTransactionRoute] Processing gasWanted fee structure:', {
-              gasWanted: result.data.gasWanted,
-              gasWantedType: typeof result.data.gasWanted,
-            });
             const feeDenom = feeToken?.denom || '';
             let asset = resolveAssetFromDenom(feeDenom, step.fromChain);
 
@@ -1643,10 +1508,6 @@ export const useSendActions = () => {
             );
             const feeAmount =
               parseInt(result.data.gasWanted, 10) * (feeToken?.gasPriceStep?.average || 0);
-
-            console.log('[DEBUG][executeTransactionRoute] Fee Amount:', {
-              calculatedFee: feeAmount,
-            });
 
             const feeState: FeeState = {
               asset,
@@ -1664,41 +1525,18 @@ export const useSendActions = () => {
         let netOutput = currentInputAmount;
 
         if (result.success) {
-          console.log('[DEBUG][executeTransactionRoute] Calculating total fees for step:', {
-            stepIndex: i,
-            stepType: step.type,
-            feeData: feeData.map(f => ({ denom: f.asset.denom, amount: f.amount })),
-          });
           // Calculate total fees
           const totalFees = feeData.reduce((sum, fee) => sum + BigInt(fee.amount), BigInt(0));
-
-          console.log('[DEBUG][executeTransactionRoute] Total fees calculated:', {
-            totalFees: totalFees.toString(),
-            currentInputAmount: currentInputAmount,
-            currentInputType: typeof currentInputAmount,
-          });
 
           // Get the expected output amount
           let expectedOutput = BigInt(currentInputAmount);
           if (result.data?.estimatedAmountOut) {
-            console.log('[DEBUG][executeTransactionRoute] Using estimatedAmountOut:', {
-              estimatedAmountOut: result.data.estimatedAmountOut,
-              estimatedType: typeof result.data.estimatedAmountOut,
-            });
-
             const intEstAmountOut = Math.floor(parseFloat(result.data.estimatedAmountOut));
             expectedOutput = BigInt(intEstAmountOut);
           } else if (step.type === TransactionType.SWAP || step.type === TransactionType.EXCHANGE) {
-            console.log(
-              '[DEBUG][executeTransactionRoute] No estimatedAmountOut, using input as fallback',
-            );
             // For swaps/exchanges, if no explicit output, we might need to estimate
             // This would ideally come from the route response or simulation
             expectedOutput = BigInt(currentInputAmount); // Fallback
-            console.log(
-              '[DEBUG][executeTransactionRoute] Expected output:',
-              expectedOutput.toString(),
-            );
           }
 
           // Calculate net output based on transaction type
@@ -1719,21 +1557,6 @@ export const useSendActions = () => {
               netOutput = expectedOutput.toString();
           }
         }
-
-        console.log('[DEBUG][executeTransactionRoute] Step completed:', {
-          stepIndex: i,
-          success: result.success,
-          inputAmount: currentInputAmount,
-          outputAmount: netOutput,
-          fees: feeData.map(fee => ({
-            chainId: fee.chainId,
-            denom: fee.asset.denom,
-            amount: fee.amount,
-            gasWanted: fee.gasWanted,
-            gasPrice: fee.gasPrice,
-          })),
-          stepType: step.type,
-        });
 
         // Update the step log with net output and fees
         updateStepLog({

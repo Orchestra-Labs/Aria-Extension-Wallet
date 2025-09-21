@@ -269,7 +269,6 @@ export const loadOsmosisDataAtom = atom(null, async (get, set) => {
 
 export const isOsmosisSupportedDenomAtom = atom(get => (originDenom: string): boolean => {
   const osmosisAssets = get(osmosisAssetsAtom);
-  console.log('[DEBUG][isOsmosisSupportedDenomAtom] Osmosis assets:', osmosisAssets);
   return osmosisAssets.some(asset => asset.originDenom === originDenom);
 });
 

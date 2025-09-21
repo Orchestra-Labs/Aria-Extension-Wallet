@@ -214,33 +214,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   const receiveChain = getChainInfo(receiveState.chainId);
   const restUris = sendChain?.rest_uris;
 
-  console.log('[DEBUG][updateTransactionRouteAtom] Starting route calculation', {
-    sendState: {
-      chainId: sendState.chainId,
-      asset: sendState.asset
-        ? {
-            denom: sendState.asset.denom,
-            originDenom: sendState.asset.originDenom,
-            originChainId: sendState.asset.originChainId,
-            symbol: sendState.asset.symbol,
-          }
-        : null,
-      amount: sendState.amount,
-    },
-    receiveState: {
-      chainId: receiveState.chainId,
-      asset: receiveState.asset
-        ? {
-            denom: receiveState.asset.denom,
-            originDenom: receiveState.asset.originDenom,
-            originChainId: receiveState.asset.originChainId,
-            symbol: receiveState.asset.symbol,
-          }
-        : null,
-    },
-    walletAddress: walletAddress ? 'exists' : 'missing',
-  });
-
   if (!sendChain || !receiveChain) {
     console.error('[updateTransactionRouteAtom] Missing chain info');
     return;
@@ -258,14 +231,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   const isSendDenomSupported = isOsmosisSupportedDenom(sendState.asset.originDenom);
   const isReceiveDenomSupported = isOsmosisSupportedDenom(receiveState.asset.originDenom);
   const coinExchangeIsSupported = isSendDenomSupported && isReceiveDenomSupported;
-
-  console.log('[DEBUG][updateTransactionRouteAtom] Denom support check', {
-    sendDenom: sendState.asset.originDenom,
-    isSendDenomSupported,
-    receiveDenom: receiveState.asset.originDenom,
-    isReceiveDenomSupported,
-    coinExchangeIsSupported,
-  });
 
   // // Check chain support
   // const areChainsSkipSupported =
@@ -410,8 +375,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
       );
     }
   } else if (!sendAndReceiveAssetsMatch && coinExchangeIsSupported) {
-    console.log('[DEBUG][updateTransactionRouteAtom] Creating exchange route with Osmosis logic');
-
     const osmosisChainId = getOsmosisChainId(networkLevel);
 
     const isSendAssetOnOsmosis = sendState.chainId === osmosisChainId;
@@ -420,15 +383,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     // Check if assets are on their native chains
     const isSendAssetOnNativeChain = sendState.chainId === sendState.asset.originChainId;
     const isReceiveAssetOnNativeChain = receiveState.chainId === receiveState.asset.originChainId;
-
-    console.log('[DEBUG][updateTransactionRouteAtom] Asset chain status', {
-      sendAssetOnNativeChain: isSendAssetOnNativeChain,
-      receiveAssetOnNativeChain: isReceiveAssetOnNativeChain,
-      sendChainId: sendState.chainId,
-      sendOriginChainId: sendState.asset.originChainId,
-      receiveChainId: receiveState.chainId,
-      receiveOriginChainId: receiveState.asset.originChainId,
-    });
 
     const needsBridgeToOsmosis = !isSendAssetOnOsmosis && isSendDenomSupported;
     const needsBridgeFromOsmosis = !isReceiveAssetOnOsmosis && isReceiveDenomSupported;
