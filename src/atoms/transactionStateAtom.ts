@@ -208,7 +208,6 @@ export const totalFeesAtom = atom(get => {
         });
 
         // Only sum fees that use the same asset as the derived fee state
-        // TODO: correlate on Asset type via originalDenom, not via denom
         if (feeAsset && fee.asset.originDenom === feeAsset.originDenom) {
           totalFee += fee.amount;
           console.log(`[totalFeesAtom] Added fee: ${fee.amount}, new total: ${totalFee}`);

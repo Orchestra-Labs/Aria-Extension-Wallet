@@ -106,7 +106,6 @@ export const CreateWallet = () => {
 
   // TODO: add saved addresses (name and address)
 
-  // TODO: add feeLoading state so user knows fees are updating
   // TODO: add search icon to search field, add onclick
 
   // TODO: fix copytextfield issue of enlarged border on click
