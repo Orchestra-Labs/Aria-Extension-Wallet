@@ -1,7 +1,7 @@
 {
   "name": "Aria Wallet",
   "description": "Crypto wallet built for the Cosmos ecosystem.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "manifest_version": 3,
   "action": {
     "default_popup": "index.html",
@@ -18,23 +18,40 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content-script.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content-script.js"
+      ]
     }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
-  "host_permissions": ["https://*/*", "http://*/*"],
-  "permissions": ["clipboardWrite"],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "permissions": [
+    "clipboardWrite"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["index.html"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "index.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     },
     {
-      "resources": ["injected-script.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "injected-script.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

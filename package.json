@@ -1,7 +1,7 @@
 {
   "name": "aria-wallet",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,12 @@
     "check-types": "tsc",
     "prepare-zip": "yarn build && rm -f aria-wallet.zip && zip -r aria-wallet.zip dist/",
     "reinstall": "rm -rf node_modules yarn.lock && yarn install",
+    "version:show": "node -e \"console.log(require('./package.json').version)\"",
     "set-version": "NODE_OPTIONS='--loader ts-node/esm' ts-node src/scripts/set-version.ts",
+    "version:set": "yarn set-version",
+    "version:major": "yarn set-version major",
+    "version:minor": "yarn set-version minor",
+    "version:fix": "yarn set-version fix",
     "build:standard": "tsc && vite build && vite build --config vite.content-script.config.ts && npx vite build --config vite.background-script.config.ts && npx vite build --config vite.injected-script.config.ts",
     "build:tsc": "tsc --noEmit",
     "build:main": "NODE_OPTIONS=\"--max-old-space-size=4096\" vite build",

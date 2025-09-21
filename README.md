@@ -76,33 +76,48 @@ Builds the app and creates a aria-wallet.zip file for distribution.
 
 Deletes node_modules and yarn.lock and reinstalls dependencies.
 
-### `yarn set-version <version>`
+### `yarn version:show`
+
+Displays the current version from package.json.
+
+### `yarn version:set <version>`
 
 Updates both `package.json` and `manifest.json` to the specified version number.
 
+### `yarn version:major <version>`
+
+Automatically bumps the major version (e.g. 1.3.2 → 2.0.0). Use for breaking changes that require user action.
+
+### `yarn version:minior <version>`
+
+Automatically bumps the minor version (e.g. 1.3.2 → 1.4.0). Use for new features that maintain backward compatibility.
+
+### `yarn version:fix <version>`
+
+Automatically bumps the fix/patch version (e.g. 1.3.2 → 1.3.3). Use for bug fixes and minor improvements.
+
 #### Usage:
 
-- **Patch version** (e.g. bump `1.3.2` → `1.3.3`)
+- **Specific version**
 
   ```bash
-  yarn set-version 1.3.3
-  ```
-
-- **Minor version** (e.g. `1.3.2` → `1.4.0`)
-
-  ```bash
-  yarn set-version 1.4.0
+  yarn version:set 2.1.5
   ```
 
 - **Major version** (e.g. `1.3.2` → `2.0.0`)
 
   ```bash
-  yarn set-version 2.0.0
+  yarn version:major
   ```
 
-- **Specific version**
+- **Minor version** (e.g. `1.3.2` → `1.4.0`)
+
   ```bash
-  yarn set-version 2.1.5
+  yarn version:minor
   ```
 
-> ⚠️ This does not auto-increment. You must specify the full version explicitly.
+  - **Patch version** (e.g. bump `1.3.2` → `1.3.3`)
+
+  ```bash
+  yarn version:fix
+  ```
