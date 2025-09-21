@@ -5,13 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && vite build --config vite.content-script.config.ts && npx vite build --config vite.background-script.config.ts && npx vite build --config vite.injected-script.config.ts",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "check-types": "tsc",
     "prepare-zip": "yarn build && rm -f aria-wallet.zip && zip -r aria-wallet.zip dist/",
     "reinstall": "rm -rf node_modules yarn.lock && yarn install",
-    "set-version": "NODE_OPTIONS='--loader ts-node/esm' ts-node src/scripts/set-version.ts"
+    "set-version": "NODE_OPTIONS='--loader ts-node/esm' ts-node src/scripts/set-version.ts",
+    "build:standard": "tsc && vite build && vite build --config vite.content-script.config.ts && npx vite build --config vite.background-script.config.ts && npx vite build --config vite.injected-script.config.ts",
+    "build:tsc": "tsc --noEmit",
+    "build:main": "NODE_OPTIONS=\"--max-old-space-size=4096\" vite build",
+    "build:content": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite build --config vite.content-script.config.ts",
+    "build:background": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite build --config vite.background-script.config.ts",
+    "build:injected": "NODE_OPTIONS=\"--max-old-space-size=2048\" vite build --config vite.injected-script.config.ts",
+    "build:step-by-step": "yarn build:tsc && yarn build:main; yarn build:content; yarn build:background; yarn build:injected",
+    "build": "yarn build:step-by-step"
   },
   "dependencies": {
     "@cosmjs/amino": "^0.33.1",
@@ -54,6 +61,7 @@
     "jotai": "^2.10.0",
     "lucide-react": "~0.367.0",
     "mic-check": "^1.1.0",
+    "osmojs": "^16.15.0",
     "postcss": "~8.4.38",
     "protobufjs": "^7.5.4",
     "qrcode.react": "^4.0.1",

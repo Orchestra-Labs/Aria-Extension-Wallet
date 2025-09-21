@@ -1,3 +1,4 @@
+// TODO: remove this file if using bridges directly instead (already using DEXes directly)
 import { AssetRegistry } from '@/types';
 import { OfflineDirectSigner } from '@cosmjs/proto-signing';
 import { QueryType } from '@/constants';

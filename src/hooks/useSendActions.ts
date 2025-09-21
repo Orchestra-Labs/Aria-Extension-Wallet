@@ -15,18 +15,20 @@ import {
   getChainWalletAtom,
   allWalletAssetsAtom,
   updateStepLogAtom,
+  osmosisFeeTokenByDenomAtom,
 } from '@/atoms';
-import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
+import {
+  DEFAULT_OSMOSIS_DENOM,
+  GREATER_EXPONENT_DEFAULT,
+  TransactionStatus,
+  TransactionType,
+} from '@/constants';
 import {
   Asset,
   FeeState,
-  FeeStructure,
   FeeToken,
   IBCObject,
   SendObject,
-  SkipOperationFee,
-  SkipOperationSimulation,
-  SkipSimulationResult,
   TransactionResult,
   TransactionStep,
   Uri,
@@ -39,21 +41,17 @@ import {
   sendIBCTransaction,
   sendTransaction,
   swapTransaction,
-  executeSkipRoute,
   initializeSkipClient,
-  getSkipRoute,
-  simulateOsmosisSwap,
+  executeOsmosisSwap,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
-import { useGetSigner } from './useGetSigner';
 import { useEffect } from 'react';
-import { UserAddress } from '@skip-go/client/cjs';
 
 // TODO: set toast for if not on original page
 // TODO: ensure if sending with no receive address value, user sends to self on send address value
 export const useSendActions = () => {
   const { refreshData } = useRefreshData();
-  const { getCosmosSigner, getEvmSigner, getSvmSigner } = useGetSigner();
+  // const { getCosmosSigner, getEvmSigner, getSvmSigner } = useGetSigner();
 
   // Get all required state values at the hook level
   const sendState = useAtomValue(sendStateAtom);
@@ -72,6 +70,7 @@ export const useSendActions = () => {
   const resetRouteStatus = useSetAtom(resetRouteStatusAtom);
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
   const allWalletAssets = useAtomValue(allWalletAssetsAtom);
+  const getOsmosisFeeTokenByDenom = useAtomValue(osmosisFeeTokenByDenomAtom);
 
   // TODO: clean up.  not all of these functions need to be in this file
   const checkGasBalance = async ({
@@ -272,392 +271,392 @@ export const useSendActions = () => {
     };
   };
 
-  const calculateSkipFees = (
-    routeResponse: any, // TODO: should be of type Skip Route Response.  search Skip library for type
-    simulationResult?: SkipSimulationResult,
-  ): SkipOperationFee[] => {
-    const fees: SkipOperationFee[] = [];
+  // const calculateSkipFees = (
+  //   routeResponse: any, // TODO: should be of type Skip Route Response.  search Skip library for type
+  //   simulationResult?: SkipSimulationResult,
+  // ): SkipOperationFee[] => {
+  //   const fees: SkipOperationFee[] = [];
 
-    // Process each operation to collect fees
-    routeResponse.operations.forEach((operation: any, index: any) => {
-      let operationFee: SkipOperationFee | null = null;
-      let simulationFee: SkipOperationSimulation | null = null;
+  //   // Process each operation to collect fees
+  //   routeResponse.operations.forEach((operation: any, index: any) => {
+  //     let operationFee: SkipOperationFee | null = null;
+  //     let simulationFee: SkipOperationSimulation | null = null;
 
-      // Get corresponding simulation result if available
-      if (simulationResult && simulationResult.operations[index]) {
-        simulationFee = simulationResult.operations[index];
-      }
+  //     // Get corresponding simulation result if available
+  //     if (simulationResult && simulationResult.operations[index]) {
+  //       simulationFee = simulationResult.operations[index];
+  //     }
 
-      // Check if operation has a transfer with fee amount
-      if (operation.transfer && operation.transfer.feeAmount) {
-        operationFee = {
-          denom: operation.transfer.feeDenom || operation.transfer.denomIn,
-          amount: operation.transfer.feeAmount,
-          chainId: operation.transfer.fromChainId,
-          operationType: 'transfer',
-        };
-      }
+  //     // Check if operation has a transfer with fee amount
+  //     if (operation.transfer && operation.transfer.feeAmount) {
+  //       operationFee = {
+  //         denom: operation.transfer.feeDenom || operation.transfer.denomIn,
+  //         amount: operation.transfer.feeAmount,
+  //         chainId: operation.transfer.fromChainId,
+  //         operationType: 'transfer',
+  //       };
+  //     }
 
-      // For swap operations, prioritize simulation results over affiliate fees
-      if (operation.swap) {
-        // First, check if we have a valid simulation result
-        if (simulationFee && simulationFee.success) {
-          operationFee = {
-            denom: simulationFee.feeToken.denom,
-            amount: simulationFee.feeAmount.toString(),
-            chainId: simulationFee.chainId,
-            operationType: 'swap',
-          };
-        }
-        // Only use affiliate fee if no simulation result and it's non-zero
-        else if (operation.swap.estimatedAffiliateFee) {
-          const affiliateFee = operation.swap.estimatedAffiliateFee;
+  //     // For swap operations, prioritize simulation results over affiliate fees
+  //     if (operation.swap) {
+  //       // First, check if we have a valid simulation result
+  //       if (simulationFee && simulationFee.success) {
+  //         operationFee = {
+  //           denom: simulationFee.feeToken.denom,
+  //           amount: simulationFee.feeAmount.toString(),
+  //           chainId: simulationFee.chainId,
+  //           operationType: 'swap',
+  //         };
+  //       }
+  //       // Only use affiliate fee if no simulation result and it's non-zero
+  //       else if (operation.swap.estimatedAffiliateFee) {
+  //         const affiliateFee = operation.swap.estimatedAffiliateFee;
 
-          if (affiliateFee && affiliateFee !== '0') {
-            // Find the index where numbers end and letters begin
-            let splitIndex = 0;
-            while (splitIndex < affiliateFee.length && !isNaN(parseInt(affiliateFee[splitIndex]))) {
-              splitIndex++;
-            }
+  //         if (affiliateFee && affiliateFee !== '0') {
+  //           // Find the index where numbers end and letters begin
+  //           let splitIndex = 0;
+  //           while (splitIndex < affiliateFee.length && !isNaN(parseInt(affiliateFee[splitIndex]))) {
+  //             splitIndex++;
+  //           }
 
-            const amount = affiliateFee.substring(0, splitIndex);
-            const denom = affiliateFee.substring(splitIndex);
+  //           const amount = affiliateFee.substring(0, splitIndex);
+  //           const denom = affiliateFee.substring(splitIndex);
 
-            if (amount !== '0') {
-              operationFee = {
-                denom: denom || operation.swap.denomOut,
-                amount: amount,
-                chainId: operation.swap.fromChainId,
-                operationType: 'swap',
-              };
-            }
-          }
-        }
-      }
+  //           if (amount !== '0') {
+  //             operationFee = {
+  //               denom: denom || operation.swap.denomOut,
+  //               amount: amount,
+  //               chainId: operation.swap.fromChainId,
+  //               operationType: 'swap',
+  //             };
+  //           }
+  //         }
+  //       }
+  //     }
 
-      // Use simulation result as fallback if no fee found yet
-      if ((!operationFee || operationFee.amount === '0') && simulationFee) {
-        operationFee = {
-          denom: simulationFee.feeToken.denom,
-          amount: simulationFee.feeAmount.toString(),
-          chainId: simulationFee.chainId,
-          operationType: simulationFee.operationType || 'transfer',
-        };
-      }
+  //     // Use simulation result as fallback if no fee found yet
+  //     if ((!operationFee || operationFee.amount === '0') && simulationFee) {
+  //       operationFee = {
+  //         denom: simulationFee.feeToken.denom,
+  //         amount: simulationFee.feeAmount.toString(),
+  //         chainId: simulationFee.chainId,
+  //         operationType: simulationFee.operationType || 'transfer',
+  //       };
+  //     }
 
-      // Check if we still don't have a fee
-      if (!operationFee) {
-        // Final fallback: use a conservative default estimate
-        const defaultGasEstimate = operation.swap ? 200000 : 250000; // Different defaults for swap vs transfer
-        const chainInfo = getFullRegistryChainInfo(
-          operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
-        );
-        const feeToken = chainInfo?.fees?.[0];
+  //     // Check if we still don't have a fee
+  //     if (!operationFee) {
+  //       // Final fallback: use a conservative default estimate
+  //       const defaultGasEstimate = operation.swap ? 200000 : 250000; // Different defaults for swap vs transfer
+  //       const chainInfo = getFullRegistryChainInfo(
+  //         operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
+  //       );
+  //       const feeToken = chainInfo?.fees?.[0];
 
-        if (feeToken) {
-          const gasPrice = feeToken.gasPriceStep.average;
-          const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+  //       if (feeToken) {
+  //         const gasPrice = feeToken.gasPriceStep.average;
+  //         const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
 
-          operationFee = {
-            denom: feeToken.denom,
-            amount: feeAmount.toString(),
-            chainId: operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
-            operationType: operation.swap ? 'swap' : 'transfer',
-          };
-        }
-      }
+  //         operationFee = {
+  //           denom: feeToken.denom,
+  //           amount: feeAmount.toString(),
+  //           chainId: operation.swap ? operation.swap.fromChainId : operation.transfer.fromChainId,
+  //           operationType: operation.swap ? 'swap' : 'transfer',
+  //         };
+  //       }
+  //     }
 
-      // Add the fee to the list if valid
-      if (operationFee && operationFee.amount !== '0') {
-        // Ensure denoms match when summing fees for the same chain
-        const existingFeeIndex = fees.findIndex(
-          f => f.chainId === operationFee!.chainId && f.denom === operationFee!.denom,
-        );
+  //     // Add the fee to the list if valid
+  //     if (operationFee && operationFee.amount !== '0') {
+  //       // Ensure denoms match when summing fees for the same chain
+  //       const existingFeeIndex = fees.findIndex(
+  //         f => f.chainId === operationFee!.chainId && f.denom === operationFee!.denom,
+  //       );
 
-        if (existingFeeIndex >= 0) {
-          // Sum fees with matching denoms and chainIds
-          const existingAmount = BigInt(fees[existingFeeIndex].amount);
-          const newAmount = BigInt(operationFee.amount);
-          const totalAmount = (existingAmount + newAmount).toString();
+  //       if (existingFeeIndex >= 0) {
+  //         // Sum fees with matching denoms and chainIds
+  //         const existingAmount = BigInt(fees[existingFeeIndex].amount);
+  //         const newAmount = BigInt(operationFee.amount);
+  //         const totalAmount = (existingAmount + newAmount).toString();
 
-          fees[existingFeeIndex].amount = totalAmount;
-        } else {
-          fees.push(operationFee);
-        }
-      }
-    });
+  //         fees[existingFeeIndex].amount = totalAmount;
+  //       } else {
+  //         fees.push(operationFee);
+  //       }
+  //     }
+  //   });
 
-    return fees;
-  };
+  //   return fees;
+  // };
 
-  const runSkipFeeSimulations = async (
-    skipRoute: any,
-    userAddresses: { chainId: string; address: string }[],
-  ): Promise<SkipSimulationResult> => {
-    const simulations: SkipOperationSimulation[] = [];
-    const operationFees: SkipOperationFee[] = [];
-    let totalEstimatedFees = 0;
-    let allSufficient = true;
+  // const runSkipFeeSimulations = async (
+  //   skipRoute: any,
+  //   userAddresses: { chainId: string; address: string }[],
+  // ): Promise<SkipSimulationResult> => {
+  //   const simulations: SkipOperationSimulation[] = [];
+  //   const operationFees: SkipOperationFee[] = [];
+  //   let totalEstimatedFees = 0;
+  //   let allSufficient = true;
 
-    // Process each operation in the route
-    for (const operation of skipRoute.operations) {
-      let chainId: string;
-      let denom: string;
-      let operationType: string;
+  //   // Process each operation in the route
+  //   for (const operation of skipRoute.operations) {
+  //     let chainId: string;
+  //     let denom: string;
+  //     let operationType: string;
 
-      if (operation.swap) {
-        chainId = operation.swap.fromChainId;
-        denom = operation.swap.denomIn;
-        operationType = 'swap';
-      } else {
-        chainId = operation.transfer.fromChainId;
-        denom = operation.transfer.denomIn;
-        operationType = 'transfer';
-      }
+  //     if (operation.swap) {
+  //       chainId = operation.swap.fromChainId;
+  //       denom = operation.swap.denomIn;
+  //       operationType = 'swap';
+  //     } else {
+  //       chainId = operation.transfer.fromChainId;
+  //       denom = operation.transfer.denomIn;
+  //       operationType = 'transfer';
+  //     }
 
-      console.log(
-        `[runSkipFeeSimulations] Processing ${operationType} operation on ${chainId} with ${denom}`,
-      );
+  //     console.log(
+  //       `[runSkipFeeSimulations] Processing ${operationType} operation on ${chainId} with ${denom}`,
+  //     );
 
-      // TODO: start here.  logs show processing line above, but not code walkthrough below. find out if going through correct process, then test and clean up
-      const chainInfo = getFullRegistryChainInfo(chainId);
-      if (!chainInfo) {
-        simulations.push({
-          chainId,
-          denom,
-          operationType,
-          success: false,
-          estimatedGas: '0',
-          feeAmount: 0,
-          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
-          error: `Chain info not found for ${chainId}`,
-        });
-        operationFees.push({ amount: '0', denom, chainId, operationType });
-        allSufficient = false;
-        continue;
-      }
+  //     // TODO: start here.  logs show processing line above, but not code walkthrough below. find out if going through correct process, then test and clean up
+  //     const chainInfo = getFullRegistryChainInfo(chainId);
+  //     if (!chainInfo) {
+  //       simulations.push({
+  //         chainId,
+  //         denom,
+  //         operationType,
+  //         success: false,
+  //         estimatedGas: '0',
+  //         feeAmount: 0,
+  //         feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+  //         error: `Chain info not found for ${chainId}`,
+  //       });
+  //       operationFees.push({ amount: '0', denom, chainId, operationType });
+  //       allSufficient = false;
+  //       continue;
+  //     }
 
-      // Get the correct address for this specific chain
-      const userAddress = userAddresses.find(addr => addr.chainId === chainId)?.address;
-      if (!userAddress) {
-        simulations.push({
-          chainId,
-          denom,
-          operationType,
-          success: false,
-          estimatedGas: '0',
-          feeAmount: 0,
-          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
-          error: `User address not found for chain ${chainId}`,
-        });
-        operationFees.push({ amount: '0', denom, chainId, operationType });
-        allSufficient = false;
-        continue;
-      }
+  //     // Get the correct address for this specific chain
+  //     const userAddress = userAddresses.find(addr => addr.chainId === chainId)?.address;
+  //     if (!userAddress) {
+  //       simulations.push({
+  //         chainId,
+  //         denom,
+  //         operationType,
+  //         success: false,
+  //         estimatedGas: '0',
+  //         feeAmount: 0,
+  //         feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+  //         error: `User address not found for chain ${chainId}`,
+  //       });
+  //       operationFees.push({ amount: '0', denom, chainId, operationType });
+  //       allSufficient = false;
+  //       continue;
+  //     }
 
-      const feeToken = chainInfo.fees?.[0];
-      if (!feeToken) {
-        simulations.push({
-          chainId,
-          denom,
-          operationType,
-          success: false,
-          estimatedGas: '0',
-          feeAmount: 0,
-          feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
-          error: `No fee tokens available for chain ${chainId}`,
-        });
-        operationFees.push({ amount: '0', denom, chainId, operationType });
-        allSufficient = false;
-        continue;
-      }
+  //     const feeToken = chainInfo.fees?.[0];
+  //     if (!feeToken) {
+  //       simulations.push({
+  //         chainId,
+  //         denom,
+  //         operationType,
+  //         success: false,
+  //         estimatedGas: '0',
+  //         feeAmount: 0,
+  //         feeToken: { denom: 'unknown', gasPriceStep: { low: 0, average: 0, high: 0 } },
+  //         error: `No fee tokens available for chain ${chainId}`,
+  //       });
+  //       operationFees.push({ amount: '0', denom, chainId, operationType });
+  //       allSufficient = false;
+  //       continue;
+  //     }
 
-      // Use a smaller amount for simulation to avoid insufficient funds errors
-      const simulationAmount = '1000';
-      const sendObject: SendObject = {
-        recipientAddress: userAddress,
-        amount: simulationAmount,
-        denom,
-        feeToken,
-      };
+  //     // Use a smaller amount for simulation to avoid insufficient funds errors
+  //     const simulationAmount = '1000';
+  //     const sendObject: SendObject = {
+  //       recipientAddress: userAddress,
+  //       amount: simulationAmount,
+  //       denom,
+  //       feeToken,
+  //     };
 
-      let simulationResult: TransactionResult;
-      let operationFeeAmount = 0;
-      let isDefaultEstimate = false;
+  //     let simulationResult: TransactionResult;
+  //     let operationFeeAmount = 0;
+  //     let isDefaultEstimate = false;
 
-      try {
-        // NOTE: swapVenue name will be osmosis-poolmanager
-        if (operation.swap) {
-          // TODO: don't use hard indexing
-          const swapOperations = operation.swap.swapIn?.swapOperations;
-          if (swapOperations && swapOperations.length > 0) {
-            // Use the unified swap simulation function for both single and multi-hop
-            simulationResult = await simulateOsmosisSwap({
-              sender: userAddress,
-              swapOperations,
-              tokenInAmount: simulationAmount,
-              chainId,
-              restUris: chainInfo.rest_uris,
-              feeToken,
-            });
-          } else {
-            simulationResult = await executeSend({
-              fromAddress: userAddress,
-              sendObject,
-              chainId: chainId,
-              simulateTransaction: true,
-            });
-          }
-        } else if (operation.transfer) {
-          const ibcSendObject: SendObject = {
-            ...sendObject,
-            amount: simulationAmount,
-          };
+  //     try {
+  //       // NOTE: swapVenue name will be osmosis-poolmanager
+  //       if (operation.swap) {
+  //         // TODO: don't use hard indexing
+  //         const swapOperations = operation.swap.swapIn?.swapOperations;
+  //         if (swapOperations && swapOperations.length > 0) {
+  //           // Use the unified swap simulation function for both single and multi-hop
+  //           simulationResult = await simulateOsmosisSwap({
+  //             sender: userAddress,
+  //             swapOperations,
+  //             tokenInAmount: simulationAmount,
+  //             chainId,
+  //             restUris: chainInfo.rest_uris,
+  //             feeToken,
+  //           });
+  //         } else {
+  //           simulationResult = await executeSend({
+  //             fromAddress: userAddress,
+  //             sendObject,
+  //             chainId: chainId,
+  //             simulateTransaction: true,
+  //           });
+  //         }
+  //       } else if (operation.transfer) {
+  //         const ibcSendObject: SendObject = {
+  //           ...sendObject,
+  //           amount: simulationAmount,
+  //         };
 
-          simulationResult = await executeIBC({
-            fromAddress: userAddress,
-            sendObject: ibcSendObject,
-            sendChainId: chainId,
-            receiveChainId: operation.transfer.toChainId,
-            simulateTransaction: true,
-          });
-        } else {
-          simulationResult = await executeSend({
-            fromAddress: userAddress,
-            sendObject,
-            chainId: chainId,
-            simulateTransaction: true,
-          });
-        }
+  //         simulationResult = await executeIBC({
+  //           fromAddress: userAddress,
+  //           sendObject: ibcSendObject,
+  //           sendChainId: chainId,
+  //           receiveChainId: operation.transfer.toChainId,
+  //           simulateTransaction: true,
+  //         });
+  //       } else {
+  //         simulationResult = await executeSend({
+  //           fromAddress: userAddress,
+  //           sendObject,
+  //           chainId: chainId,
+  //           simulateTransaction: true,
+  //         });
+  //       }
 
-        if (simulationResult.success && simulationResult.data) {
-          const estimatedGas = simulationResult.data.gasWanted || '0';
-          const gasPrice = feeToken.gasPriceStep.average;
-          const feeAmount = Math.ceil(parseInt(estimatedGas) * gasPrice);
-          operationFeeAmount = feeAmount;
+  //       if (simulationResult.success && simulationResult.data) {
+  //         const estimatedGas = simulationResult.data.gasWanted || '0';
+  //         const gasPrice = feeToken.gasPriceStep.average;
+  //         const feeAmount = Math.ceil(parseInt(estimatedGas) * gasPrice);
+  //         operationFeeAmount = feeAmount;
 
-          // Check if this is a default estimate
-          isDefaultEstimate = simulationResult.message?.includes('default gas estimate') || false;
+  //         // Check if this is a default estimate
+  //         isDefaultEstimate = simulationResult.message?.includes('default gas estimate') || false;
 
-          if (!isDefaultEstimate) {
-            // Only check balance for actual simulations, not default estimates
-            const balanceCheck = await checkGasBalance({
-              address: userAddress,
-              feeToken,
-              estimatedGas,
-              chainId,
-              restUris: chainInfo.rest_uris,
-            });
+  //         if (!isDefaultEstimate) {
+  //           // Only check balance for actual simulations, not default estimates
+  //           const balanceCheck = await checkGasBalance({
+  //             address: userAddress,
+  //             feeToken,
+  //             estimatedGas,
+  //             chainId,
+  //             restUris: chainInfo.rest_uris,
+  //           });
 
-            const operationSuccess = balanceCheck.hasSufficientBalance;
-            if (!operationSuccess) {
-              allSufficient = false;
-            }
+  //           const operationSuccess = balanceCheck.hasSufficientBalance;
+  //           if (!operationSuccess) {
+  //             allSufficient = false;
+  //           }
 
-            simulations.push({
-              chainId,
-              denom,
-              operationType,
-              success: operationSuccess,
-              estimatedGas,
-              feeAmount,
-              feeToken,
-              error: operationSuccess
-                ? undefined
-                : `Insufficient ${feeToken.denom} for gas fees. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}`,
-            });
-          } else {
-            // For default estimates, assume insufficient balance
-            simulations.push({
-              chainId,
-              denom,
-              operationType,
-              success: false,
-              estimatedGas,
-              feeAmount,
-              feeToken,
-            });
-          }
+  //           simulations.push({
+  //             chainId,
+  //             denom,
+  //             operationType,
+  //             success: operationSuccess,
+  //             estimatedGas,
+  //             feeAmount,
+  //             feeToken,
+  //             error: operationSuccess
+  //               ? undefined
+  //               : `Insufficient ${feeToken.denom} for gas fees. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}`,
+  //           });
+  //         } else {
+  //           // For default estimates, assume insufficient balance
+  //           simulations.push({
+  //             chainId,
+  //             denom,
+  //             operationType,
+  //             success: false,
+  //             estimatedGas,
+  //             feeAmount,
+  //             feeToken,
+  //           });
+  //         }
 
-          totalEstimatedFees += feeAmount;
-        } else {
-          // If simulation fails completely, use conservative default (with IBC being higher)
-          const defaultGasEstimate = operationType === 'transfer' ? 250000 : 200000;
-          const gasPrice = feeToken.gasPriceStep.average;
-          const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
-          operationFeeAmount = feeAmount;
-          isDefaultEstimate = true;
+  //         totalEstimatedFees += feeAmount;
+  //       } else {
+  //         // If simulation fails completely, use conservative default (with IBC being higher)
+  //         const defaultGasEstimate = operationType === 'transfer' ? 250000 : 200000;
+  //         const gasPrice = feeToken.gasPriceStep.average;
+  //         const feeAmount = Math.ceil(defaultGasEstimate * gasPrice);
+  //         operationFeeAmount = feeAmount;
+  //         isDefaultEstimate = true;
 
-          simulations.push({
-            chainId,
-            denom,
-            operationType,
-            success: false,
-            estimatedGas: defaultGasEstimate.toString(),
-            feeAmount,
-            feeToken,
-            error: simulationResult?.message || 'Simulation failed',
-          });
+  //         simulations.push({
+  //           chainId,
+  //           denom,
+  //           operationType,
+  //           success: false,
+  //           estimatedGas: defaultGasEstimate.toString(),
+  //           feeAmount,
+  //           feeToken,
+  //           error: simulationResult?.message || 'Simulation failed',
+  //         });
 
-          totalEstimatedFees += feeAmount;
-        }
-      } catch (error) {
-        console.error(
-          `[runSkipFeeSimulations] Error simulating ${operationType} on ${chainId}:`,
-          error,
-        );
+  //         totalEstimatedFees += feeAmount;
+  //       }
+  //     } catch (error) {
+  //       console.error(
+  //         `[runSkipFeeSimulations] Error simulating ${operationType} on ${chainId}:`,
+  //         error,
+  //       );
 
-        simulations.push({
-          chainId,
-          denom,
-          operationType,
-          success: false,
-          estimatedGas: '0',
-          feeAmount: 0,
-          feeToken,
-          error: error instanceof Error ? error.message : 'Simulation failed',
-        });
-        operationFees.push({ amount: '0', denom, chainId, operationType });
-        allSufficient = false;
-        continue;
-      }
+  //       simulations.push({
+  //         chainId,
+  //         denom,
+  //         operationType,
+  //         success: false,
+  //         estimatedGas: '0',
+  //         feeAmount: 0,
+  //         feeToken,
+  //         error: error instanceof Error ? error.message : 'Simulation failed',
+  //       });
+  //       operationFees.push({ amount: '0', denom, chainId, operationType });
+  //       allSufficient = false;
+  //       continue;
+  //     }
 
-      // Calculate final fee amount for this operation
-      let finalFeeAmount = operationFeeAmount;
+  //     // Calculate final fee amount for this operation
+  //     let finalFeeAmount = operationFeeAmount;
 
-      // Add estimated affiliate fee if it exists (for swaps)
-      if (operation.swap && operation.swap.estimatedAffiliateFee) {
-        const affiliateFee = operation.swap.estimatedAffiliateFee;
-        const [affiliateAmount, affiliateDenom] = affiliateFee.split(/(?=\D+$)/); // Split at the first non-digit
+  //     // Add estimated affiliate fee if it exists (for swaps)
+  //     if (operation.swap && operation.swap.estimatedAffiliateFee) {
+  //       const affiliateFee = operation.swap.estimatedAffiliateFee;
+  //       const [affiliateAmount, affiliateDenom] = affiliateFee.split(/(?=\D+$)/); // Split at the first non-digit
 
-        if (affiliateDenom === denom) {
-          finalFeeAmount += parseInt(affiliateAmount) || 0;
-        }
-      }
+  //       if (affiliateDenom === denom) {
+  //         finalFeeAmount += parseInt(affiliateAmount) || 0;
+  //       }
+  //     }
 
-      operationFees.push({
-        amount: finalFeeAmount.toString(),
-        denom: isDefaultEstimate ? feeToken.denom : denom, // Use fee token denom for default estimates
-        chainId,
-        operationType,
-      });
-    }
+  //     operationFees.push({
+  //       amount: finalFeeAmount.toString(),
+  //       denom: isDefaultEstimate ? feeToken.denom : denom, // Use fee token denom for default estimates
+  //       chainId,
+  //       operationType,
+  //     });
+  //   }
 
-    console.log('[runSkipFeeSimulations] Completed simulations:', {
-      totalOperations: simulations.length,
-      totalEstimatedFees,
-      allSufficient,
-      simulations,
-      operationFees,
-    });
+  //   console.log('[runSkipFeeSimulations] Completed simulations:', {
+  //     totalOperations: simulations.length,
+  //     totalEstimatedFees,
+  //     allSufficient,
+  //     simulations,
+  //     operationFees,
+  //   });
 
-    return {
-      operations: simulations,
-      totalEstimatedFees,
-      hasSufficientBalances: allSufficient,
-      operationFees,
-    };
-  };
+  //   return {
+  //     operations: simulations,
+  //     totalEstimatedFees,
+  //     hasSufficientBalances: allSufficient,
+  //     operationFees,
+  //   };
+  // };
 
   const executeSend = async ({
     fromAddress,
@@ -887,276 +886,409 @@ export const useSendActions = () => {
     }
   };
 
-  // TODO: enable amount out as an option (to handle billing)
-  // TODO: use call to Osmosis for exchange after getting pool from route
-  const executeSkipTx = async ({
+  const executeOsmosisExchange = async ({
     step,
-    sendObject,
-    receiveAssetDenom,
-    simulateTransaction,
+    inputAmount,
+    isSimulation,
   }: {
     step: TransactionStep;
-    sendObject: SendObject;
-    receiveAssetDenom: string;
-    simulateTransaction: boolean;
+    inputAmount: string;
+    isSimulation: boolean;
   }): Promise<TransactionResult> => {
-    console.log('[DEBUG][executeSkipTx] Starting Skip transaction', {
-      stepType: step.type,
+    console.log('[DEBUG][executeOsmosisExchange] Starting Osmosis exchange', {
       stepHash: step.hash,
-      originalAmount: sendObject.amount,
-      inputDenom: sendObject.denom,
-      outputDenom: receiveAssetDenom,
-      simulateTransaction,
+      inputAmount,
+      inputDenom: step.fromAsset.denom,
+      outputDenom: step.toAsset.denom,
+      isSimulation,
     });
 
     try {
-      // First, get the initial route to calculate fees
-      const routeResponse = await getSkipRoute({
-        fromChainId: sendState.asset.originChainId,
-        fromDenom: sendObject.denom,
-        toChainId: receiveState.chainId,
-        toDenom: receiveAssetDenom,
-        amount: sendObject.amount,
+      // Get session token for mnemonic
+      const sessionToken = getSessionToken();
+      if (!sessionToken) {
+        throw new Error("Session token doesn't exist");
+      }
+
+      const mnemonic = sessionToken.mnemonic;
+
+      // Get chain info for Osmosis chain
+      const osmosisChainId = step.fromChain; // Should be the same as toChain for Osmosis exchanges
+      const chainInfo = getFullRegistryChainInfo(osmosisChainId);
+
+      if (!chainInfo) {
+        throw new Error(`Chain info not found for Osmosis chain: ${osmosisChainId}`);
+      }
+
+      // Get RPC endpoint
+      const rpcEndpoint = chainInfo.rpc_uris[0]?.address;
+      if (!rpcEndpoint) {
+        throw new Error(`No RPC endpoint found for Osmosis chain: ${osmosisChainId}`);
+      }
+
+      // Get sender address for Osmosis chain
+      const senderAddress = await getAddressByChainPrefix(mnemonic, chainInfo.bech32_prefix);
+
+      // Get the fee token using the atom
+      const inputTokenDenom = step.fromAsset.denom;
+      const selectedFeeToken = getOsmosisFeeTokenByDenom(inputTokenDenom);
+
+      if (!selectedFeeToken) {
+        throw new Error('No fee tokens available for Osmosis chain');
+      }
+
+      console.log('[DEBUG][executeOsmosisExchange] Selected fee token:', {
+        inputToken: inputTokenDenom,
+        selectedFeeToken: selectedFeeToken.denom,
+        gasPriceStep: selectedFeeToken.gasPriceStep,
+        selectionType:
+          selectedFeeToken.denom === inputTokenDenom
+            ? 'Input token matches fee token'
+            : selectedFeeToken.denom === DEFAULT_OSMOSIS_DENOM
+              ? `Fell back to default: ${DEFAULT_OSMOSIS_DENOM}`
+              : 'Fell back to first available fee token',
       });
 
-      console.log('[DEBUG][executeSkipTx] Route response:', {
-        operationsCount: routeResponse.operations?.length,
-        amountIn: routeResponse.amountIn,
-        amountOut: routeResponse.amountOut,
-        operations: routeResponse.operations?.map((op: any, index: number) => ({
-          index,
-          type: op.swap ? 'swap' : 'transfer',
-          fromChain: op.swap ? op.swap.fromChainId : op.transfer?.fromChainId,
-          toChain: op.swap ? op.swap.toChainId : op.transfer?.toChainId,
-          inputDenom: op.swap ? op.swap.denomIn : op.transfer?.denomIn,
-          outputDenom: op.swap ? op.swap.denomOut : op.transfer?.denomOut,
-        })),
-      });
-
-      if (!routeResponse.operations?.length) {
-        throw new Error('No valid Skip route found');
-      }
-
-      // Get user addresses for all required chains
-      // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
-      const requiredChainAddresses = routeResponse.requiredChainAddresses;
-      const userAddresses: UserAddress[] = await Promise.all(
-        requiredChainAddresses.map(async (chainId: string, index: number) => {
-          console.log(`🔄 Processing chain ${index}: ${chainId}`);
-
-          let address: string;
-          const chainWallet = getWalletInfo(chainId);
-
-          if ((chainWallet && chainWallet.address) || chainWallet.address.trim() !== '') {
-            console.log(`✅ Using local wallet for ${chainId}: ${chainWallet.address}`);
-            address = chainWallet.address;
-          } else {
-            console.log(`⚠️  No local wallet found for ${chainId}, generating from mnemonic`);
-            // Fallback: get address from mnemonic
-            const sessionToken = getSessionToken();
-            if (!sessionToken) throw new Error("Session token doesn't exist");
-
-            const chainInfo = getFullRegistryChainInfo(chainId);
-            console.log(`🔍 Chain info for ${chainId}:`, chainInfo);
-
-            if (!chainInfo?.bech32_prefix) {
-              console.error(`❌ Prefix not found for chain ${chainId}`);
-              throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId}`);
-            }
-
-            console.log(
-              `🔑 Generating address for ${chainId} with prefix: ${chainInfo.bech32_prefix}`,
-            );
-            try {
-              address = await getAddressByChainPrefix(
-                sessionToken.mnemonic,
-                chainInfo.bech32_prefix,
-              );
-              console.log(`✅ Generated address for ${chainId}: ${address}`);
-            } catch (error) {
-              console.error(`❌ Failed to generate address for ${chainId}:`, error);
-              throw error;
-            }
-          }
-
-          return {
-            chainId,
-            address,
-          };
-        }),
-      );
-
-      console.log('👥 Final user addresses:', userAddresses);
-
-      // Validate that all addresses are properly defined
-      const validAddresses = userAddresses.filter(
-        addr => addr && addr.chainId && addr.address && addr.address.trim() !== '',
-      );
-
-      if (validAddresses.length !== requiredChainAddresses.length) {
-        throw new Error('Missing addresses on Skip path');
-      }
-
-      // Run fee simulations before proceeding
-      const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
-      const calculatedFees = calculateSkipFees(routeResponse, simulationResult);
-
-      // Calculate fees for the initial chain (first operation)
-      const initialChainFees = calculatedFees.filter(
-        fee => fee.chainId === sendState.asset.originChainId,
-      );
-
-      let adjustedInputAmount = BigInt(sendObject.amount);
-
-      // Subtract fees from the initial amount for the first chain
-      if (initialChainFees.length > 0) {
-        const totalFees = initialChainFees.reduce(
-          (sum, fee) => sum + BigInt(fee.amount),
-          BigInt(0),
-        );
-
-        // Ensure we don't subtract more than available
-        if (totalFees > adjustedInputAmount) {
-          throw new Error(
-            `Insufficient funds: ${sendObject.amount}${sendObject.denom} available, but ${totalFees.toString()}${initialChainFees[0].denom} needed for fees`,
-          );
-        }
-
-        adjustedInputAmount -= totalFees;
-
-        console.log('[DEBUG][executeSkipTx] Adjusted input amount after fee deduction:', {
-          originalAmount: sendObject.amount,
-          totalFees: totalFees.toString(),
-          adjustedAmount: adjustedInputAmount.toString(),
-          feeDenom: initialChainFees[0].denom,
-        });
-      }
-
-      // Get a new route with the adjusted amount if we subtracted fees
-      let finalRouteResponse = routeResponse;
-      if (adjustedInputAmount !== BigInt(sendObject.amount)) {
-        console.log('[DEBUG][executeSkipTx] Requesting new route with adjusted amount');
-
-        finalRouteResponse = await getSkipRoute({
-          fromChainId: sendState.asset.originChainId,
-          fromDenom: sendObject.denom,
-          toChainId: receiveState.chainId,
-          toDenom: receiveAssetDenom,
-          amount: adjustedInputAmount.toString(),
-        });
-
-        console.log('[DEBUG][executeSkipTx] Adjusted route response:', {
-          operationsCount: finalRouteResponse.operations?.length,
-          amountIn: finalRouteResponse.amountIn,
-          amountOut: finalRouteResponse.amountOut,
-        });
-      }
-
-      // For simulation, return early with route info
-      if (simulateTransaction) {
-        const feeStructure: FeeStructure = {
-          amount: calculatedFees.map(fee => ({
-            denom: fee.denom,
-            amount: fee.amount,
-          })),
-          gas: calculatedFees[0]?.amount || '0',
-        };
-
-        updateStepLog({
-          stepHash: step.hash,
-          log: {
-            skipRoute: finalRouteResponse,
-            inputAmount: sendObject.amount,
-            outputAmount: finalRouteResponse.estimatedAmountOut || '0',
-            // Also update fees if available from simulation
-            fees: calculatedFees.map(fee => {
-              const chainRegistryFeeInfo = getFullRegistryChainInfo(fee.chainId)?.fees?.[0];
-              const asset = resolveAssetFromDenom(fee.denom, fee.chainId);
-
-              // Parse the fee amount to ensure it's a number
-              const feeAmount = parseInt(fee.amount, 10);
-
-              return {
-                asset,
-                amount: feeAmount,
-                chainId: fee.chainId,
-                feeToken: chainRegistryFeeInfo || {
-                  denom: fee.denom,
-                  gasPriceStep: { low: 0, average: 0, high: 0 },
-                },
-                gasWanted: feeAmount,
-                gasPrice: chainRegistryFeeInfo?.gasPriceStep?.average || 0,
-              };
-            }),
-          },
-        });
-
-        console.log('[DEBUG][executeSkipTx] Simulation completed:', {
-          originalInput: sendObject.amount,
-          finalOutput: finalRouteResponse.estimatedAmountOut,
-          fees: calculatedFees.map(fee => ({
-            chainId: fee.chainId,
-            denom: fee.denom,
-            amount: fee.amount,
-            operationType: fee.operationType,
-          })),
-          operations: finalRouteResponse.operations?.map((op: any, index: number) => ({
-            index,
-            type: op.swap ? 'swap' : 'transfer',
-            inputAmount: op.swap ? op.swap.amountIn : op.transfer?.amount,
-            outputAmount: op.swap ? op.swap.amountOut : op.transfer?.amount,
-          })),
-        });
-
-        return {
-          success: true,
-          message: 'Transaction simulation successful',
-          data: {
-            code: 0,
-            txHash: 'simulated',
-            gasWanted: calculatedFees[0]?.amount || '0',
-            route: finalRouteResponse,
-            estimatedAmountOut: finalRouteResponse.amountOut,
-            fees: feeStructure,
-          },
-        };
-      }
-
-      // Execute the route using Skip's built-in execution
-      const result = await executeSkipRoute(
-        finalRouteResponse,
-        userAddresses,
-        async (chainId: string) => {
-          console.log(`🖊️  Getting signer for chain: ${chainId}`);
-          const signer = await getCosmosSigner(chainId);
-          return signer;
+      // Execute the Osmosis swap
+      const result = await executeOsmosisSwap({
+        mnemonic: mnemonic,
+        rpcEndpoint,
+        senderAddress,
+        tokenIn: {
+          amount: inputAmount,
+          denom: step.fromAsset.denom,
         },
-        getEvmSigner,
-        getSvmSigner,
-      );
+        tokenOutDenom: step.toAsset.denom,
+        feeToken: selectedFeeToken,
+        simulateOnly: isSimulation,
+      });
 
+      console.log('[DEBUG][executeOsmosisExchange] Osmosis swap result:', {
+        success: result.success,
+        simulated: result.simulated,
+        estimatedGas: result.estimatedGas,
+        transactionHash: result.transactionHash,
+      });
+
+      // Format the result to match the expected TransactionResult format
       if (result.success) {
-        return {
-          success: true,
-          message: 'Route successfully executed',
-          data: {
-            code: 0,
-            txHash: 'multi-tx', // TODO: change to array of tx hashes or to final tx hash
-            gasWanted: '0',
-            route: routeResponse,
-          },
-        };
+        if (isSimulation) {
+          // For simulation, return the estimated gas and routes
+          return {
+            success: true,
+            message: 'Osmosis swap simulation successful',
+            data: {
+              code: 0,
+              txHash: 'simulated',
+              gasWanted: result.estimatedGas?.toString() || '0',
+              estimatedAmountOut: result.tokenOutMinAmount
+                ? (parseInt(result.tokenOutMinAmount) * 1.01).toString() // Add 1% buffer for simulation
+                : inputAmount, // Fallback to input amount if no output estimate
+              fees: {
+                amount: [
+                  {
+                    denom: selectedFeeToken.denom,
+                    amount: result.recommendedFee?.gas || '0',
+                  },
+                ],
+                gas: result.estimatedGas?.toString() || '0',
+              },
+            },
+          };
+        } else {
+          // For actual execution, return the transaction hash
+          return {
+            success: true,
+            message: 'Osmosis swap executed successfully',
+            data: {
+              code: 0,
+              txHash: result.transactionHash,
+              gasWanted: result.gasUsed?.toString() || '0',
+            },
+          };
+        }
       } else {
-        throw new Error(result.message);
+        throw new Error(result.message || 'Osmosis swap failed');
       }
-    } catch (error) {
-      console.error('[useSendActions] Skip Tx failed:', error);
+    } catch (error: any) {
+      console.error('[executeOsmosisExchange] Error:', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Skip Tx failed',
+        message: error instanceof Error ? error.message : 'Osmosis exchange failed',
       };
     }
   };
+
+  // TODO: enable amount out as an option (to handle billing)
+  // TODO: use call to Osmosis for exchange after getting pool from route
+  // const executeSkipTx = async ({
+  //   step,
+  //   sendObject,
+  //   receiveAssetDenom,
+  //   simulateTransaction,
+  // }: {
+  //   step: TransactionStep;
+  //   sendObject: SendObject;
+  //   receiveAssetDenom: string;
+  //   simulateTransaction: boolean;
+  // }): Promise<TransactionResult> => {
+  //   console.log('[DEBUG][executeSkipTx] Starting Skip transaction', {
+  //     stepType: step.type,
+  //     stepHash: step.hash,
+  //     originalAmount: sendObject.amount,
+  //     inputDenom: sendObject.denom,
+  //     outputDenom: receiveAssetDenom,
+  //     simulateTransaction,
+  //   });
+
+  //   try {
+  //     // First, get the initial route to calculate fees
+  //     const routeResponse = await getSkipRoute({
+  //       fromChainId: sendState.asset.originChainId,
+  //       fromDenom: sendObject.denom,
+  //       toChainId: receiveState.chainId,
+  //       toDenom: receiveAssetDenom,
+  //       amount: sendObject.amount,
+  //     });
+
+  //     console.log('[DEBUG][executeSkipTx] Route response:', {
+  //       operationsCount: routeResponse.operations?.length,
+  //       amountIn: routeResponse.amountIn,
+  //       amountOut: routeResponse.amountOut,
+  //       operations: routeResponse.operations?.map((op: any, index: number) => ({
+  //         index,
+  //         type: op.swap ? 'swap' : 'transfer',
+  //         fromChain: op.swap ? op.swap.fromChainId : op.transfer?.fromChainId,
+  //         toChain: op.swap ? op.swap.toChainId : op.transfer?.toChainId,
+  //         inputDenom: op.swap ? op.swap.denomIn : op.transfer?.denomIn,
+  //         outputDenom: op.swap ? op.swap.denomOut : op.transfer?.denomOut,
+  //       })),
+  //     });
+
+  //     if (!routeResponse.operations?.length) {
+  //       throw new Error('No valid Skip route found');
+  //     }
+
+  //     // Get user addresses for all required chains
+  //     // NOTE: DO NOT deduplicate! The Skip client expects the exact same number of addresses
+  //     const requiredChainAddresses = routeResponse.requiredChainAddresses;
+  //     const userAddresses: UserAddress[] = await Promise.all(
+  //       requiredChainAddresses.map(async (chainId: string, index: number) => {
+  //         console.log(`🔄 Processing chain ${index}: ${chainId}`);
+
+  //         let address: string;
+  //         const chainWallet = getWalletInfo(chainId);
+
+  //         if ((chainWallet && chainWallet.address) || chainWallet.address.trim() !== '') {
+  //           console.log(`✅ Using local wallet for ${chainId}: ${chainWallet.address}`);
+  //           address = chainWallet.address;
+  //         } else {
+  //           console.log(`⚠️  No local wallet found for ${chainId}, generating from mnemonic`);
+  //           // Fallback: get address from mnemonic
+  //           const sessionToken = getSessionToken();
+  //           if (!sessionToken) throw new Error("Session token doesn't exist");
+
+  //           const chainInfo = getFullRegistryChainInfo(chainId);
+  //           console.log(`🔍 Chain info for ${chainId}:`, chainInfo);
+
+  //           if (!chainInfo?.bech32_prefix) {
+  //             console.error(`❌ Prefix not found for chain ${chainId}`);
+  //             throw new Error(`Prefix not found for ${chainInfo?.pretty_name || chainId}`);
+  //           }
+
+  //           console.log(
+  //             `🔑 Generating address for ${chainId} with prefix: ${chainInfo.bech32_prefix}`,
+  //           );
+  //           try {
+  //             address = await getAddressByChainPrefix(
+  //               sessionToken.mnemonic,
+  //               chainInfo.bech32_prefix,
+  //             );
+  //             console.log(`✅ Generated address for ${chainId}: ${address}`);
+  //           } catch (error) {
+  //             console.error(`❌ Failed to generate address for ${chainId}:`, error);
+  //             throw error;
+  //           }
+  //         }
+
+  //         return {
+  //           chainId,
+  //           address,
+  //         };
+  //       }),
+  //     );
+
+  //     console.log('👥 Final user addresses:', userAddresses);
+
+  //     // Validate that all addresses are properly defined
+  //     const validAddresses = userAddresses.filter(
+  //       addr => addr && addr.chainId && addr.address && addr.address.trim() !== '',
+  //     );
+
+  //     if (validAddresses.length !== requiredChainAddresses.length) {
+  //       throw new Error('Missing addresses on Skip path');
+  //     }
+
+  //     // Run fee simulations before proceeding
+  //     const simulationResult = await runSkipFeeSimulations(routeResponse, userAddresses);
+  //     const calculatedFees = calculateSkipFees(routeResponse, simulationResult);
+
+  //     // Calculate fees for the initial chain (first operation)
+  //     const initialChainFees = calculatedFees.filter(
+  //       fee => fee.chainId === sendState.asset.originChainId,
+  //     );
+
+  //     let adjustedInputAmount = BigInt(sendObject.amount);
+
+  //     // Subtract fees from the initial amount for the first chain
+  //     if (initialChainFees.length > 0) {
+  //       const totalFees = initialChainFees.reduce(
+  //         (sum, fee) => sum + BigInt(fee.amount),
+  //         BigInt(0),
+  //       );
+
+  //       // Ensure we don't subtract more than available
+  //       if (totalFees > adjustedInputAmount) {
+  //         throw new Error(
+  //           `Insufficient funds: ${sendObject.amount}${sendObject.denom} available, but ${totalFees.toString()}${initialChainFees[0].denom} needed for fees`,
+  //         );
+  //       }
+
+  //       adjustedInputAmount -= totalFees;
+
+  //       console.log('[DEBUG][executeSkipTx] Adjusted input amount after fee deduction:', {
+  //         originalAmount: sendObject.amount,
+  //         totalFees: totalFees.toString(),
+  //         adjustedAmount: adjustedInputAmount.toString(),
+  //         feeDenom: initialChainFees[0].denom,
+  //       });
+  //     }
+
+  //     // Get a new route with the adjusted amount if we subtracted fees
+  //     let finalRouteResponse = routeResponse;
+  //     if (adjustedInputAmount !== BigInt(sendObject.amount)) {
+  //       console.log('[DEBUG][executeSkipTx] Requesting new route with adjusted amount');
+
+  //       finalRouteResponse = await getSkipRoute({
+  //         fromChainId: sendState.asset.originChainId,
+  //         fromDenom: sendObject.denom,
+  //         toChainId: receiveState.chainId,
+  //         toDenom: receiveAssetDenom,
+  //         amount: adjustedInputAmount.toString(),
+  //       });
+
+  //       console.log('[DEBUG][executeSkipTx] Adjusted route response:', {
+  //         operationsCount: finalRouteResponse.operations?.length,
+  //         amountIn: finalRouteResponse.amountIn,
+  //         amountOut: finalRouteResponse.amountOut,
+  //       });
+  //     }
+
+  //     // For simulation, return early with route info
+  //     if (simulateTransaction) {
+  //       const feeStructure: FeeStructure = {
+  //         amount: calculatedFees.map(fee => ({
+  //           denom: fee.denom,
+  //           amount: fee.amount,
+  //         })),
+  //         gas: calculatedFees[0]?.amount || '0',
+  //       };
+
+  //       updateStepLog({
+  //         stepHash: step.hash,
+  //         log: {
+  //           skipRoute: finalRouteResponse,
+  //           inputAmount: sendObject.amount,
+  //           outputAmount: finalRouteResponse.estimatedAmountOut || '0',
+  //           // Also update fees if available from simulation
+  //           fees: calculatedFees.map(fee => {
+  //             const chainRegistryFeeInfo = getFullRegistryChainInfo(fee.chainId)?.fees?.[0];
+  //             const asset = resolveAssetFromDenom(fee.denom, fee.chainId);
+
+  //             // Parse the fee amount to ensure it's a number
+  //             const feeAmount = parseInt(fee.amount, 10);
+
+  //             return {
+  //               asset,
+  //               amount: feeAmount,
+  //               chainId: fee.chainId,
+  //               feeToken: chainRegistryFeeInfo || {
+  //                 denom: fee.denom,
+  //                 gasPriceStep: { low: 0, average: 0, high: 0 },
+  //               },
+  //               gasWanted: feeAmount,
+  //               gasPrice: chainRegistryFeeInfo?.gasPriceStep?.average || 0,
+  //             };
+  //           }),
+  //         },
+  //       });
+
+  //       console.log('[DEBUG][executeSkipTx] Simulation completed:', {
+  //         originalInput: sendObject.amount,
+  //         finalOutput: finalRouteResponse.estimatedAmountOut,
+  //         fees: calculatedFees.map(fee => ({
+  //           chainId: fee.chainId,
+  //           denom: fee.denom,
+  //           amount: fee.amount,
+  //           operationType: fee.operationType,
+  //         })),
+  //         operations: finalRouteResponse.operations?.map((op: any, index: number) => ({
+  //           index,
+  //           type: op.swap ? 'swap' : 'transfer',
+  //           inputAmount: op.swap ? op.swap.amountIn : op.transfer?.amount,
+  //           outputAmount: op.swap ? op.swap.amountOut : op.transfer?.amount,
+  //         })),
+  //       });
+
+  //       return {
+  //         success: true,
+  //         message: 'Transaction simulation successful',
+  //         data: {
+  //           code: 0,
+  //           txHash: 'simulated',
+  //           gasWanted: calculatedFees[0]?.amount || '0',
+  //           route: finalRouteResponse,
+  //           estimatedAmountOut: finalRouteResponse.amountOut,
+  //           fees: feeStructure,
+  //         },
+  //       };
+  //     }
+
+  //     // Execute the route using Skip's built-in execution
+  //     const result = await executeSkipRoute(
+  //       finalRouteResponse,
+  //       userAddresses,
+  //       async (chainId: string) => {
+  //         console.log(`🖊️  Getting signer for chain: ${chainId}`);
+  //         const signer = await getCosmosSigner(chainId);
+  //         return signer;
+  //       },
+  //       getEvmSigner,
+  //       getSvmSigner,
+  //     );
+
+  //     if (result.success) {
+  //       return {
+  //         success: true,
+  //         message: 'Route successfully executed',
+  //         data: {
+  //           code: 0,
+  //           txHash: 'multi-tx', // TODO: change to array of tx hashes or to final tx hash
+  //           gasWanted: '0',
+  //           route: routeResponse,
+  //         },
+  //       };
+  //     } else {
+  //       throw new Error(result.message);
+  //     }
+  //   } catch (error) {
+  //     console.error('[useSendActions] Skip Tx failed:', error);
+  //     return {
+  //       success: false,
+  //       message: error instanceof Error ? error.message : 'Skip Tx failed',
+  //     };
+  //   }
+  // };
 
   const executeStep = async ({
     step,
@@ -1270,17 +1402,23 @@ export const useSendActions = () => {
           });
           break;
         case TransactionType.EXCHANGE:
-          const skipSendObject: SendObject = {
-            recipientAddress: finalRecipientAddress,
-            amount: inputAmount,
-            denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
-            feeToken,
-          };
-          result = await executeSkipTx({
+          // const skipSendObject: SendObject = {
+          //   recipientAddress: finalRecipientAddress,
+          //   amount: inputAmount,
+          //   denom: step.fromAsset.originDenom, // Skip only recognizes the original denom
+          //   feeToken,
+          // };
+          // result = await executeSkipTx({
+          //   step,
+          //   sendObject: skipSendObject,
+          //   receiveAssetDenom: step.toAsset.denom,
+          //   simulateTransaction: isSimulation,
+          // });
+          console.log('[DEBUG][executeStep] Using Osmosis for exchange');
+          result = await executeOsmosisExchange({
             step,
-            sendObject: skipSendObject,
-            receiveAssetDenom: step.toAsset.denom,
-            simulateTransaction: isSimulation,
+            inputAmount,
+            isSimulation,
           });
           break;
         default:
@@ -1455,9 +1593,25 @@ export const useSendActions = () => {
           const fees = result.data.fees;
           const feeToken = stepLog?.fees?.[0].feeToken;
 
+          console.log('[DEBUG][executeTransactionRoute] Processing fees:', {
+            feesData: fees,
+            feeToken: feeToken?.denom,
+            stepType: step.type,
+            stepIndex: i,
+          });
+
           // Handle FeeStructure type (amount array)
           if (fees.amount && Array.isArray(fees.amount)) {
+            console.log(
+              '[DEBUG][executeTransactionRoute] Processing fee amount array:',
+              fees.amount,
+            );
             for (const feeAmount of fees.amount) {
+              console.log('[DEBUG][executeTransactionRoute] Processing individual fee amount:', {
+                denom: feeAmount.denom,
+                amount: feeAmount.amount,
+                amountType: typeof feeAmount.amount,
+              });
               // Use the helper function to resolve the asset
               let asset = resolveAssetFromDenom(feeAmount.denom, step.fromChain);
 
@@ -1476,6 +1630,10 @@ export const useSendActions = () => {
           }
           // Handle simple gasWanted/amount structure
           else if (result.data.gasWanted) {
+            console.log('[DEBUG][executeTransactionRoute] Processing gasWanted fee structure:', {
+              gasWanted: result.data.gasWanted,
+              gasWantedType: typeof result.data.gasWanted,
+            });
             const feeDenom = feeToken?.denom || '';
             let asset = resolveAssetFromDenom(feeDenom, step.fromChain);
 
@@ -1485,6 +1643,10 @@ export const useSendActions = () => {
             );
             const feeAmount =
               parseInt(result.data.gasWanted, 10) * (feeToken?.gasPriceStep?.average || 0);
+
+            console.log('[DEBUG][executeTransactionRoute] Fee Amount:', {
+              calculatedFee: feeAmount,
+            });
 
             const feeState: FeeState = {
               asset,
@@ -1502,17 +1664,41 @@ export const useSendActions = () => {
         let netOutput = currentInputAmount;
 
         if (result.success) {
+          console.log('[DEBUG][executeTransactionRoute] Calculating total fees for step:', {
+            stepIndex: i,
+            stepType: step.type,
+            feeData: feeData.map(f => ({ denom: f.asset.denom, amount: f.amount })),
+          });
           // Calculate total fees
           const totalFees = feeData.reduce((sum, fee) => sum + BigInt(fee.amount), BigInt(0));
+
+          console.log('[DEBUG][executeTransactionRoute] Total fees calculated:', {
+            totalFees: totalFees.toString(),
+            currentInputAmount: currentInputAmount,
+            currentInputType: typeof currentInputAmount,
+          });
 
           // Get the expected output amount
           let expectedOutput = BigInt(currentInputAmount);
           if (result.data?.estimatedAmountOut) {
-            expectedOutput = BigInt(result.data.estimatedAmountOut);
+            console.log('[DEBUG][executeTransactionRoute] Using estimatedAmountOut:', {
+              estimatedAmountOut: result.data.estimatedAmountOut,
+              estimatedType: typeof result.data.estimatedAmountOut,
+            });
+
+            const intEstAmountOut = Math.floor(parseFloat(result.data.estimatedAmountOut));
+            expectedOutput = BigInt(intEstAmountOut);
           } else if (step.type === TransactionType.SWAP || step.type === TransactionType.EXCHANGE) {
+            console.log(
+              '[DEBUG][executeTransactionRoute] No estimatedAmountOut, using input as fallback',
+            );
             // For swaps/exchanges, if no explicit output, we might need to estimate
             // This would ideally come from the route response or simulation
             expectedOutput = BigInt(currentInputAmount); // Fallback
+            console.log(
+              '[DEBUG][executeTransactionRoute] Expected output:',
+              expectedOutput.toString(),
+            );
           }
 
           // Calculate net output based on transaction type

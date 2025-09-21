@@ -6,11 +6,17 @@ import {
   NetworkLevel,
   OSMOSIS_ENDPOINTS,
 } from '@/constants';
-import { Asset, LocalChainRegistry, SimplifiedChainInfo, Uri } from '@/types';
+import { Asset, FeeToken, LocalChainRegistry, SimplifiedChainInfo, Uri } from '@/types';
 import { queryRestNode } from './queryNodes';
 import { safeTrimLowerCase } from './formatString';
 import { getIbcRegistry } from './dataHelpers';
 import { getOsmosisChainId } from './utils';
+import { getCombinedCosmosSigner } from './signers';
+import { osmosis, getSigningOsmosisClient } from 'osmojs';
+import { coin, coins } from '@cosmjs/amino';
+import { getKeplrStyleGasEstimates } from './exchangeTransactions';
+
+const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
 
 export interface OsmosisPoolAsset {
   token: { denom: string; amount: string };
@@ -49,78 +55,26 @@ export interface OsmosisAssetFetcherOptions {
   restUris: Uri[];
 }
 
-export const getReachableAssetsFromOsmosis = (
-  osmosisAssets: Asset[],
-  targetChainId?: string,
-): Asset[] => {
-  if (targetChainId) {
-    // Return assets from a specific chain
-    return osmosisAssets.filter(
-      asset => asset.originChainId === targetChainId && asset.originChainId !== 'unknown',
-    );
-  }
-
-  // Return all reachable assets
-  return osmosisAssets.filter(asset => asset.originChainId !== 'unknown');
-};
-
-export const isAssetReachableOnOsmosis = (
-  assetDenom: string,
-  originChainId: string,
-  osmosisAssets: Asset[],
-): boolean => {
-  return osmosisAssets.some(
-    asset =>
-      (asset.denom === assetDenom || asset.originDenom === assetDenom) &&
-      asset.originChainId === originChainId,
-  );
-};
-
-export const getOsmosisConnectedChains = async (networkLevel: NetworkLevel): Promise<string[]> => {
-  const osmosisChainId = getOsmosisChainId(networkLevel);
-  const ibcRegistry = getIbcRegistry();
-  const networkRegistry =
-    networkLevel === NetworkLevel.TESTNET ? ibcRegistry.data.testnet : ibcRegistry.data.mainnet;
-
-  const connectedChains: string[] = [];
-
-  if (!networkRegistry) {
-    console.warn('No IBC registry found for network level:', networkLevel);
-    return connectedChains;
-  }
-
-  // Find all connections that involve Osmosis
-  for (const [connectionKey, connection] of Object.entries(networkRegistry)) {
-    if (connectionKey.includes(osmosisChainId)) {
-      const [chain1, chain2] = connectionKey.split(',');
-      const isOsmosisFirst = chain1 === osmosisChainId;
-      const otherChainId = isOsmosisFirst ? chain2 : chain1;
-
-      const osmosisConnectionInfo = connection[osmosisChainId];
-      const otherChainConnectionInfo = connection[otherChainId];
-
-      if (osmosisConnectionInfo && otherChainConnectionInfo) {
-        connectedChains.push(otherChainId);
-      }
-    }
-  }
-
-  console.log(
-    `[getOsmosisConnectedChains] Found ${connectedChains.length} chains connected to Osmosis`,
-  );
-  return connectedChains;
-};
-
-export const isChainConnectedToOsmosis = (chainId: string, connectedChains: string[]): boolean => {
-  return connectedChains.some(chain => chain === chainId);
-};
-
-export const getOsmosisConnectionInfo = (
-  chainId: string,
-  connectedChains: string[],
-): string | undefined => {
-  return connectedChains.find(chain => chain === chainId);
-};
+interface RouteResponse {
+  amount_in: {
+    denom: string;
+    amount: string;
+  };
+  amount_out: string;
+  route: Array<{
+    pools: Array<{
+      id: number;
+      type: number;
+      token_out_denom: string;
+      spread_factor: string;
+      taker_fee: string;
+    }>;
+    out_amount: string;
+    in_amount: string;
+  }>;
+  effective_fee: string;
+  price_impact: string;
+}
 
 export const fetchOsmosisPools = async (
   restUris: string[],
@@ -289,6 +243,7 @@ export const resolveIbcDenom = async (
   }
 };
 
+// TODO: replace this stub with real functionality.
 export const resolveGammDenom = (gammDenom: string): string => {
   // GAMM denoms are in format: gamm/pool/{pool_id}
   return gammDenom.replace(GAMM_PREFIX, '');
@@ -492,44 +447,220 @@ export const getOsmosisAssetsWithResolutions = async (
   }
 };
 
-// Utility functions
-export const getOriginChainsFromOsmosisAssets = (assets: Asset[]): string[] => {
-  const chainIds = new Set<string>();
+// TODO: do not call these swaps.  they are DEXes.  getDEXRoute, executeDEX
+export async function getSwapRoutes(
+  tokenInAmount: string,
+  tokenInDenom: string,
+  tokenOutDenom: string,
+): Promise<{ routes: any[]; amountOut: string; tokenOutMinAmount: string }> {
+  try {
+    // URL encode parameters
+    const encodedTokenIn = encodeURIComponent(`${tokenInAmount}${tokenInDenom}`);
+    const encodedTokenOutDenom = encodeURIComponent(tokenOutDenom);
 
-  assets.forEach(asset => {
-    if (asset.originChainId && asset.originChainId !== 'unknown') {
-      chainIds.add(asset.originChainId);
+    const url = `https://sqs.osmosis.zone/router/quote?tokenIn=${encodedTokenIn}&tokenOutDenom=${encodedTokenOutDenom}&humanDenoms=false&applyExponents=false`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch routes: ${response.statusText}`);
     }
-  });
 
-  return Array.from(chainIds);
-};
+    const data: RouteResponse = await response.json();
 
-export const enrichOsmosisAssetsWithOriginData = (
-  assets: Asset[],
-  fullChainRegistry: LocalChainRegistry,
-): Asset[] => {
-  return assets.map(asset => {
-    if (asset.originChainId && asset.originChainId !== 'unknown') {
-      const originChain = fullChainRegistry[asset.originChainId];
-      const originAsset = findAssetMetadata(
-        asset.originDenom,
-        fullChainRegistry,
-        asset.originChainId,
+    // Convert route response to osmojs format
+    const routes = data.route.flatMap(routeSegment =>
+      routeSegment.pools.map(pool => ({
+        poolId: pool.id.toString(),
+        tokenOutDenom: pool.token_out_denom,
+      })),
+    );
+
+    // Calculate tokenOutMinAmount with 1% slippage tolerance
+    const amountOut = data.amount_out;
+    const minAmount = Math.floor(parseInt(amountOut) * 0.99).toString();
+
+    return {
+      routes,
+      amountOut,
+      tokenOutMinAmount: minAmount,
+    };
+  } catch (error) {
+    console.error('Error fetching routes:', error);
+    throw error;
+  }
+}
+
+// TODO: allow for setting via amount out
+// NOTE: documentation at https://docs.osmosis.zone/osmojs/#doing-a-swap
+export async function executeOsmosisSwap({
+  mnemonic,
+  rpcEndpoint,
+  senderAddress,
+  tokenIn,
+  tokenOutDenom,
+  feeToken,
+  tokenOutMinAmount,
+  memo = 'aria wallet',
+  gasMultiplier = 1.3,
+  simulateOnly = false,
+}: {
+  mnemonic: string;
+  rpcEndpoint: string;
+  senderAddress: string;
+  tokenIn: {
+    amount: string;
+    denom: string;
+  };
+  tokenOutDenom: string;
+  feeToken: FeeToken;
+  routes?: {
+    poolId: string;
+    tokenOutDenom: string;
+  }[];
+  tokenOutMinAmount?: string;
+  memo?: string;
+  gasMultiplier?: number;
+  feeLevel?: 'low' | 'medium' | 'high';
+  simulateOnly?: boolean;
+}): Promise<any> {
+  try {
+    // Get routes from SQS endpoint if not provided
+    let finalRoutes: any[] = [];
+    let finalTokenOutMinAmount = tokenOutMinAmount;
+
+    if (!tokenOutMinAmount) {
+      const routeData = await getSwapRoutes(tokenIn.amount, tokenIn.denom, tokenOutDenom);
+      finalRoutes = routeData.routes;
+      finalTokenOutMinAmount = routeData.tokenOutMinAmount;
+
+      console.log('[DEBUG][osmosisApiHelper] Fetched routes:', finalRoutes);
+      console.log('[DEBUG][osmosisApiHelper] Expected amount out:', routeData.amountOut);
+      console.log(
+        '[DEBUG][osmosisApiHelper] Minimum amount out (with 1% slippage):',
+        finalTokenOutMinAmount,
+      );
+    } else {
+      throw new Error('No exchange route found');
+    }
+
+    // Get combined signer
+    const signer = await getCombinedCosmosSigner(mnemonic, 'osmo');
+
+    // Initialize signing client
+    const signingClient = await getSigningOsmosisClient({
+      rpcEndpoint,
+      signer,
+    });
+
+    const msg = swapExactAmountIn({
+      sender: senderAddress,
+      routes: finalRoutes,
+      tokenIn: coin(tokenIn.amount, tokenIn.denom),
+      tokenOutMinAmount: finalTokenOutMinAmount || '0',
+    });
+
+    const selectedFeeTokenDenom = feeToken.denom;
+    const gasPrice = feeToken.gasPriceStep['average']; // TODO: make gas price steps configurable
+
+    console.log(
+      '[DEBUG][osmosisApiHelper] Using fee token:',
+      selectedFeeTokenDenom,
+      'with gas price:',
+      gasPrice,
+    );
+
+    let fee = { amount: coins(0, selectedFeeTokenDenom), gas: '0' };
+    let gasEstimated = 0;
+    let gasWithBuffer = 0;
+
+    try {
+      // Try to simulate first for accurate gas estimate
+      gasEstimated = await signingClient.simulate(senderAddress, [msg], memo);
+      gasWithBuffer = Math.ceil(gasEstimated * gasMultiplier);
+
+      // ✅ Calculate fee amount for SUCCESS case
+      const feeAmount = Math.ceil(gasWithBuffer * gasPrice);
+
+      fee = {
+        amount: coins(feeAmount, selectedFeeTokenDenom), // ✅ Now this has the actual fee
+        gas: gasWithBuffer.toString(),
+      };
+
+      console.log('[DEBUG][osmosisApiHelper] Using simulated gas:', gasWithBuffer);
+      console.log('[DEBUG][osmosisApiHelper] Calculated fee amount:', feeAmount);
+    } catch (simulationError) {
+      console.warn(
+        '[DEBUG][osmosisApiHelper] Simulation failed, using Keplr-style gas estimates:',
+        simulationError,
       );
 
-      if (originAsset) {
-        return {
-          ...asset,
-          logo: asset.logo || originAsset.logo,
-          symbol: asset.symbol || originAsset.symbol,
-          name: asset.name || originAsset.name,
-          exponent: asset.exponent || originAsset.exponent,
-          coinGeckoId: asset.coinGeckoId || originAsset.coinGeckoId,
-          networkName: originChain?.pretty_name || originChain?.chain_name || asset.networkName,
-        };
-      }
+      // Convert routes to the format expected by getKeplrStyleGasEstimates
+      const swapOperations = finalRoutes.map(route => ({
+        pool: route.poolId,
+        denomIn: tokenIn.denom,
+        denomOut: route.tokenOutDenom,
+      }));
+
+      // Use Keplr-style gas estimates as fallback
+      const { gasWanted } = getKeplrStyleGasEstimates(swapOperations);
+      gasWithBuffer = Math.ceil(parseInt(gasWanted) * gasMultiplier);
+
+      // ✅ Calculate fee amount for ERROR case
+      const feeAmount = Math.ceil(gasWithBuffer * gasPrice);
+
+      fee = {
+        amount: coins(feeAmount, selectedFeeTokenDenom),
+        gas: gasWithBuffer.toString(),
+      };
+
+      console.log('[DEBUG][osmosisApiHelper] Using Keplr-style gas estimate:', gasWithBuffer);
+      console.log('[DEBUG][osmosisApiHelper] Calculated fee amount:', feeAmount);
     }
-    return asset;
-  });
-};
+
+    // Debug logs to verify fee calculation
+    console.log('[DEBUG][osmosisApiHelper] Fee calculation details:', {
+      gasEstimated,
+      gasWithBuffer,
+      gasPrice,
+      feeAmount: fee.amount[0]?.amount || '0',
+      feeTokenDenom: selectedFeeTokenDenom,
+      finalFee: fee,
+    });
+
+    if (simulateOnly) {
+      console.log('[DEBUG][osmosisApiHelper] Simulation results:');
+      console.log('[DEBUG][osmosisApiHelper] Estimated gas:', gasEstimated);
+      console.log('[DEBUG][osmosisApiHelper] Recommended fee:', fee);
+
+      return {
+        success: true,
+        simulated: true,
+        estimatedGas: gasEstimated,
+        recommendedFee: fee,
+        routes: finalRoutes,
+        tokenOutMinAmount: finalTokenOutMinAmount,
+      };
+    } else {
+      console.log('[DEBUG][osmosisApiHelper] Executing swap with fee:', fee);
+
+      // Execute the swap
+      const result = await signingClient.signAndBroadcast(senderAddress, [msg], fee, memo);
+
+      console.log('[DEBUG][osmosisApiHelper] Swap executed successfully:', result);
+
+      return {
+        success: true,
+        simulated: false,
+        transactionHash: result.transactionHash,
+        gasUsed: result.gasUsed,
+        fee,
+        routes: finalRoutes,
+        tokenOutMinAmount: finalTokenOutMinAmount,
+      };
+    }
+  } catch (error) {
+    console.error('[DEBUG][osmosisApiHelper] Error executing swap:', error);
+    throw error;
+  }
+}

@@ -1,5 +1,17 @@
-import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, SettingsOption } from '@/constants';
-import { Asset, LocalChainRegistry, SimplifiedChainInfo, SubscriptionRecord } from '@/types';
+import {
+  DEFAULT_EXTERNAL_GAS_PRICES,
+  DEFAULT_OSMOSIS_DENOM,
+  DEFAULT_SUBSCRIPTION,
+  LOCAL_CHAIN_REGISTRY,
+  SettingsOption,
+} from '@/constants';
+import {
+  Asset,
+  FeeToken,
+  LocalChainRegistry,
+  SimplifiedChainInfo,
+  SubscriptionRecord,
+} from '@/types';
 import { atom } from 'jotai';
 import {
   assetSortOrderAtom,
@@ -11,6 +23,8 @@ import { networkLevelAtom } from './networkLevelAtom';
 import {
   filterAndSortAssets,
   filterAndSortChains,
+  getOsmosisAssetsWithResolutions,
+  getOsmosisChainId,
   getStoredChainRegistry,
   getSupportedChains,
   getSymphonyChainId,
@@ -227,4 +241,64 @@ export const loadSkipChainsAtom = atom(null, async (_, set) => {
   } catch (error) {
     console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
   }
+});
+
+export const osmosisChainsAtom = atom<string[]>([]);
+export const osmosisAssetsAtom = atom<Asset[]>([]);
+export const loadOsmosisDataAtom = atom(null, async (get, set) => {
+  try {
+    const networkLevel = get(networkLevelAtom);
+    const fullChainRegistry = get(fullChainRegistryAtom);
+    const subscribedChainRegistry = get(subscribedChainRegistryAtom);
+
+    // Get Osmosis chain ID
+    const osmosisChainId = getOsmosisChainId(networkLevel);
+    set(osmosisChainsAtom, [osmosisChainId]);
+
+    // Fetch Osmosis assets
+    const osmosisAssets = await getOsmosisAssetsWithResolutions(
+      networkLevel,
+      subscribedChainRegistry[networkLevel],
+      fullChainRegistry[networkLevel],
+    );
+    set(osmosisAssetsAtom, osmosisAssets);
+  } catch (error) {
+    console.error('[loadOsmosisDataAtom] Failed to load Osmosis data:', error);
+  }
+});
+
+export const isOsmosisSupportedDenomAtom = atom(get => (originDenom: string): boolean => {
+  const osmosisAssets = get(osmosisAssetsAtom);
+  console.log('[DEBUG][isOsmosisSupportedDenomAtom] Osmosis assets:', osmosisAssets);
+  return osmosisAssets.some(asset => asset.originDenom === originDenom);
+});
+
+export const osmosisFeeTokensAtom = atom((get): FeeToken[] => {
+  const networkLevel = get(networkLevelAtom);
+  const fullChainRegistry = get(fullChainRegistryAtom)[networkLevel];
+  const osmosisChainId = getOsmosisChainId(networkLevel);
+  const osmosisChain = fullChainRegistry[osmosisChainId];
+
+  return osmosisChain.fees || [];
+});
+
+export const osmosisFeeTokenByDenomAtom = atom(get => (denom: string): FeeToken | null => {
+  const feeTokens = get(osmosisFeeTokensAtom);
+
+  // First try to find the exact denom match
+  const exactMatch = feeTokens.find(token => token.denom === denom);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // If no exact match, try to find DEFAULT_OSMOSIS_DENOM
+  const defaultMatch = feeTokens.find(token => token.denom === DEFAULT_OSMOSIS_DENOM);
+  if (defaultMatch) {
+    return defaultMatch;
+  }
+
+  // If neither is found, return the first available fee token or a constructed default
+  return feeTokens.length > 0
+    ? feeTokens[0]
+    : { denom: DEFAULT_OSMOSIS_DENOM, gasPriceStep: DEFAULT_EXTERNAL_GAS_PRICES };
 });

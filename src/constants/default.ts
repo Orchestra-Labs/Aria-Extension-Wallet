@@ -19,6 +19,7 @@ export const SYMPHONY_CHAIN_ID_LIST = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID]
 
 export const OSMOSIS_MAINNET_ID = 'osmosis-1';
 export const OSMOSIS_TESTNET_ID = 'osmo-test-5';
+export const DEFAULT_OSMOSIS_DENOM = 'uosmo';
 
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
