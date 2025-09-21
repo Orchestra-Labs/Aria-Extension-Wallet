@@ -447,8 +447,7 @@ export const getOsmosisAssetsWithResolutions = async (
   }
 };
 
-// TODO: do not call these swaps.  they are DEXes.  getDEXRoute, executeDEX
-export async function getSwapRoutes(
+export async function getOsmosisDEXRoutes(
   tokenInAmount: string,
   tokenInDenom: string,
   tokenOutDenom: string,
@@ -493,7 +492,7 @@ export async function getSwapRoutes(
 
 // TODO: allow for setting via amount out
 // NOTE: documentation at https://docs.osmosis.zone/osmojs/#doing-a-swap
-export async function executeOsmosisSwap({
+export async function useOsmosisDEX({
   mnemonic,
   rpcEndpoint,
   senderAddress,
@@ -530,7 +529,7 @@ export async function executeOsmosisSwap({
     let finalTokenOutMinAmount = tokenOutMinAmount;
 
     if (!tokenOutMinAmount) {
-      const routeData = await getSwapRoutes(tokenIn.amount, tokenIn.denom, tokenOutDenom);
+      const routeData = await getOsmosisDEXRoutes(tokenIn.amount, tokenIn.denom, tokenOutDenom);
       finalRoutes = routeData.routes;
       finalTokenOutMinAmount = routeData.tokenOutMinAmount;
     } else {

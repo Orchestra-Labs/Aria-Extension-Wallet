@@ -36,7 +36,7 @@ import {
   sendTransaction,
   swapTransaction,
   initializeSkipClient,
-  executeOsmosisSwap,
+  useOsmosisDEX,
 } from '@/helpers';
 import { useRefreshData } from './useRefreshData';
 import { useEffect } from 'react';
@@ -885,7 +885,7 @@ export const useSendActions = () => {
       }
 
       // Execute the Osmosis swap
-      const result = await executeOsmosisSwap({
+      const result = await useOsmosisDEX({
         mnemonic: mnemonic,
         rpcEndpoint,
         senderAddress,
