@@ -35,7 +35,7 @@ export const buildMessageBundle = ({
       if (endpoint === COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator) {
         // NOTE: If no amount is provided, Cosmos will unstake all
         messageValue.amount = {
-          denom: validatorInfo.balance.denom,
+          denom: validatorInfo.balance.denom, // need to use current denom here, whether ibc or original
           amount: amount || validatorInfo.balance.amount,
         };
       } else if (amount && denom) {
@@ -88,6 +88,7 @@ export const stakeToValidator = async (
       rpcUris: chain.rpc_uris,
       messages,
       feeToken,
+      chainId: chain.chain_id,
       simulateOnly,
     });
 
@@ -117,7 +118,7 @@ export const stakeToValidator = async (
 export const claimRewards = async (
   chain: SimplifiedChainInfo,
   validatorInfoArray: FullValidatorInfo[],
-  feeToken: FeeToken,
+  feeToken?: FeeToken,
   simulateOnly = false,
 ): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.claimRewards;
@@ -151,6 +152,7 @@ export const claimRewards = async (
         rpcUris,
         messages,
         feeToken,
+        chainId: chain.chain_id,
         simulateOnly: true,
       });
 
@@ -176,7 +178,7 @@ export const claimRewards = async (
       console.log(`Processing claim rewards batch ${index + 1}/${messageChunks.length}`);
 
       const estimatedGas = Math.ceil(parseFloat(simulation.gasWanted || '0') * 1.1);
-      const feeAmount = Math.ceil(estimatedGas * (feeToken.gasPriceStep?.average || 0.025));
+      const feeAmount = Math.ceil(estimatedGas * (feeToken?.gasPriceStep?.average || 0.025));
 
       const result = await queryRpcNode({
         endpoint,
@@ -184,11 +186,12 @@ export const claimRewards = async (
         rpcUris,
         messages,
         feeToken,
-        simulateOnly: false,
+        chainId: chain.chain_id,
         fee: {
-          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }],
+          amount: [{ denom: feeToken?.denom || '', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
+        simulateOnly: false,
       });
 
       if (!result || result.code !== 0) {
@@ -270,7 +273,7 @@ export const claimAndRestake = async (
   const delegateMessages = validatorInfoArray.flatMap(validatorInfo => {
     return (validatorInfo.rewards || [])
       .map(rewardItem => {
-        if (!rewardItem.denom || !rewardItem.amount) return null;
+        if (!rewardItem.denom || !rewardItem.amount) return null; // need to use current denom here, whether ibc or original
 
         // Remove decimal portion if present
         const amount = rewardItem.amount.includes('.')
@@ -285,7 +288,7 @@ export const claimAndRestake = async (
             delegatorAddress: validatorInfo.delegation.delegator_address,
             validatorAddress: validatorInfo.delegation.validator_address,
             amount: {
-              denom: rewardItem.denom,
+              denom: rewardItem.denom, // need to use current denom here, whether ibc or original
               amount,
             },
           },
@@ -314,6 +317,7 @@ export const claimAndRestake = async (
       rpcUris,
       messages,
       feeToken,
+      chainId: chain.chain_id,
       simulateOnly: true,
     });
 
@@ -347,11 +351,12 @@ export const claimAndRestake = async (
       rpcUris,
       messages,
       feeToken,
-      simulateOnly: false,
+      chainId: chain.chain_id,
       fee: {
-        amount: [{ denom: feeToken?.denom || 'uatom', amount: feeAmount.toString() }],
+        amount: [{ denom: feeToken?.denom || 'note', amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
         gas: estimatedGas.toString(),
       },
+      simulateOnly: false,
     });
 
     if (!result || result.code !== 0) {
@@ -420,7 +425,7 @@ export const claimAndUnstake = async ({
   const endpoint = COSMOS_CHAIN_ENDPOINTS.undelegateFromValidator;
   const prefix = chain.bech32_prefix;
   const rpcUris = chain.rpc_uris;
-  const denom = validatorInfoArray[0].balance.denom;
+  const denom = validatorInfoArray[0].balance.denom; // need to use current denom here, whether ibc or original
 
   // For partial unstaking, format the amount
   let formattedAmount: string | undefined = undefined;
@@ -465,6 +470,7 @@ export const claimAndUnstake = async ({
         rpcUris,
         messages,
         feeToken,
+        chainId: chain.chain_id,
         simulateOnly: true,
       });
 
@@ -500,11 +506,12 @@ export const claimAndUnstake = async ({
         rpcUris,
         messages,
         feeToken,
-        simulateOnly: false,
+        chainId: chain.chain_id,
         fee: {
-          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }],
+          amount: [{ denom: feeToken.denom, amount: feeAmount.toString() }], // need to use current denom here, whether ibc or original
           gas: estimatedGas.toString(),
         },
+        simulateOnly: false,
       });
 
       if (!result || result.code !== 0) {

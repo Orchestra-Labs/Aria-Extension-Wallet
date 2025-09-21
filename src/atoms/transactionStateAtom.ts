@@ -1,26 +1,26 @@
 import { atom, WritableAtom } from 'jotai';
 import {
-  DEFAULT_FEE_TOKEN,
+  DEFAULT_DENOM,
   DEFAULT_FEE_STATE,
+  DEFAULT_FEE_TOKEN,
   DEFAULT_RECEIVE_STATE,
   DEFAULT_SEND_STATE,
   InputStatus,
+  SIM_TX_FRESHNESS_TIMEOUT,
+  TextClass,
   TransactionStatus,
 } from '@/constants';
-import {
-  Asset,
-  CalculatedFeeDisplay,
-  FeeState,
-  TransactionLog,
-  TransactionState,
-  TransactionStatusState,
-} from '@/types';
+import { Asset, CalculatedFeeDisplay, FeeState, TransactionState } from '@/types';
 import { selectedAssetAtom } from './assetsAtom';
-import { networkLevelAtom } from './networkLevelAtom';
-import { subscribedChainRegistryAtom } from './chainRegistryAtom';
 import { allWalletAssetsAtom } from './walletAtom';
-import { transactionTypeAtom } from './transactionTypeAtom';
-import { getFeeTextClass } from '@/helpers';
+import {
+  transactionHasValidRouteAtom,
+  transactionRouteAtom,
+  transactionRouteFailedAtom,
+  transactionRouteHashAtom,
+} from './transactionRouteAtom';
+import { resetTransactionLogsAtom, transactionLogsAtom } from './transactionLogsAtom';
+import { addressVerifiedAtom, recipientAddressAtom } from './addressAtom';
 
 type TransactionStateAtom = WritableAtom<
   TransactionState,
@@ -28,151 +28,267 @@ type TransactionStateAtom = WritableAtom<
   void
 >;
 
-const createTransactionAtom = (
-  defaultState: TransactionState,
-  storageAtom: WritableAtom<TransactionState, [TransactionState], void>,
-) => {
-  return atom(
-    get => {
-      const baseState = get(storageAtom);
-      if (baseState.asset === defaultState.asset) {
-        const selectedAsset = get(selectedAssetAtom);
-        return {
-          ...defaultState,
-          asset: selectedAsset,
-          chainID: selectedAsset.networkID,
-        };
-      }
-      return baseState;
-    },
-    (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
-      const current = get(storageAtom);
-      const newValue = typeof update === 'function' ? update(current) : update;
-      set(storageAtom, newValue);
-    },
-  ) as TransactionStateAtom;
-};
-
 // Base storage atoms
 const _sendStateAtom = atom<TransactionState>(DEFAULT_SEND_STATE);
 const _receiveStateAtom = atom<TransactionState>(DEFAULT_RECEIVE_STATE);
 export const _feeStateAtom = atom<FeeState>(DEFAULT_FEE_STATE);
 
 // Public state atoms
-export const sendStateAtom = createTransactionAtom(DEFAULT_SEND_STATE, _sendStateAtom);
-export const receiveStateAtom = createTransactionAtom(DEFAULT_RECEIVE_STATE, _receiveStateAtom);
-
-export const feeStateAtom = atom<FeeState, [FeeState | ((prev: FeeState) => FeeState)], void>(
+export const sendStateAtom = atom(
   get => {
-    // First get the current manually set state
-    const currentState = get(_feeStateAtom);
-
-    // If we have manually set values (non-zero), use those
-    if (currentState.amount > 0 || currentState.gasWanted > 0) {
-      return currentState;
-    }
-
-    // Otherwise compute default state
-    const selectedAsset = get(selectedAssetAtom);
-    const networkLevel = get(networkLevelAtom);
-    const chainRegistry = get(subscribedChainRegistryAtom);
-
-    const chainInfo = chainRegistry[networkLevel][selectedAsset.networkID];
-    const feeToken =
-      chainInfo?.fees?.find(fee => fee.denom === selectedAsset.denom) || chainInfo?.fees?.[0];
-
-    return {
-      ...currentState, // Preserve any other manually set fields
-      asset: selectedAsset,
-      amount: 0,
-      chainID: selectedAsset.networkID,
-      feeToken: feeToken || DEFAULT_FEE_TOKEN,
-      gasWanted: 0,
-      gasPrice: 0,
-    };
+    return get(_sendStateAtom);
   },
-  (get, set, update: FeeState | ((prev: FeeState) => FeeState)) => {
-    const current = get(_feeStateAtom);
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_sendStateAtom);
     const newValue = typeof update === 'function' ? update(current) : update;
-    console.log('[feeStateAtom] Updating fee state:', {
-      current: get(_feeStateAtom),
-      newValue,
-    });
-    set(_feeStateAtom, newValue);
-    console.log('[feeStateAtom] Updated fee state:', get(_feeStateAtom));
+    set(_sendStateAtom, newValue);
+  },
+) as TransactionStateAtom;
+
+export const receiveStateAtom = atom(
+  get => {
+    return get(_receiveStateAtom);
+  },
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_receiveStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_receiveStateAtom, newValue);
+  },
+) as TransactionStateAtom;
+
+export const updateSendAssetAndChainAtom = atom(null, (_, set, asset: Asset) => {
+  set(_sendStateAtom, prev => ({
+    ...prev,
+    asset: asset,
+    chainId: asset.chainId,
+  }));
+});
+
+export const resetReceiveChainAtom = atom(null, (get, set) => {
+  const selectedAsset = get(selectedAssetAtom);
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    chainId: selectedAsset.chainId,
+  }));
+});
+
+export const updateReceiveChainAtom = atom(null, (_, set, newChainId: string) => {
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    chainId: newChainId,
+  }));
+});
+
+export const updateReceiveAssetAndChainAtom = atom(null, (_, set, asset: Asset) => {
+  set(_receiveStateAtom, prev => ({
+    ...prev,
+    asset: asset,
+    chainId: asset.chainId,
+  }));
+});
+
+export const updateReceiveStateAtom = atom(
+  null,
+  (get, set, update: TransactionState | ((prev: TransactionState) => TransactionState)) => {
+    const current = get(_receiveStateAtom);
+    const newValue = typeof update === 'function' ? update(current) : update;
+    set(_receiveStateAtom, newValue);
   },
 );
 
-export const calculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
-  console.group('[calculatedFeeAtom] Recalculating fee display');
-  const sendState = get(sendStateAtom);
-  const feeState = get(feeStateAtom);
-  const transactionType = get(transactionTypeAtom);
+export const derivedFeeStateAtom = atom<FeeState | null>(get => {
+  const transactionRoute = get(transactionRouteAtom);
+  const transactionLogs = get(transactionLogsAtom);
 
-  console.log('Send state:', sendState);
-  console.log('Fee state:', feeState);
-  console.log('Transaction type valid:', transactionType.isValid);
+  console.log('[derivedFeeStateAtom] Evaluating...', {
+    hasSteps: transactionRoute.steps.length > 0,
+    stepCount: transactionRoute.steps.length,
+    stepHashes: transactionRoute.steps.map(s => s.hash),
+    logsKeys: Object.keys(transactionLogs),
+  });
+
+  if (transactionRoute.steps.length === 0) {
+    console.log('[derivedFeeStateAtom] No steps in route, returning null');
+    return null;
+  }
+
+  // Get fee from the first step (starting asset)
+  const firstStep = transactionRoute.steps[0];
+  const firstStepLog = transactionLogs[firstStep.hash];
+
+  console.log('[derivedFeeStateAtom] First step details:', {
+    stepHash: firstStep.hash,
+    stepType: firstStep.type,
+    fromChain: firstStep.fromChain,
+    fromAsset: firstStep.fromAsset,
+    logExists: !!firstStepLog,
+    logFees: firstStepLog?.fees,
+  });
+
+  if (!firstStepLog?.fees || firstStepLog.fees.length === 0) {
+    console.log('[derivedFeeStateAtom] No fees in first step log, returning null');
+    return null;
+  }
+
+  const originalFeeToken = firstStepLog.fees[0];
+
+  if (!originalFeeToken || typeof originalFeeToken !== 'object') {
+    console.log('[derivedFeeStateAtom] Invalid fee token structure, returning null');
+    return null;
+  }
+
+  const feeToken = originalFeeToken.feeToken || DEFAULT_FEE_TOKEN;
+  const asset = originalFeeToken.asset || firstStep.fromAsset;
+  const amount = originalFeeToken.amount || 0;
+  const chainId = originalFeeToken.chainId || firstStep.fromChain;
+  const gasWanted = originalFeeToken.gasWanted || 0;
+  const gasPrice = originalFeeToken.gasPrice || 0;
+
+  const result = {
+    asset,
+    amount,
+    chainId,
+    feeToken,
+    gasWanted,
+    gasPrice,
+  };
+
+  console.log('[derivedFeeStateAtom] Returning fee state:', result);
+  return result;
+});
+
+export const totalFeesAtom = atom(get => {
+  const transactionRoute = get(transactionRouteAtom);
+  const transactionLogs = get(transactionLogsAtom);
+  const derivedFeeState = get(derivedFeeStateAtom);
+
+  console.log('[totalFeesAtom] Evaluating...', {
+    stepCount: transactionRoute.steps.length,
+    derivedFeeState: derivedFeeState,
+    derivedFeeAsset: derivedFeeState?.asset?.denom || DEFAULT_DENOM,
+    derivedOriginDenom: derivedFeeState?.asset?.originDenom,
+  });
+
+  if (!derivedFeeState || !derivedFeeState.asset) {
+    console.log('[totalFeesAtom] No derived fee state, returning zero');
+    return { totalFee: 0, feeAsset: null };
+  }
+
+  let totalFee = 0;
+  let feeAsset: Asset | null = derivedFeeState?.asset || null;
+  transactionRoute.steps.forEach((step, index) => {
+    const log = transactionLogs[step.hash];
+    console.log(`[totalFeesAtom] Processing step ${index}:`, {
+      stepHash: step.hash,
+      stepType: step.type,
+      logExists: !!log,
+      logFees: log?.fees,
+    });
+
+    if (log?.fees) {
+      const feesArray = Array.isArray(log.fees) ? log.fees : [log.fees];
+
+      feesArray.forEach((fee, feeIndex) => {
+        if (!fee.asset || typeof fee.asset !== 'object') {
+          console.warn(
+            `[totalFeesAtom] Invalid fee.asset at step ${index}, fee index ${feeIndex}:`,
+            fee,
+          );
+          return;
+        }
+
+        console.log(`[totalFeesAtom] Processing fee ${feeIndex} in step ${index}:`, {
+          feeAmount: fee.amount,
+          feeAssetDenom: fee.asset.denom,
+          feeAssetOriginDenom: fee.asset.originDenom,
+          derivedAssetDenom: feeAsset?.denom,
+          derivedOriginDenom: feeAsset?.originDenom,
+          matchesByDenom: feeAsset && fee.asset.denom === feeAsset.denom,
+          matchesByOriginDenom: feeAsset && fee.asset.originDenom === feeAsset.originDenom,
+        });
+
+        // Only sum fees that use the same asset as the derived fee state
+        if (feeAsset && fee.asset.originDenom === feeAsset.originDenom) {
+          totalFee += fee.amount;
+          console.log(`[totalFeesAtom] Added fee: ${fee.amount}, new total: ${totalFee}`);
+        }
+      });
+    }
+  });
+
+  const result = { totalFee, feeAsset };
+  console.log('[totalFeesAtom] Final result:', result);
+  return result;
+});
+
+export const calculatedTotalFeeDisplayAtom = atom<CalculatedFeeDisplay>(get => {
+  const sendState = get(sendStateAtom);
+  const { totalFee, feeAsset } = get(totalFeesAtom);
+  const transactionHasValidRoute = get(transactionHasValidRouteAtom);
+  const derivedFeeState = get(derivedFeeStateAtom);
+
+  console.log('[calculatedTotalFeeDisplayAtom] Evaluating...', {
+    sendStateAmount: sendState.amount,
+    totalFee,
+    feeAsset: feeAsset?.denom,
+    hasValidRoute: transactionHasValidRoute,
+    derivedFeeState,
+  });
 
   const defaultReturn: CalculatedFeeDisplay = {
     feeAmount: 0,
     feeUnit: '',
-    textClass: 'text-blue',
+    textClass: TextClass.GOOD,
     percentage: 0,
     calculatedFee: 0,
     gasWanted: 0,
     gasPrice: 0,
   };
 
-  if (!sendState.asset || !transactionType.isValid) {
-    console.log('Returning default - no asset or invalid transaction type');
-    console.groupEnd();
+  if (!sendState.asset || !transactionHasValidRoute || !feeAsset) {
+    console.log('[calculatedTotalFeeDisplayAtom] Missing required data, returning default:', {
+      hasSendAsset: !!sendState.asset,
+      hasValidRoute: transactionHasValidRoute,
+      hasFeeAsset: !!feeAsset,
+    });
     return defaultReturn;
   }
 
-  const exponent = sendState.asset.exponent;
-  const calculatedFee = feeState.amount / Math.pow(10, exponent);
+  const exponent = feeAsset.exponent;
+  const calculatedFee = totalFee / Math.pow(10, exponent);
   const percentage = sendState.amount > 0 ? (calculatedFee / sendState.amount) * 100 : 0;
 
-  console.log('Calculated values:', {
-    exponent,
-    calculatedFee,
-    percentage,
-  });
-  console.groupEnd();
-
-  return {
-    ...defaultReturn,
-    feeAmount: feeState.amount,
-    feeUnit: sendState.asset.symbol,
-    textClass: getFeeTextClass(percentage),
+  const result = {
+    feeAmount: totalFee,
+    feeUnit: feeAsset.symbol,
+    textClass: percentage > 0.1 ? TextClass.WARNING : TextClass.GOOD,
     percentage,
     calculatedFee,
-    gasWanted: feeState.gasWanted,
-    gasPrice: feeState.gasPrice,
+    gasWanted: derivedFeeState?.gasWanted || 0,
+    gasPrice: derivedFeeState?.gasPrice || 0,
   };
+
+  console.log('[calculatedTotalFeeDisplayAtom] Final result:', result);
+  return result;
 });
 
 // Reset function
 export const resetTransactionStatesAtom = atom(null, (get, set) => {
   const selectedAsset = get(selectedAssetAtom);
 
+  console.log('[resetTransactionStatesAtom] Resetting all transaction states');
+
   // Reset main states
   set(_sendStateAtom, {
     ...DEFAULT_SEND_STATE,
     asset: selectedAsset,
-    chainID: selectedAsset.networkID,
+    chainId: selectedAsset.chainId,
   });
 
   set(_receiveStateAtom, {
     ...DEFAULT_RECEIVE_STATE,
     asset: selectedAsset,
-    chainID: selectedAsset.networkID,
-  });
-
-  // Reset fee state
-  set(_feeStateAtom, {
-    ...get(feeStateAtom),
-    ...DEFAULT_FEE_STATE,
+    chainId: selectedAsset.chainId,
   });
 
   // Reset errors
@@ -186,50 +302,107 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
     status: InputStatus.NEUTRAL,
   });
 
-  // Reset transaction status
-  set(transactionStatusAtom, {
-    status: TransactionStatus.IDLE,
+  // Reset transaction logs
+  set(resetTransactionLogsAtom);
+
+  // Reset transaction route
+  set(transactionRouteAtom, {
+    steps: [],
+    currentStep: 0,
+    isComplete: false,
+    isSimulation: true,
   });
+
+  // Reset route hash
+  set(transactionRouteHashAtom, '');
+
+  // Reset simulation invalidation
+  set(simulationInvalidationAtom, {
+    lastRunTimestamp: 0,
+    routeHash: '',
+    shouldInvalidate: false,
+  });
+
+  // Reset fee state
+  set(_feeStateAtom, DEFAULT_FEE_STATE);
 });
 
+// TODO: consider later steps and the maximums inherent to those as well
 export const maxAvailableAtom = atom(get => {
   const sendAsset = get(sendStateAtom).asset;
   const walletAssets = get(allWalletAssetsAtom);
-  const feeState = get(feeStateAtom);
+  const derivedFeeState = get(derivedFeeStateAtom);
 
   if (!sendAsset) return 0;
 
+  // TODO: change to find all (when transaction routing enables combination sends)
   const walletAsset = walletAssets.find((asset: Asset) => asset.denom === sendAsset.denom);
   if (!walletAsset) return 0;
 
   const maxAmount = parseFloat(walletAsset.amount || '0');
-  const feeAmount = feeState.amount;
+  const feeAmount = derivedFeeState?.amount || 0;
 
   return Math.max(0, maxAmount - feeAmount);
 });
 
-export const transactionLogAtom = atom<TransactionLog>({
-  isSimulation: false,
-  entries: [],
+// TODO: group in with maxAvailableAtom as dictionary return
+export const maxAvailableDisplayAtom = atom(get => {
+  const sendAsset = get(sendStateAtom).asset;
+  const maxAmount = get(maxAvailableAtom);
+
+  return maxAmount / Math.pow(10, sendAsset.exponent);
 });
 
-export const transactionStatusAtom = atom<TransactionStatusState>({
-  status: TransactionStatus.IDLE,
+export const isTxPendingAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
+
+  // Check if any step is in progress
+  return route.steps.some(step => {
+    const log = logs[step.hash];
+    return log?.status === TransactionStatus.PENDING;
+  });
 });
 
-export const isLoadingAtom = atom(
-  get => get(transactionStatusAtom).status === TransactionStatus.LOADING,
-);
+export const isTransactionSuccessAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  return route.isComplete;
+});
 
-export const isTransactionSuccessAtom = atom(
-  get => get(transactionStatusAtom).status === TransactionStatus.SUCCESS,
-);
+export const transactionFailedAtom = atom(get => {
+  return get(transactionRouteFailedAtom);
+});
 
-export const transactionFailedAtom = atom(
-  get => get(transactionStatusAtom).status === TransactionStatus.ERROR,
-);
+export const transactionErrorAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
 
-export const transactionErrorAtom = atom(get => get(transactionStatusAtom).error);
+  // Find the first error message from any failed step
+  for (const step of route.steps) {
+    const log = logs[step.hash];
+    if (log?.status === TransactionStatus.ERROR && log.error) {
+      return log.error;
+    }
+  }
+
+  return undefined;
+});
+
+export const finalTransactionHashAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
+
+  // If the route is complete, get the hash from the last step
+  if (route.isComplete && route.steps.length > 0) {
+    const lastStep = route.steps[route.steps.length - 1];
+    const lastStepLog = logs[lastStep.hash];
+
+    return lastStepLog?.txHash;
+  }
+
+  // If it's a simulation or not complete, return undefined
+  return undefined;
+});
 
 // In transactionStateAtom.ts
 export const sendErrorAtom = atom<{
@@ -249,9 +422,64 @@ export const receiveErrorAtom = atom<{
 });
 
 // Add these derived atoms for convenience
-export const isInvalidTransactionAtom = atom(get => get(transactionTypeAtom).isValid !== true);
+export const isInvalidTransactionAtom = atom(get => get(transactionHasValidRouteAtom) !== true);
 export const hasSendErrorAtom = atom(get => get(sendErrorAtom).message !== '');
 export const hasReceiveErrorAtom = atom(get => get(receiveErrorAtom).message !== '');
 
-export const lastSimulationUpdateAtom = atom<number>(0);
-export const simulationBlockedAtom = atom<boolean>(false);
+export const simulationInvalidationAtom = atom({
+  lastRunTimestamp: 0,
+  routeHash: '',
+  shouldInvalidate: false,
+});
+
+export const invalidateSimulationAtom = atom(null, (get, set) => {
+  const currentRouteHash = get(transactionRouteHashAtom);
+  set(simulationInvalidationAtom, {
+    lastRunTimestamp: 0,
+    routeHash: currentRouteHash,
+    shouldInvalidate: true,
+  });
+});
+
+export const canRunSimulationAtom = atom(get => {
+  const sendState = get(sendStateAtom);
+  const maxAvailable = get(maxAvailableAtom);
+  const recipientAddress = get(recipientAddressAtom);
+  const addressVerified = get(addressVerifiedAtom);
+  const transactionHasValidRoute = get(transactionHasValidRouteAtom);
+  const isTxPending = get(isTxPendingAtom);
+  const transactionError = get(transactionErrorAtom);
+  const simulationInvalidation = get(simulationInvalidationAtom);
+  const transactionRouteHash = get(transactionRouteHashAtom);
+  const isTxSuccess = get(isTransactionSuccessAtom);
+
+  const hasValidAmount =
+    !isNaN(sendState.amount) && sendState.amount > 0 && sendState.amount <= maxAvailable;
+
+  const needsInvalidation =
+    simulationInvalidation.shouldInvalidate ||
+    simulationInvalidation.routeHash !== transactionRouteHash ||
+    Date.now() - simulationInvalidation.lastRunTimestamp > SIM_TX_FRESHNESS_TIMEOUT;
+
+  const canRun =
+    recipientAddress &&
+    addressVerified &&
+    hasValidAmount &&
+    transactionHasValidRoute &&
+    !isTxPending &&
+    !transactionError &&
+    (needsInvalidation || !isTxSuccess);
+
+  console.log('[canRunSimulationAtom] Evaluation:', {
+    recipientAddress: !!recipientAddress,
+    addressVerified,
+    hasValidAmount,
+    transactionHasValidRoute,
+    isTxPending,
+    transactionError: !!transactionError,
+    needsInvalidation,
+    result: canRun,
+  });
+
+  return canRun;
+});

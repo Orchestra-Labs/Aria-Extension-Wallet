@@ -1,21 +1,38 @@
 import {
+  CommType,
   DEFAULT_FEE_TOKEN,
   DEFAULT_REST_TIMEOUT,
+  FIVE_MINUTES,
   MAX_RETRIES_PER_QUERY,
+  ONE_SECOND,
   QueryType,
   SYMPHONY_ENDPOINTS,
 } from '@/constants';
 import { SigningStargateClient, GasPrice } from '@cosmjs/stargate';
 import { delay } from './timer';
-import { FeeToken, RPCResponse, Uri } from '@/types';
+import { FeeToken, RPCResponse, SortedValidator, Uri } from '@/types';
 import {
-  createOfflineSignerByPrefix,
   getAddressByChainPrefix,
   getSessionToken,
+  getSortedValidators,
+  recordQueryResult,
 } from './dataHelpers';
 import { getSigningSymphonyClient } from '@orchestra-labs/symphonyjs';
+import { getCosmosDirectSigner } from './signers';
 
-//indexer specific error - i.e tx submitted, but indexer disabled so returned incorrect
+// Client connection caching
+const clientCache = new Map<string, SigningStargateClient>();
+const CACHE_TTL = FIVE_MINUTES;
+// Sorted URIs caching
+const SORT_CACHE_TTL = ONE_SECOND;
+
+interface ValidatorCacheEntry {
+  validators: SortedValidator[];
+  timestamp: number;
+}
+
+let sortedValidatorsCache: { [cacheKey: string]: ValidatorCacheEntry } = {};
+
 const isIndexerError = (error: any): boolean => {
   return (
     error?.message?.includes('transaction indexing is disabled') ||
@@ -23,15 +40,71 @@ const isIndexerError = (error: any): boolean => {
   );
 };
 
-// Helper: Perform a REST API query to a selected node
-// TODO: make queryType an enum
-const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST' | 'GET') => {
+const shouldRecordFailure = (error: any): boolean => {
+  const errorMessage = error?.message || '';
+
+  // Client errors (4xx) - validator/access issues
+  const isClientError =
+    errorMessage.includes('HTTP 400') ||
+    errorMessage.includes('HTTP 401') ||
+    errorMessage.includes('HTTP 403') ||
+    errorMessage.includes('HTTP 404') ||
+    errorMessage.includes('HTTP 405') ||
+    errorMessage.includes('HTTP 408') ||
+    errorMessage.includes('HTTP 409') ||
+    errorMessage.includes('HTTP 410') ||
+    errorMessage.includes('HTTP 429');
+
+  // Server errors (5xx) - validator infrastructure problems
+  const isServerError =
+    errorMessage.includes('HTTP 500') ||
+    errorMessage.includes('HTTP 501') ||
+    errorMessage.includes('HTTP 502') ||
+    errorMessage.includes('HTTP 503') ||
+    errorMessage.includes('HTTP 504') ||
+    errorMessage.includes('HTTP 507') ||
+    errorMessage.includes('HTTP 508') ||
+    errorMessage.includes('HTTP 509') ||
+    errorMessage.includes('HTTP 522');
+
+  // Also record indexer errors since they're validator-specific
+  const isIndexerRelated = isIndexerError(error);
+
+  // Connection errors (not HTTP status but network-level issues)
+  const isConnectionError =
+    errorMessage.includes('ECONNREFUSED') ||
+    errorMessage.includes('ENOTFOUND') ||
+    errorMessage.includes('ECONNRESET') ||
+    errorMessage.includes('ETIMEDOUT');
+
+  // Timeout errors (aborted requests)
+  const isTimeout = errorMessage.includes('timed out') || errorMessage.includes('AbortError');
+
+  return isClientError || isServerError || isIndexerRelated || isConnectionError || isTimeout;
+};
+
+const performRestQuery = async (
+  uri: string,
+  endpoint: string,
+  queryType: QueryType,
+  data?: any,
+) => {
   const adjustedUri = uri.endsWith('/') && endpoint.startsWith('/') ? uri.slice(0, -1) : uri;
   const uriEndpoint = `${adjustedUri}${endpoint}`;
-  // console.log(`[queryNodes] Performing REST query to ${uriEndpoint} and query type ${queryType}`);
 
+  const startTime = Date.now();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
+
+  const options: RequestInit = {
+    method: queryType,
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+  };
+
+  if (queryType === 'POST' && data) {
+    options.body = JSON.stringify(data);
+  }
 
   try {
     const response = await fetch(`${uriEndpoint}`, {
@@ -42,35 +115,29 @@ const performRestQuery = async (uri: string, endpoint: string, queryType: 'POST'
     });
 
     clearTimeout(timeoutId);
+    const queryTime = Date.now() - startTime;
 
     if (!response.ok) {
-      console.error('[queryNodes] Node query failed:', response);
-      throw new Error('Node query failed');
+      console.error('[queryNodes] Node query failed:', response.status, response.statusText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const responseBody = await response.json();
-
-    // console.log(
-    //   `[queryNodes] REST query to ${uriEndpoint} with query type ${queryType} successful, response:`,
-    //   responseBody,
-    // );
-    return responseBody;
+    return { data: responseBody, queryTime, statusCode: response.status };
   } catch (error) {
     clearTimeout(timeoutId);
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        throw new Error(`Request timed out after ${DEFAULT_REST_TIMEOUT}ms`);
+        throw new Error(`Request timed out`);
       }
       throw error;
     }
 
-    // Handle non-Error throwables
     throw new Error(`Unknown error occurred: ${String(error)}`);
   }
 };
 
-// Helper: Perform an RPC query using signing, such as for claiming rewards or staking
 const performRpcQuery = async (
   client: SigningStargateClient,
   walletAddress: string,
@@ -81,151 +148,160 @@ const performRpcQuery = async (
     amount: { denom: string; amount: string }[];
     gas: string;
   },
-  memo: string = 'wallet',
+  memo: string = 'aria wallet',
 ): Promise<RPCResponse> => {
-  console.log('[queryNodes] Performing RPC query...');
-  console.log('[queryNodes] Fee Token:', feeToken);
-
   try {
     let calculatedFee = fee;
-    let gasPrice = feeToken.gasPriceStep.average; // Start with average
-    let attempts = 0;
-    const maxAttempts = 2; // Try average first, then high if needed
+    let gasPrice = feeToken.gasPriceStep.average;
 
-    while (attempts < maxAttempts) {
-      try {
-        if (!calculatedFee) {
-          console.log('[queryNodes] Calculating fee...');
-          const feeDenom = feeToken.denom;
-          const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
+    if (!calculatedFee) {
+      const feeDenom = feeToken.denom;
+      const defaultGasPrice = GasPrice.fromString(`${gasPrice}${feeDenom}`);
 
-          // Simulate transaction to get gas estimate
-          const gasEstimation = await client.simulate(walletAddress, messages, memo);
-          console.log('[queryNodes] Raw Gas Estimation:', gasEstimation);
+      // Simulate transaction to get gas estimate
+      const gasEstimation = await client.simulate(walletAddress, messages, memo);
 
-          // Add buffer (30% more gas than estimated)
-          const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
-          console.log('[queryNodes] Buffered Gas Estimation:', bufferedGasEstimation);
+      // Add buffer (30% more gas than estimated)
+      const bufferedGasEstimation = Math.ceil(gasEstimation * 1.3);
 
-          // Calculate fee amount
-          const feeAmount = Math.ceil(
-            bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
-          );
-          console.log('[queryNodes] Calculated Fee Amount:', feeAmount);
+      // Calculate fee amount
+      const feeAmount = Math.ceil(
+        bufferedGasEstimation * defaultGasPrice.amount.toFloatApproximation(),
+      );
 
-          calculatedFee = {
-            amount: [
-              {
-                denom: feeDenom,
-                amount: feeAmount.toString(),
-              },
-            ],
-            gas: bufferedGasEstimation.toString(),
-          };
-        }
-
-        console.log('[queryNodes] Final Calculated Fee:', calculatedFee);
-
-        if (simulateOnly) {
-          console.log('[queryNodes] Simulation success, returning fee info.');
-          return {
-            code: 0,
-            message: 'Simulation success',
-            fee: calculatedFee,
-            gasWanted: calculatedFee.gas,
-          };
-        }
-
-        const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
-        console.log('[queryNodes] Transaction result:', result);
-
-        if (result.code === 0) {
-          return {
-            code: 0,
-            txHash: result.transactionHash,
-            gasUsed: result.gasUsed?.toString(),
-            gasWanted: result.gasWanted?.toString(),
-            message: 'Transaction success',
-          };
-        }
-
-        // Handle specific error codes
-        if (result.code === 13) {
-          // 13 = insufficient fee
-          throw new Error('Insufficient fee');
-        }
-
-        console.error('[queryNodes] Transaction failed with code:', result.code);
-        throw new Error(`Transaction failed with code ${result.code}`);
-      } catch (error: any) {
-        console.error('[queryNodes] Error during RPC query:', error);
-
-        // Check if we should retry with higher gas price
-        if (
-          attempts < maxAttempts - 1 &&
-          (error.message.includes('insufficient fee') || error.code === 13)
-        ) {
-          attempts++;
-          gasPrice = feeToken.gasPriceStep.high; // Switch to high gas price
-          calculatedFee = undefined; // Force recalculation
-          console.log(`[queryNodes] Retrying with higher gas price: ${gasPrice}`);
-          continue;
-        }
-
-        // If we have an indexer error, handle specially
-        if (isIndexerError(error)) {
-          console.log('Indexer error detected.');
-          return {
-            code: 1,
-            message: 'Node indexer disabled',
-            txHash: error.txHash || 'unknown',
-          };
-        }
-
-        throw error;
-      }
+      calculatedFee = {
+        amount: [
+          {
+            denom: feeDenom,
+            amount: feeAmount.toString(),
+          },
+        ],
+        gas: bufferedGasEstimation.toString(),
+      };
     }
 
-    throw new Error('All fee adjustment attempts failed');
+    if (simulateOnly) {
+      return {
+        code: 0,
+        message: 'Simulation success',
+        fees: calculatedFee,
+        gasWanted: calculatedFee.gas,
+      };
+    }
+
+    const result = await client.signAndBroadcast(walletAddress, messages, calculatedFee, memo);
+
+    if (result.code === 0) {
+      return {
+        code: 0,
+        txHash: result.transactionHash,
+        gasUsed: result.gasUsed?.toString(),
+        gasWanted: result.gasWanted?.toString(),
+        message: 'Transaction success',
+      };
+    }
+
+    console.error('[queryNodes] Transaction failed with code:', result.code);
+    throw new Error(`Transaction failed with code ${result.code}`);
   } catch (error: any) {
+    if (isIndexerError(error)) {
+      return {
+        code: 1,
+        message: 'Node indexer disabled',
+        txHash: error.txHash || 'unknown',
+      };
+    }
+
     console.error('[queryNodes] Final error:', error);
     throw error;
   }
 };
 
-const getTranactionSigner = async (
+const getCachedSigner = async (
   endpoint: string,
   uri: Uri,
   mnemonic: string,
   prefix: string,
 ): Promise<SigningStargateClient> => {
+  const cacheKey = `${uri.address}-${prefix}`;
+
+  // Check cache and validate it's not too old
+  const cachedClient = clientCache.get(cacheKey);
+  if (cachedClient) {
+    return cachedClient;
+  }
+
   const isSymphonyQuery = Object.values(SYMPHONY_ENDPOINTS).some(symphonyEndpoint =>
     endpoint.startsWith(symphonyEndpoint),
   );
 
-  console.log(`[queryNodes] Is Symphony query: ${isSymphonyQuery}`);
-  const offlineSigner = await createOfflineSignerByPrefix(mnemonic, prefix);
+  const offlineSigner = await getCosmosDirectSigner(mnemonic, prefix);
 
-  const signer = isSymphonyQuery
+  const client = isSymphonyQuery
     ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
     : await SigningStargateClient.connectWithSigner(uri.address, offlineSigner);
-  return signer;
+
+  // Cache the client
+  clientCache.set(cacheKey, client);
+
+  // Set timeout to clear cache entry
+  setTimeout(() => {
+    clientCache.delete(cacheKey);
+  }, CACHE_TTL);
+
+  return client;
+};
+
+const sortUrisWithCache = (uris: Uri[], sortedValidators: SortedValidator[]): Uri[] => {
+  const performanceRank = new Map<string, number>();
+  sortedValidators.forEach((validator, index) => {
+    performanceRank.set(validator.validatorId, index);
+  });
+
+  return [...uris].sort((a, b) => {
+    const rankA = performanceRank.get(a.address) ?? Infinity;
+    const rankB = performanceRank.get(b.address) ?? Infinity;
+    return rankA - rankB;
+  });
+};
+
+const getSortedUris = (chainId: string, uris: Uri[], commType: CommType): Uri[] => {
+  const now = Date.now();
+  const cacheKey = `${chainId}-${commType}`;
+
+  // Use cache if available and not expired
+  if (
+    sortedValidatorsCache[cacheKey] &&
+    now - sortedValidatorsCache[cacheKey].timestamp < SORT_CACHE_TTL
+  ) {
+    return sortUrisWithCache(uris, sortedValidatorsCache[cacheKey].validators);
+  }
+
+  const sortedValidators = getSortedValidators(chainId, commType);
+  sortedValidatorsCache[cacheKey] = {
+    validators: sortedValidators,
+    timestamp: now,
+  };
+
+  return sortUrisWithCache(uris, sortedValidators);
 };
 
 const queryWithRetry = async ({
   endpoint,
   useRPC = false,
-  queryType = 'GET',
+  queryType = QueryType.GET,
   messages = [],
   feeToken = DEFAULT_FEE_TOKEN,
   simulateOnly = false,
   fee,
   prefix,
   uris,
+  chainId,
+  data,
 }: {
   endpoint: string;
   useRPC?: boolean;
-  queryType?: 'GET' | 'POST';
+  queryType?: QueryType;
   messages?: any[];
   feeToken?: FeeToken;
   simulateOnly?: boolean;
@@ -235,15 +311,28 @@ const queryWithRetry = async ({
   };
   prefix: string;
   uris: Uri[];
+  chainId: string;
+  data?: any;
 }): Promise<RPCResponse> => {
   let attemptCount = 0;
   let lastError: any = null;
 
-  // TODO: add rest.cosmos.directory/[chain name] (i.e. rest.cosmos.directory/symphony) or rest.testcosmos.directory/[chain name] to start of list before querying.
-  const shuffledUris = [...uris].sort(() => Math.random() - 0.5);
-  while (attemptCount < MAX_RETRIES_PER_QUERY && attemptCount <= uris.length - 1) {
-    const uriIndex = attemptCount % shuffledUris.length;
-    const uri = shuffledUris[uriIndex];
+  // Determine query type for sorting and recording
+  const queryTypeCategory: CommType = useRPC ? CommType.RPC : CommType.REST;
+
+  // Get sorted validators for this query type
+  const sortedUris = getSortedUris(chainId, uris, queryTypeCategory);
+
+  if (sortedUris.length === 0) {
+    throw new Error(`No validators available for ${chainId} ${queryTypeCategory}`);
+  }
+
+  while (attemptCount < MAX_RETRIES_PER_QUERY) {
+    const startTime = Date.now();
+
+    // Get the current validator for this attempt (cycle through the list)
+    const currentIndex = attemptCount % sortedUris.length;
+    const currentUri = sortedUris[currentIndex];
 
     try {
       if (useRPC) {
@@ -253,7 +342,7 @@ const queryWithRetry = async ({
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
 
-        const transactionSigner = await getTranactionSigner(endpoint, uri, mnemonic, prefix);
+        const transactionSigner = await getCachedSigner(endpoint, currentUri, mnemonic, prefix);
 
         const result = await performRpcQuery(
           transactionSigner,
@@ -263,22 +352,53 @@ const queryWithRetry = async ({
           simulateOnly,
           fee,
         );
+
+        const queryTime = Date.now() - startTime;
+        recordQueryResult(chainId, currentUri.address, queryTime, true, CommType.RPC);
+
+        // Success! Return the result
         return result;
       } else {
-        const result = await performRestQuery(uri.address, endpoint, queryType);
-        return result;
+        const result = await performRestQuery(currentUri.address, endpoint, queryType, data);
+        recordQueryResult(chainId, currentUri.address, result.queryTime, true, CommType.REST);
+
+        // Success! Return the result
+        return result.data;
       }
     } catch (error) {
-      console.error(`[queryNodes] ${error}`);
+      const queryTime = Date.now() - startTime;
+      console.error(`[queryNodes] Query failed for ${currentUri.address}: ${error}`);
+
+      // Always record timeouts as failures
+      const isTimeout = error instanceof Error && error.message.includes('timed out');
+
+      if (shouldRecordFailure(error) || isTimeout) {
+        recordQueryResult(chainId, currentUri.address, queryTime, false, queryTypeCategory);
+      } else {
+        // Non-serious error, don't record failure
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else {
+          errorMessage = String(error);
+        }
+        console.log(
+          `[queryNodes] Not recording failure for ${currentUri.address}: ${errorMessage}`,
+        );
+      }
 
       attemptCount++;
       lastError = error;
 
-      const backoff = Math.min(2 ** attemptCount * 500, 5000);
-      console.log(
-        `[queryNodes] Attempt ${attemptCount + 1} via ${uri.address} at ${endpoint}, waiting ${backoff}ms before retry`,
-      );
-      await delay(backoff);
+      if (attemptCount < MAX_RETRIES_PER_QUERY) {
+        const backoff = Math.min(2 ** attemptCount * 500, 5000);
+        console.log(
+          `[queryNodes] Next attempt (${attemptCount}/${MAX_RETRIES_PER_QUERY}) via ${sortedUris[attemptCount % sortedUris.length].address} at ${endpoint}, waiting ${backoff}ms before retry`,
+        );
+        await delay(backoff);
+      }
     }
   }
 
@@ -298,11 +418,15 @@ export const queryRestNode = async ({
   queryType = QueryType.GET,
   prefix,
   restUris,
+  chainId,
+  data,
 }: {
   endpoint: string;
   queryType?: QueryType;
   prefix: string;
   restUris: Uri[];
+  chainId: string;
+  data?: any;
 }) =>
   queryWithRetry({
     endpoint,
@@ -310,6 +434,8 @@ export const queryRestNode = async ({
     queryType,
     prefix,
     uris: restUris,
+    chainId,
+    data,
   });
 
 export const queryRpcNode = async ({
@@ -320,10 +446,12 @@ export const queryRpcNode = async ({
   fee,
   prefix,
   rpcUris,
+  chainId,
 }: {
   endpoint: string;
   prefix: string;
   rpcUris: Uri[];
+  chainId: string;
   messages?: any[];
   feeToken?: FeeToken;
   simulateOnly?: boolean;
@@ -341,4 +469,5 @@ export const queryRpcNode = async ({
     fee,
     prefix,
     uris: rpcUris,
+    chainId,
   });

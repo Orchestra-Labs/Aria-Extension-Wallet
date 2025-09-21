@@ -23,6 +23,11 @@ export const chainWalletAtom = (chainId: string) => {
   return chainWalletCache.get(chainId)!;
 };
 
+export const getChainWalletAtom = atom(get => (chainId: string) => {
+  const sessionWallet = get(sessionWalletAtom);
+  return sessionWallet.chainWallets[chainId] || { address: '', assets: [] };
+});
+
 // Secure updater for chain wallet data
 export const updateChainWalletAtom = atom(
   null,
@@ -34,6 +39,7 @@ export const updateChainWalletAtom = atom(
       oldAddress: existingWallet.address,
       newAddress: update.address,
       assetsCount: update.assets?.length,
+      assets: update.assets,
     });
 
     set(sessionWalletAtom, {
@@ -68,10 +74,10 @@ export const hasNonZeroAssetsAtom = atom(get => {
   const allAssets = get(allWalletAssetsAtom);
   const networkLevel = get(networkLevelAtom);
   const chainRegistry = get(subscribedChainRegistryAtom);
-  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
+  const validChainIds = Object.keys(chainRegistry[networkLevel] || {});
 
   return allAssets.some(asset => {
-    if (!validChainIDs.includes(asset.networkID)) return false;
+    if (!validChainIds.includes(asset.chainId)) return false;
     const amountStr = asset.amount?.trim() || '0';
     const amount = Number(amountStr);
     return !isNaN(amount) && amount > 0;

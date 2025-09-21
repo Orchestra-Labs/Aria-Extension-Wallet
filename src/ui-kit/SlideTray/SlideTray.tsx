@@ -9,6 +9,11 @@ import { cn } from '@/helpers/utils';
 import { Button } from '../Button';
 import { Separator } from '../Separator';
 
+export interface SlideTrayHandle {
+  closeWithAnimation: () => void;
+  isOpen: () => boolean;
+}
+
 interface SlideTrayProps {
   triggerComponent: React.ReactNode;
   title?: string;
@@ -23,7 +28,7 @@ interface SlideTrayProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-export const SlideTray = forwardRef<unknown, SlideTrayProps>(
+export const SlideTray = forwardRef<SlideTrayHandle, SlideTrayProps>(
   (
     {
       triggerComponent,
@@ -41,15 +46,9 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
     ref,
   ) => {
     const trayRef = useRef<HTMLDivElement>(null);
-    const [open, setOpen] = useState(false);
-
-    useEffect(() => {
-      onOpenChange?.(open);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open]);
-
     const startY = useRef<number>(0);
 
+    const [open, setOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [isMouseDown, setIsMouseDown] = useState(false);
 
@@ -127,15 +126,24 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
     // Detect scrolling or clicking in the trigger component
     const handleMouseDown = (e: React.MouseEvent) => {
       startY.current = e.clientY;
-      setIsMouseDown(true);
+      const target = e.target as HTMLElement;
+      const isPreventedButton = target.closest('[data-prevent-tray-open]');
+
+      if (!isPreventedButton) {
+        startY.current = e.clientY;
+        setIsMouseDown(true);
+      }
     };
 
     const handleMouseUp = (e: React.MouseEvent) => {
       const endY = e.clientY;
       const diff = Math.abs(startY.current - endY);
 
+      const target = e.target as HTMLElement;
+      const isPreventedButton = target.closest('[data-prevent-tray-open]');
+
       // If there's minimal movement and no dragging
-      if (diff < 5 && !isDragging) {
+      if (diff < 5 && !isDragging && !isPreventedButton) {
         setOpen(true);
       }
 
@@ -151,6 +159,11 @@ export const SlideTray = forwardRef<unknown, SlideTrayProps>(
         setIsDragging(true);
       }
     };
+
+    useEffect(() => {
+      onOpenChange?.(open);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     useImperativeHandle(
       ref,

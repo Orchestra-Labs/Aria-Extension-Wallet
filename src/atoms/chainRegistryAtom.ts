@@ -1,5 +1,17 @@
-import { DEFAULT_SUBSCRIPTION, LOCAL_CHAIN_REGISTRY, SettingsOption } from '@/constants';
-import { Asset, LocalChainRegistry, SimplifiedChainInfo, SubscriptionRecord } from '@/types';
+import {
+  DEFAULT_EXTERNAL_GAS_PRICES,
+  DEFAULT_OSMOSIS_DENOM,
+  DEFAULT_SUBSCRIPTION,
+  LOCAL_CHAIN_REGISTRY,
+  SettingsOption,
+} from '@/constants';
+import {
+  Asset,
+  FeeToken,
+  LocalChainRegistry,
+  SimplifiedChainInfo,
+  SubscriptionRecord,
+} from '@/types';
 import { atom } from 'jotai';
 import {
   assetSortOrderAtom,
@@ -11,7 +23,10 @@ import { networkLevelAtom } from './networkLevelAtom';
 import {
   filterAndSortAssets,
   filterAndSortChains,
+  getOsmosisAssetsWithResolutions,
+  getOsmosisChainId,
   getStoredChainRegistry,
+  getSupportedChains,
   getSymphonyChainId,
 } from '@/helpers';
 import { userAccountAtom } from './accountAtom';
@@ -40,11 +55,29 @@ export const unloadFullRegistryAtom = atom(null, (_, set) => {
   set(fullChainRegistryAtom, EMPTY_CHAIN_REGISTRY);
 });
 
+export const chainDenomsAtom = atom(get => {
+  const registry = get(fullChainRegistryAtom);
+  const networkLevel = get(networkLevelAtom);
+
+  return (chainId: string) => {
+    const chain = registry[networkLevel][chainId];
+    if (!chain?.assets) return [];
+    return Object.values(chain.assets).map(asset => asset.originDenom || asset.denom);
+  };
+});
+
 export const subscriptionSelectionsAtom = atom<SubscriptionRecord>(DEFAULT_SUBSCRIPTION);
 
 export const chainInfoAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);
   const chainRegistry = get(subscribedChainRegistryAtom);
+
+  return (chainId: string) => chainRegistry[networkLevel][chainId];
+});
+
+export const fullRegistryChainInfoAtom = atom(get => {
+  const networkLevel = get(networkLevelAtom);
+  const chainRegistry = get(fullChainRegistryAtom);
 
   return (chainId: string) => chainRegistry[networkLevel][chainId];
 });
@@ -79,53 +112,14 @@ export const selectedCoinListAtom = atom<Asset[]>(get => {
   const allAssets = get(allAssetsFromSubscribedChainsAtom);
 
   return allAssets.filter(asset => {
-    const selectedDenoms = subscriptionSelections[asset.networkID] || [];
-    return selectedDenoms.includes(asset.denom);
-  });
-});
-
-export const addCoinToChainAtom = atom(null, (get, set, { chainId, denom }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  const updated = {
-    ...current,
-    [networkLevel]: {
-      ...current[networkLevel],
-      [chainId]: [...(current[networkLevel][chainId] || []), denom],
-    },
-  };
-  set(subscriptionSelectionsAtom, updated);
-});
-
-export const removeCoinFromChainAtom = atom(null, (get, set, { chainId, denom }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  const currentDenoms = current[networkLevel][chainId] || [];
-  const updatedDenoms = currentDenoms.filter(d => d !== denom);
-
-  const updatedChains =
-    updatedDenoms.length === 0
-      ? Object.fromEntries(Object.entries(current[networkLevel]).filter(([id]) => id !== chainId))
-      : {
-          ...current[networkLevel],
-          [chainId]: updatedDenoms,
-        };
-
-  set(subscriptionSelectionsAtom, {
-    ...current,
-    [networkLevel]: updatedChains,
-  });
-});
-
-export const setChainCoinsAtom = atom(null, (get, set, { chainId, denoms }) => {
-  const networkLevel = get(networkLevelAtom);
-  const current = get(subscriptionSelectionsAtom);
-  set(subscriptionSelectionsAtom, {
-    ...current,
-    [networkLevel]: {
-      ...current[networkLevel],
-      [chainId]: denoms,
-    },
+    const chainSelection = subscriptionSelections[asset.chainId];
+    // Include asset if either:
+    // 1. viewAll is true for the chain, OR
+    // 2. the asset's denom is in the subscribedDenoms list
+    return (
+      chainSelection.viewAll ||
+      (chainSelection.subscribedDenoms || []).includes(asset.originDenom || asset.denom)
+    );
   });
 });
 
@@ -141,7 +135,7 @@ export const filteredChainAssetsAtom = atom(get => {
   const filteredAssets = testnetAccessEnabled
     ? allAssets
     : allAssets.filter(asset => {
-        const chain = get(fullChainRegistryAtom).mainnet[asset.networkID];
+        const chain = get(fullChainRegistryAtom).mainnet[asset.chainId];
         return chain !== undefined; // Only include assets from mainnet chains
       });
 
@@ -159,7 +153,7 @@ export const filteredChainRegistryAtom = atom(get => {
   console.log('[filteredChainRegistryAtom] networkLevel:', networkLevel);
   console.log('[filteredChainRegistryAtom] subscriptionSelections:', subscriptionSelections);
 
-  // Get subscribed chain IDs for the current network level
+  // Get subscribed chainIds for the current network level
   const subscribedChainIds = Object.keys(subscriptionSelections[networkLevel]);
   console.log('[filteredChainRegistryAtom] subscribedChainIds:', subscribedChainIds);
 
@@ -190,7 +184,7 @@ export const selectedValidatorChainAtom = atom<string, [string], void>(
 
     const subscribedChainIds = subscribedChains.map(chain => chain.chain_id);
 
-    // Priority 1: User's default chain ID (if subscribed)
+    // Priority 1: User's default chain id (if subscribed)
     const userDefaultChain = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
     if (userDefaultChain && subscribedChainIds.includes(userDefaultChain)) {
       return userDefaultChain;
@@ -236,4 +230,74 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
   const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
 
   return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
+});
+
+export const skipChainsAtom = atom<string[]>([]);
+export const loadSkipChainsAtom = atom(null, async (_, set) => {
+  try {
+    const chains = await getSupportedChains();
+    const parsedChains = chains.map(chain => chain.chain_id);
+    set(skipChainsAtom, parsedChains);
+  } catch (error) {
+    console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
+  }
+});
+
+export const osmosisChainsAtom = atom<string[]>([]);
+export const osmosisAssetsAtom = atom<Asset[]>([]);
+export const loadOsmosisDataAtom = atom(null, async (get, set) => {
+  try {
+    const networkLevel = get(networkLevelAtom);
+    const fullChainRegistry = get(fullChainRegistryAtom);
+    const subscribedChainRegistry = get(subscribedChainRegistryAtom);
+
+    // Get Osmosis chain ID
+    const osmosisChainId = getOsmosisChainId(networkLevel);
+    set(osmosisChainsAtom, [osmosisChainId]);
+
+    // Fetch Osmosis assets
+    const osmosisAssets = await getOsmosisAssetsWithResolutions(
+      networkLevel,
+      subscribedChainRegistry[networkLevel],
+      fullChainRegistry[networkLevel],
+    );
+    set(osmosisAssetsAtom, osmosisAssets);
+  } catch (error) {
+    console.error('[loadOsmosisDataAtom] Failed to load Osmosis data:', error);
+  }
+});
+
+export const isOsmosisSupportedDenomAtom = atom(get => (originDenom: string): boolean => {
+  const osmosisAssets = get(osmosisAssetsAtom);
+  return osmosisAssets.some(asset => asset.originDenom === originDenom);
+});
+
+export const osmosisFeeTokensAtom = atom((get): FeeToken[] => {
+  const networkLevel = get(networkLevelAtom);
+  const fullChainRegistry = get(fullChainRegistryAtom)[networkLevel];
+  const osmosisChainId = getOsmosisChainId(networkLevel);
+  const osmosisChain = fullChainRegistry[osmosisChainId];
+
+  return osmosisChain.fees || [];
+});
+
+export const osmosisFeeTokenByDenomAtom = atom(get => (denom: string): FeeToken | null => {
+  const feeTokens = get(osmosisFeeTokensAtom);
+
+  // First try to find the exact denom match
+  const exactMatch = feeTokens.find(token => token.denom === denom);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // If no exact match, try to find DEFAULT_OSMOSIS_DENOM
+  const defaultMatch = feeTokens.find(token => token.denom === DEFAULT_OSMOSIS_DENOM);
+  if (defaultMatch) {
+    return defaultMatch;
+  }
+
+  // If neither is found, return the first available fee token or a constructed default
+  return feeTokens.length > 0
+    ? feeTokens[0]
+    : { denom: DEFAULT_OSMOSIS_DENOM, gasPriceStep: DEFAULT_EXTERNAL_GAS_PRICES };
 });

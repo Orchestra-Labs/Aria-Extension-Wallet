@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Triangle } from 'lucide-react';
 import BigNumber from 'bignumber.js';
 
@@ -15,6 +15,9 @@ import {
   userAccountAtom,
   isFetchingWalletDataAtom,
   chainInfoAtom,
+  selectedAssetAtom,
+  updateReceiveAssetAndChainAtom,
+  updateSendAssetAndChainAtom,
 } from '@/atoms';
 import { Button } from '@/ui-kit';
 import {
@@ -53,6 +56,9 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const chainId = useAtomValue(selectedValidatorChainAtom);
   const selectedChainId = useAtomValue(selectedValidatorChainAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
+  const setSelectedAsset = useSetAtom(selectedAssetAtom);
+  const updateReceiveAssetAndChain = useSetAtom(updateReceiveAssetAndChainAtom);
+  const updateSendAssetAndChain = useSetAtom(updateSendAssetAndChainAtom);
 
   const defaultChainId = userAccount?.settings.defaultSelections[networkLevel].defaultChainId;
   const accountViewChainId = defaultChainId || getSymphonyChainId(networkLevel);
@@ -72,8 +78,8 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
   const symbol = balanceDisplayUnit.symbol;
   const currentExponent = balanceDisplayUnit.exponent;
 
-  const validChainIDs = Object.keys(chainRegistry[networkLevel] || {});
-  const networkWalletAssets = walletAssets.filter(asset => validChainIDs.includes(asset.networkID));
+  const validChainIds = Object.keys(chainRegistry[networkLevel] || {});
+  const networkWalletAssets = walletAssets.filter(asset => validChainIds.includes(asset.chainId));
 
   // Check if Symphony chain is subscribed
   const isSymphonySubscribed = useMemo(() => {
@@ -87,16 +93,16 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
   const totalValue = useMemo(() => {
     return networkWalletAssets.reduce((sum, asset) => {
-      const amount = new BigNumber(asset.amount || '0');
+      const amount = parseFloat(asset.displayAmount || '0');
       const price = asset.price || 0;
-      return sum.plus(amount.multipliedBy(price));
-    }, new BigNumber(0));
+      return sum + amount * price;
+    }, 0);
   }, [networkWalletAssets]);
 
   const totalTokenAmount = useMemo(() => {
     return networkWalletAssets.reduce((sum, asset) => {
-      return sum.plus(new BigNumber(asset.amount || '0'));
-    }, new BigNumber(0));
+      return sum + parseFloat(asset.displayAmount || '0');
+    }, 0);
   }, [networkWalletAssets]);
 
   if (currentStep === 0) {
@@ -114,7 +120,7 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
           if (rewardAmount.isZero()) return;
 
           // Find the asset to get price and decimals
-          const asset = networkWalletAssets.find(a => a.denom === reward.denom);
+          const asset = networkWalletAssets.find(a => (a.originDenom || a.denom) === reward.denom);
           const decimals = asset?.exponent || 6;
           const price = asset?.price || 0;
 
@@ -137,7 +143,10 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
 
     // Calculate staked balance (secondary text)
     const totalStakedMLD = validatorData
-      .filter(item => item.balance?.denom === balanceDisplayUnit?.denom)
+      .filter(
+        item =>
+          item.balance?.denom === (balanceDisplayUnit?.originDenom || balanceDisplayUnit?.denom),
+      )
       .reduce((sum, item) => {
         const amount = new BigNumber(item.balance?.amount || '0');
         // Convert from base units to human-readable units using the exponent
@@ -146,7 +155,11 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
       }, new BigNumber(0));
 
     // Find the primary asset to get its price
-    const primaryAsset = networkWalletAssets.find(a => a.denom === balanceDisplayUnit?.denom);
+    const primaryAsset = networkWalletAssets.find(
+      a =>
+        (a.originDenom || a.denom) ===
+        (balanceDisplayUnit?.originDenom || balanceDisplayUnit?.denom),
+    );
     const stakedValue = totalStakedMLD.multipliedBy(primaryAsset?.price || 0);
 
     secondaryText = formatValueWithFallback(
@@ -166,6 +179,9 @@ export const BalanceCard = ({ currentStep, totalSteps, swipeTo }: BalanceCardPro
     disabled:border-none disabled:text-neutral-3 disabled:bg-transparent disabled:cursor-default`;
 
   const handleSendClick = () => {
+    setSelectedAsset(balanceDisplayUnit);
+    updateSendAssetAndChain(balanceDisplayUnit);
+    updateReceiveAssetAndChain(balanceDisplayUnit);
     navigate(ROUTES.APP.SEND);
   };
 

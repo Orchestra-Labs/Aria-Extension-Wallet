@@ -1,12 +1,12 @@
-import { Asset, SimplifiedChainInfo, TransactionState } from '@/types';
+import { Asset, SimplifiedChainInfo } from '@/types';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { isValidSwap } from './swapTransactions';
-import { isValidSend } from './sendTransactions';
 import {
   DEFAULT_MAINNET_ASSET,
   DEFAULT_TESTNET_ASSET,
   NetworkLevel,
+  OSMOSIS_MAINNET_ID,
+  OSMOSIS_TESTNET_ID,
   SYMPHONY_MAINNET_ID,
   SYMPHONY_TESTNET_ID,
   TextFieldStatus,
@@ -51,31 +51,6 @@ export const getRegexForDecimals = (exponent: number) => {
   return new RegExp(`^\\d*\\.?\\d{0,${exponent}}$`);
 };
 
-export const isValidTransaction = async ({
-  sendAddress,
-  recipientAddress,
-  sendState,
-  receiveState,
-}: {
-  sendAddress: string;
-  recipientAddress: string;
-  sendState: TransactionState;
-  receiveState: TransactionState;
-}) => {
-  if (!(sendAddress && recipientAddress)) {
-    return false;
-  }
-
-  const sendAsset = sendState.asset;
-  const receiveAsset = receiveState.asset;
-
-  const isSwap = isValidSwap({ sendAsset, receiveAsset });
-  const isSend = isValidSend({ sendAsset, receiveAsset });
-  const result = isSend || isSwap;
-
-  return result;
-};
-
 export const calculateRemainingTime = (completionTime: string): string => {
   const now = new Date();
   const endTime = new Date(completionTime);
@@ -101,7 +76,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   if (chainFeeList.length > 0) {
     const primaryFeeDenom = chainFeeList[0].denom;
     const matchingAsset = Object.values(chain.assets).find(
-      asset => asset.denom === primaryFeeDenom,
+      asset => asset.denom === primaryFeeDenom, // check against current denom
     );
 
     if (matchingAsset) {
@@ -122,7 +97,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   if (firstAsset) {
     console.log(
       `[Utils] Using first asset as fallback for chain ${chain.chain_id}:`,
-      firstAsset.denom,
+      firstAsset.denom, // check against current denom
     );
     return firstAsset;
   }
@@ -131,6 +106,7 @@ export const getPrimaryFeeToken = (chain: SimplifiedChainInfo): Asset | null => 
   return null;
 };
 
+// TODO: move these to hook and use full chain registry
 export function getSymphonyChainId(networkLevel: NetworkLevel): string {
   return networkLevel === NetworkLevel.MAINNET ? SYMPHONY_MAINNET_ID : SYMPHONY_TESTNET_ID;
 }
@@ -138,3 +114,7 @@ export function getSymphonyChainId(networkLevel: NetworkLevel): string {
 export function getSymphonyDefaultAsset(networkLevel: NetworkLevel): Asset {
   return networkLevel === NetworkLevel.MAINNET ? DEFAULT_MAINNET_ASSET : DEFAULT_TESTNET_ASSET;
 }
+
+export const getOsmosisChainId = (networkLevel: NetworkLevel): string => {
+  return networkLevel === NetworkLevel.MAINNET ? OSMOSIS_MAINNET_ID : OSMOSIS_TESTNET_ID;
+};

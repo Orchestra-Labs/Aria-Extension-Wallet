@@ -33,7 +33,7 @@ export const executeStakeAtom = atom(
     try {
       if (!simulate) {
         set(validatorTransactionStateAtom, {
-          status: TransactionStatus.LOADING,
+          status: TransactionStatus.PENDING,
         });
       }
 
@@ -91,7 +91,7 @@ export const executeUnstakeAtom = atom(
     try {
       if (!simulate) {
         set(validatorTransactionStateAtom, {
-          status: TransactionStatus.LOADING,
+          status: TransactionStatus.PENDING,
         });
       }
 
@@ -147,7 +147,7 @@ export const executeClaimAtom = atom(
     try {
       if (!simulate) {
         set(validatorTransactionStateAtom, {
-          status: TransactionStatus.LOADING,
+          status: TransactionStatus.PENDING,
         });
       }
 

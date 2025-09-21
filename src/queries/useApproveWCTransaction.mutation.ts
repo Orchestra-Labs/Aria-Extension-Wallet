@@ -4,15 +4,9 @@ import { useMutation, UseMutationOptions } from '@tanstack/react-query';
 import { SignClientTypes } from '@walletconnect/types';
 import { getSdkError } from '@walletconnect/utils';
 import { Buffer } from 'buffer';
-import Long from 'long';
 
 import { COSMOS_SIGNING_METHODS } from '@/constants/wc';
-import {
-  createAminoSignerByPrefix,
-  createOfflineSignerByPrefix,
-  getSessionToken,
-  walletkit,
-} from '@/helpers';
+import { getCosmosAminoSigner, getCosmosDirectSigner, getSessionToken, walletkit } from '@/helpers';
 import { useAtomValue } from 'jotai';
 import { chainInfoAtom } from '@/atoms';
 
@@ -40,8 +34,8 @@ const approveWCTransaction = async ({ requestEvent }: Params) => {
   }
 
   const signerPrefix = chain.bech32_prefix;
-  const directSigner = await createOfflineSignerByPrefix(sessionToken.mnemonic, signerPrefix);
-  const aminoSigner = await createAminoSignerByPrefix(sessionToken.mnemonic, signerPrefix);
+  const directSigner = await getCosmosDirectSigner(sessionToken.mnemonic, signerPrefix);
+  const aminoSigner = await getCosmosAminoSigner(sessionToken.mnemonic, signerPrefix);
 
   const signTransaction = async () => {
     const accounts = await directSigner.getAccounts();
@@ -61,7 +55,7 @@ const approveWCTransaction = async ({ requestEvent }: Params) => {
           bodyBytes: bufferFromBase64(signDoc.bodyBytes) as unknown as Uint8Array,
           authInfoBytes: bufferFromBase64(signDoc.authInfoBytes) as unknown as Uint8Array,
           chainId: signDoc.chainId,
-          accountNumber: Long.fromString(signDoc.accountNumber) as unknown as bigint,
+          accountNumber: BigInt(signDoc.accountNumber),
         });
 
         const result = {

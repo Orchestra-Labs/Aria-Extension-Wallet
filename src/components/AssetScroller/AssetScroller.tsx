@@ -30,7 +30,7 @@ export const AssetScroller: React.FC<AssetScrollerProps> = ({
   const assetKeys = useAssetKeys(assets);
 
   const handleRefresh = useCallback(() => {
-    refreshData({ wallet: true, validator: false });
+    refreshData({ wallet: true });
   }, [refreshData]);
 
   const handleClick = (asset: Asset) => {
@@ -76,8 +76,8 @@ const useAssetKeys = (assets: Asset[]) => {
     return assets.map((asset, index) => {
       // Stringify all identifiable properties as a base key
       const propertiesKey = JSON.stringify({
-        denom: asset.denom,
-        networkID: asset.networkID,
+        denom: asset.denom, // original denom and ibc code are both fine here
+        chainId: asset.chainId,
         amount: asset.amount,
         isIbc: asset.isIbc,
         symbol: asset.symbol,

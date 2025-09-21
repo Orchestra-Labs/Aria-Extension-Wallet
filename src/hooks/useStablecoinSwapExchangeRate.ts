@@ -10,36 +10,33 @@ import {
   SYMPHONY_MAINNET_ASSET_REGISTRY,
 } from '@/constants';
 import {
-  subscribedChainRegistryAtom,
   receiveStateAtom,
   sendStateAtom,
   networkLevelAtom,
+  chainInfoAtom,
+  isValidStablecoinSwapAtom,
 } from '@/atoms';
-import { getSymphonyChainId, isValidSwap, queryRestNode } from '@/helpers';
+import { getSymphonyChainId, queryRestNode } from '@/helpers';
 
-export function useExchangeRate() {
+// TODO: currently unused.  remove?
+export function useStablecoinSwapExchangeRate() {
   const sendState = useAtomValue(sendStateAtom);
   const receiveState = useAtomValue(receiveStateAtom);
-  const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const isValidStablecoinSwap = useAtomValue(isValidStablecoinSwapAtom);
+  const getChainInfo = useAtomValue(chainInfoAtom);
 
   // Safely get chain info with fallback to DEFAULT_CHAIN_ID
   const symphonyChainId = getSymphonyChainId(networkLevel);
-  const getChainInfo = (chainId: string) => {
-    return chainRegistry[networkLevel][chainId] || chainRegistry[networkLevel][symphonyChainId];
-  };
 
-  const chainInfo = getChainInfo(sendState.chainID);
+  const chainInfo = getChainInfo(symphonyChainId);
   const prefix = chainInfo?.bech32_prefix || '';
   const restUris = chainInfo?.rest_uris || [];
 
   const sendAsset = sendState.asset;
   const receiveAsset = receiveState.asset;
-  const sendDenom = sendState.asset.denom;
-  const receiveDenom = receiveState.asset.denom;
-
-  // Check if swap is valid
-  const validSwap = isValidSwap({ sendAsset, receiveAsset });
+  const sendDenom = sendAsset.originDenom || sendAsset.denom;
+  const receiveDenom = receiveAsset.originDenom || receiveAsset.denom;
 
   const queryExchangeRate = useQuery<string | null, Error, string | null>({
     queryKey: ['exchangeRate', sendDenom, receiveDenom],
@@ -56,7 +53,7 @@ export function useExchangeRate() {
       const formattedOfferAmount = (1 * Math.pow(10, exponent)).toFixed(0);
 
       if (!restUris.length) {
-        throw new Error(`No REST endpoints available for chain ${sendState.chainID}`);
+        throw new Error(`No REST endpoints available for chain ${sendState.chainId}`);
       }
 
       // Use queryRestNode to query exchange rates
@@ -65,6 +62,7 @@ export function useExchangeRate() {
         queryType: QueryType.GET,
         prefix,
         restUris,
+        chainId: symphonyChainId,
       });
 
       if (!response?.return_coin?.amount) {
@@ -77,20 +75,20 @@ export function useExchangeRate() {
 
       return returnExchange;
     },
-    enabled: validSwap && !!sendDenom && !!receiveDenom && !!chainInfo,
+    enabled: isValidStablecoinSwap && !!sendDenom && !!receiveDenom && !!chainInfo,
     staleTime: 30000, // Consider the data stale after 30 seconds
     refetchInterval: 60000, // Refetch every 60 seconds
   });
 
   const exchangeRate = useMemo(() => {
-    if (!validSwap) {
+    if (!isValidStablecoinSwap) {
       return 1;
     }
     if (queryExchangeRate.data) {
       return new BigNumber(queryExchangeRate.data).toNumber();
     }
     return 0;
-  }, [queryExchangeRate.data, validSwap]);
+  }, [queryExchangeRate.data, isValidStablecoinSwap]);
 
   return {
     isLoading: queryExchangeRate.isLoading,

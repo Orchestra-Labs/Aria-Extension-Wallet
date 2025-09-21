@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, SlideTray } from '@/ui-kit';
+import { Button, SlideTray, SlideTrayHandle } from '@/ui-kit';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -8,7 +8,7 @@ import {
   validatorDialogSortOrderAtom,
   validatorDialogSortTypeAtom,
   resetValidatorTransactionAtom,
-  isValidatorTxLoadingAtom,
+  isValidatorTxPendingAtom,
   isValidatorTxSuccessAtom,
   validatorErrorAtom,
   validatorTxFailedAtom,
@@ -36,7 +36,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   buttonVariant,
   isClaimDialog = false,
 }) => {
-  const slideTrayRef = useRef<{ isOpen: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
 
   const { refreshData } = useRefreshData();
   const { runTransaction, runSimulation } = useValidatorActions();
@@ -46,7 +46,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
   const setSortType = useSetAtom(validatorDialogSortTypeAtom);
   const [selectedValidators, setSelectedValidators] = useAtom(selectedValidatorsAtom);
   const getDialogValidators = useAtomValue(dialogValidatorsAtom);
-  const isLoading = useAtomValue(isValidatorTxLoadingAtom);
+  const isLoading = useAtomValue(isValidatorTxPendingAtom);
   const isSuccess = useAtomValue(isValidatorTxSuccessAtom);
   const transactionError = useAtomValue(validatorErrorAtom);
   const transactionFailed = useAtomValue(validatorTxFailedAtom);
@@ -138,7 +138,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
     slideTrayRef.current?.isOpen() && !noValidatorsSelected && !isTransactionInProgress;
 
   useEffect(() => {
-    // Use a ref to track the timeout ID
+    // Use a ref to track the timeout id
     const timeoutRef = { current: null as NodeJS.Timeout | null };
 
     const runSimulation = () => {
@@ -168,7 +168,7 @@ export const ValidatorSelectDialog: React.FC<ValidatorSelectDialogProps> = ({
 
   useEffect(() => {
     if (isSuccess) {
-      refreshData();
+      refreshData({ wallet: true, validator: true });
     }
   }, [isSuccess]);
 

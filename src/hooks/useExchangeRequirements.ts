@@ -11,6 +11,7 @@ interface ExchangeRequirementsResponse {
   };
 }
 
+// TODO: rename. useStablecoinSwapRates?
 export const useExchangeRequirements = () => {
   const chainRegistry = useAtomValue(subscribedChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
@@ -37,6 +38,7 @@ export const useExchangeRequirements = () => {
         queryType: QueryType.GET,
         prefix,
         restUris,
+        chainId: symphonyChainId,
       })) as unknown as ExchangeRequirementsResponse;
 
       if (!response?.total?.amount) {

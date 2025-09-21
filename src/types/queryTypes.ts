@@ -1,3 +1,4 @@
+import { SkipTxResponse } from './transactionTypes';
 import {
   Coin,
   StakingParams,
@@ -5,6 +6,17 @@ import {
   ValidatorInfo,
   ValidatorReward,
 } from './validatorData';
+
+export interface FeeAmount {
+  denom: string;
+  amount: string;
+}
+
+export interface FeeStructure {
+  amount: FeeAmount[];
+  gas?: string;
+  gasWanted?: string;
+}
 
 export interface Pagination {
   next_key: string | null;
@@ -28,7 +40,14 @@ export interface TransactionRPCResponse extends BaseRPCResponse {
   txHash?: string;
   gasUsed?: string;
   gasWanted?: string;
+  route?: any;
+  estimatedAmountOut?: string;
+  fee?: any;
+  fees?: FeeStructure;
+  messages?: any[];
+  minAmountOut?: string;
   height?: number;
+  skipTxResponse?: SkipTxResponse[];
 }
 
 //TX result incl the response

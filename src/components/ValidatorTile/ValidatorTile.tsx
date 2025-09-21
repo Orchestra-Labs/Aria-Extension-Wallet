@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { FullValidatorInfo, ValidatorLogoInfo } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
+import { SlideTray, Button, SlideTrayHandle } from '@/ui-kit';
 import { IconContainer, NotFoundIcon } from '@/assets/icons';
 import { ScrollTile } from '../ScrollTile';
 import {
@@ -62,7 +62,7 @@ const ValidatorTileComponent = ({
   forceCurrentViewStyle = false,
 }: ValidatorTileProps) => {
   // Refs and state
-  const slideTrayRef = useRef<{ isOpen: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
   const { runTransaction, runSimulation } = useValidatorActions();
 
   // Atoms
@@ -104,7 +104,7 @@ const ValidatorTileComponent = ({
   const txIsForCurrentValidator =
     txStatus.validatorAddress === validator.operator_address &&
     txStatus.status !== TransactionStatus.IDLE;
-  const isLoading = txIsForCurrentValidator && txStatus.status === TransactionStatus.LOADING;
+  const isPending = txIsForCurrentValidator && txStatus.status === TransactionStatus.PENDING;
   const isSuccess = txIsForCurrentValidator && txStatus.status === TransactionStatus.SUCCESS;
   const transactionFailed = txIsForCurrentValidator && txStatus.status === TransactionStatus.ERROR;
 
@@ -252,7 +252,7 @@ const ValidatorTileComponent = ({
 
   const canRunSimulation = () => {
     if (selectedAction === ValidatorAction.CLAIM) return true;
-    return amount > 0 && !isLoading && selectedAction;
+    return amount > 0 && !isPending && selectedAction;
   };
 
   useEffect(() => {
@@ -288,7 +288,7 @@ const ValidatorTileComponent = ({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [amount, isLoading, selectedAction]);
+  }, [amount, isPending, selectedAction]);
 
   useEffect(() => {
     const fetchValidatorLogo = async () => {
@@ -371,8 +371,9 @@ const ValidatorTileComponent = ({
                     {theoreticalApr
                       ? parseFloat(theoreticalApr) == 0
                         ? 'Not found'
-                        : parseFloat(theoreticalApr)
-                      : 'Not Found'}
+                        : `${parseFloat(theoreticalApr)}%`
+                      : 'Not Found'}{' '}
+                    p.a.
                   </span>
                 }
               />
@@ -383,7 +384,7 @@ const ValidatorTileComponent = ({
                     {uptime
                       ? parseFloat(uptime) == 0
                         ? 'Not Found'
-                        : parseFloat(uptime)
+                        : `${parseFloat(uptime)}% uptime`
                       : 'Not Found'}
                   </span>
                 }
@@ -439,7 +440,7 @@ const ValidatorTileComponent = ({
                   size="medium"
                   className="w-full"
                   onClick={() => setSelectedAction(ValidatorAction.STAKE)}
-                  disabled={isLoading || selectedAction === ValidatorAction.STAKE}
+                  disabled={isPending || selectedAction === ValidatorAction.STAKE}
                 >
                   Stake
                 </Button>
@@ -448,7 +449,7 @@ const ValidatorTileComponent = ({
                   variant="secondary"
                   className="w-full mx-2"
                   onClick={() => setSelectedAction(ValidatorAction.UNSTAKE)}
-                  disabled={isLoading || selectedAction === ValidatorAction.UNSTAKE}
+                  disabled={isPending || selectedAction === ValidatorAction.UNSTAKE}
                 >
                   Unstake
                 </Button>
@@ -456,7 +457,7 @@ const ValidatorTileComponent = ({
                   size="medium"
                   className="w-full"
                   onClick={() => setSelectedAction(ValidatorAction.CLAIM)}
-                  disabled={isLoading || selectedAction === ValidatorAction.CLAIM}
+                  disabled={isPending || selectedAction === ValidatorAction.CLAIM}
                 >
                   Claim
                 </Button>
@@ -480,13 +481,13 @@ const ValidatorTileComponent = ({
                 <TransactionResultsTile isSuccess={false} size="sm" message={transactionError} />
               )}
 
-              {isLoading && (
+              {isPending && (
                 <div className="flex flex-grow items-center px-4">
                   <Loader showBackground={false} />
                 </div>
               )}
 
-              {!isLoading &&
+              {!isPending &&
                 !isSuccess &&
                 (selectedAction === ValidatorAction.STAKE ||
                   selectedAction === ValidatorAction.UNSTAKE) && (
@@ -500,7 +501,7 @@ const ValidatorTileComponent = ({
                       reducedHeight
                       showClearAndMax
                       showEndButton
-                      disableButtons={isLoading}
+                      disableButtons={isPending}
                       onClear={() => setAmount(0)}
                       onMax={() => {
                         if (selectedAction === ValidatorAction.STAKE) {
@@ -517,7 +518,7 @@ const ValidatorTileComponent = ({
                   </div>
                 )}
 
-              {!isLoading && !isSuccess && selectedAction === 'claim' && (
+              {!isPending && !isSuccess && selectedAction === 'claim' && (
                 <>
                   <div className="flex justify-between items-center text-sm font-bold w-full">
                     <p className="text-sm pr-1">Claim:</p>
@@ -527,7 +528,7 @@ const ValidatorTileComponent = ({
                         size="xsmall"
                         className="px-1 rounded-md text-xs"
                         onClick={() => setIsClaimToRestake(false)}
-                        disabled={isLoading}
+                        disabled={isPending}
                       >
                         To Wallet
                       </Button>
@@ -537,7 +538,7 @@ const ValidatorTileComponent = ({
                         size="xsmall"
                         className="px-1 rounded-md text-xs"
                         onClick={() => setIsClaimToRestake(true)}
-                        disabled={isLoading}
+                        disabled={isPending}
                       >
                         To Restake
                       </Button>
@@ -549,7 +550,7 @@ const ValidatorTileComponent = ({
                       size="small"
                       variant="secondary"
                       className="w-full"
-                      disabled={isLoading}
+                      disabled={isPending}
                       onClick={() => handleAction()}
                     >
                       {`Claim ${isClaimToRestake ? 'to Restake' : 'to Wallet'}`}

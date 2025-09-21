@@ -40,6 +40,7 @@ export function useRegistryDataRefresh() {
       if (storedRegistry && !needsUpdate) {
         console.log('[Registry] Using cached registry data');
         const filteredData = filterRegistryData(storedRegistry.data, userAccount);
+        console.log('[fetchWalletAssets] setting registry to:', filteredData);
         setFullRegistry(storedRegistry.data);
         setChainRegistry(filteredData);
         return {

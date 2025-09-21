@@ -1,9 +1,4 @@
-import {
-  DEFAULT_EXTERNAL_GAS_PRICES,
-  NetworkLevel,
-  STORED_DATA_TIMEOUT,
-  SYMPHONY_CHAIN_ID_LIST,
-} from '@/constants';
+import { DEFAULT_EXTERNAL_GAS_PRICES, NetworkLevel, STORED_DATA_TIMEOUT } from '@/constants';
 import { getLocalStorageItem, setLocalStorageItem } from './localStorage';
 import { decompressSync } from 'fflate';
 import {
@@ -16,7 +11,6 @@ import {
   FeeToken,
 } from '@/types';
 
-// TODO: also pull IBC information
 // TODO: show status of download to user in topbar.  "checking for update", "querying for new chains", "updating chain information"
 // TODO: change to use regularly updated json file for single file download (faster, lighter, less wasteful)
 const REGISTRY_KEY = 'localChainRegistry';
@@ -132,12 +126,6 @@ const mergeKeplrData = (chainInfo: SimplifiedChainInfo, keplrData: any): Simplif
     console.log('Original chainInfo:', chainInfo);
     console.log('Keplr data to merge:', keplrData);
 
-    // Skip Symphony chains and invalid data
-    if (SYMPHONY_CHAIN_ID_LIST.includes(chainInfo.chain_id)) {
-      console.log('Skipping merge for Symphony chain');
-      return chainInfo;
-    }
-
     if (!keplrData) {
       console.warn('No Keplr data provided to merge');
       return chainInfo;
@@ -148,53 +136,6 @@ const mergeKeplrData = (chainInfo: SimplifiedChainInfo, keplrData: any): Simplif
       console.error('Invalid chainInfo structure:', chainInfo);
       return chainInfo;
     }
-
-    // Create safe URI objects with detailed logging
-    const createUri = (url: unknown, providerName?: string): Uri => {
-      console.groupCollapsed(`[createUri] Creating URI from:`, url);
-      try {
-        if (typeof url !== 'string') {
-          console.warn(`URL is not a string:`, url);
-          return {
-            address: '',
-            provider: providerName || 'Invalid',
-          };
-        }
-
-        if (!url.startsWith('http')) {
-          console.warn(`Invalid URL format (doesn't start with http):`, url);
-          return {
-            address: '',
-            provider: providerName || 'Invalid',
-          };
-        }
-
-        console.log(`Creating valid URI for:`, url);
-        return {
-          address: url,
-          provider: providerName || 'Keplr',
-        };
-      } finally {
-        console.groupEnd();
-      }
-    };
-
-    // Extract provider info with validation
-    const providerName = (() => {
-      try {
-        if (keplrData.nodeProvider && typeof keplrData.nodeProvider === 'object') {
-          console.log('Found nodeProvider:', keplrData.nodeProvider);
-          return typeof keplrData.nodeProvider.name === 'string'
-            ? keplrData.nodeProvider.name
-            : undefined;
-        }
-        console.log('No valid nodeProvider found');
-        return undefined;
-      } catch (error) {
-        console.warn('Error extracting provider name:', error);
-        return undefined;
-      }
-    })();
 
     // Extract bech32 prefix with validation
     const bech32Prefix = (() => {
@@ -213,44 +154,22 @@ const mergeKeplrData = (chainInfo: SimplifiedChainInfo, keplrData: any): Simplif
       }
     })();
 
-    // Log RPC URI processing
-    const rpcUris = (() => {
-      console.groupCollapsed('[RPC URIs] Processing RPC endpoints');
-      try {
-        if (typeof keplrData.rpc === 'string') {
-          console.log('Processing Keplr RPC:', keplrData.rpc);
-          const uri = createUri(keplrData.rpc, providerName);
-          console.log('Created RPC URI:', uri);
-          return [uri];
-        }
-        console.log('Using existing RPC URIs:', chainInfo.rpc_uris);
-        return chainInfo.rpc_uris;
-      } finally {
-        console.groupEnd();
-      }
-    })();
+    // Filter out Keplr endpoints from existing URIs
+    const filteredRpcUris = chainInfo.rpc_uris.filter(
+      uri => uri.address && !uri.address.toLowerCase().includes('keplr'),
+    );
 
-    // Log REST URI processing
-    const restUris = (() => {
-      console.groupCollapsed('[REST URIs] Processing REST endpoints');
-      try {
-        if (typeof keplrData.rest === 'string') {
-          console.log('Processing Keplr REST:', keplrData.rest);
-          const uri = createUri(keplrData.rest, providerName);
-          console.log('Created REST URI:', uri);
-          return [uri];
-        }
-        console.log('Using existing REST URIs:', chainInfo.rest_uris);
-        return chainInfo.rest_uris;
-      } finally {
-        console.groupEnd();
-      }
-    })();
+    const filteredRestUris = chainInfo.rest_uris.filter(
+      uri => uri.address && !uri.address.toLowerCase().includes('keplr'),
+    );
+
+    console.log('Filtered RPC URIs (Keplr excluded):', filteredRpcUris);
+    console.log('Filtered REST URIs (Keplr excluded):', filteredRestUris);
 
     const mergedInfo = {
       ...chainInfo,
-      rpc_uris: rpcUris,
-      rest_uris: restUris,
+      rpc_uris: filteredRpcUris,
+      rest_uris: filteredRestUris,
       bech32_prefix: bech32Prefix,
     };
 
@@ -329,7 +248,7 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       [],
   );
   const networkName = chain.pretty_name || chain.chainName || 'Unknown';
-  const networkID = chain.chain_id || chain.chainId || 'Unknown';
+  const chainId = chain.chain_id || chain.chainId || 'Unknown';
 
   const result: Record<string, Asset> = {};
   for (const asset of assetlist.assets || []) {
@@ -346,6 +265,7 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
     result[base] = {
       denom: base,
       amount: '0',
+      displayAmount: '0',
       exchangeRate: '-',
       isIbc: false,
       logo,
@@ -354,9 +274,11 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
       exponent,
       isFeeToken: feeTokens.has(base),
       networkName,
-      networkID,
+      chainId,
       coinGeckoId: asset.coingecko_id || undefined,
       price: 0,
+      originDenom: base,
+      originChainId: chainId,
     };
   }
 
@@ -548,17 +470,20 @@ export const filterChainRegistryToSubscriptions = (
 
   const result: LocalChainRegistry = {};
 
-  for (const chainID in subscriptions) {
-    const wantedDenoms = subscriptions[chainID];
-    const match = registry[chainID];
+  for (const chainId in subscriptions) {
+    const viewAll = subscriptions[chainId].viewAll;
+    const wantedDenoms = subscriptions[chainId].subscribedDenoms;
+    const match = registry[chainId];
 
     if (!match) continue;
 
-    const filteredAssets = Object.fromEntries(
-      Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
-    );
+    const filteredAssets = viewAll
+      ? match.assets
+      : Object.fromEntries(
+          Object.entries(match.assets || {}).filter(([denom]) => wantedDenoms.includes(denom)),
+        );
 
-    result[chainID] = {
+    result[chainId] = {
       ...match,
       assets: filteredAssets,
     };

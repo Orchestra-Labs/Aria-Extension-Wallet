@@ -20,10 +20,10 @@ export const hashPassword = (password: string, salt: string): string => {
   return hashed;
 };
 
-export const getPasswordIndexByID = (passwordID: string): number => {
+export const getPasswordIndexById = (passwordId: string): number => {
   console.log('Searching for password hash in records');
   const passwords = getPasswordRecords();
-  const index = passwords.findIndex(record => record.id === passwordID);
+  const index = passwords.findIndex(record => record.id === passwordId);
 
   return index;
 };
@@ -52,16 +52,16 @@ export const savePasswordHash = (id: string, password: string): string => {
 };
 
 export const updatePassword = (
-  passwordID: string,
+  passwordId: string,
   oldPassword: string,
   newPassword: string,
 ): string | null => {
   console.log('Updating password hash');
   const passwords = getPasswordRecords();
-  const index = passwords.findIndex(record => record.id === passwordID);
+  const index = passwords.findIndex(record => record.id === passwordId);
 
   if (index === -1) {
-    console.warn(`Password record with ID ${passwordID} not found.`);
+    console.warn(`Password record with ID ${passwordId} not found.`);
     return null;
   }
 
@@ -77,7 +77,7 @@ export const updatePassword = (
 
   const newSalt = lib.WordArray.random(16).toString();
   const newHash = hashPassword(newPassword, newSalt);
-  passwords[index] = { id: passwordID, hash: newHash, salt: newSalt };
+  passwords[index] = { id: passwordId, hash: newHash, salt: newSalt };
 
   savePasswordRecords(passwords);
   console.log('Password hash updated successfully:', newHash);

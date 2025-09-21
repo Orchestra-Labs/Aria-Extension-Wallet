@@ -8,7 +8,7 @@ import { QRCode } from '@/assets/icons';
 import { recipientAddressAtom, symphonyAssetsAtom } from '@/atoms';
 import { cn, openMediaOnboardingTab } from '@/helpers';
 import { Asset } from '@/types';
-import { Button, SlideTray } from '@/ui-kit';
+import { Button, SlideTray, SlideTrayHandle } from '@/ui-kit';
 
 interface QRCodeScannerDialogProps {
   updateReceiveAsset: (asset: Asset, propagateChanges: boolean) => void;
@@ -21,7 +21,7 @@ interface AriaQRCode {
 }
 
 export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ updateReceiveAsset }) => {
-  const slideTrayRef = useRef<{ isOpen: () => void; closeWithAnimation: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
   const cameraContainerRef = useRef<HTMLDivElement>(null);
   const html5QrRef = useRef<Html5Qrcode | null>(null);
 
@@ -73,7 +73,9 @@ export const QRCodeScannerDialog: React.FC<QRCodeScannerDialogProps> = ({ update
 
     try {
       const parsed = JSON.parse(result);
-      const preferredAsset = allAssets.find(asset => asset.denom === parsed.denom);
+      const preferredAsset = allAssets.find(
+        asset => (asset.originDenom || asset.denom) === parsed.denom,
+      );
       setAddress(parsed.address);
       if (preferredAsset) updateReceiveAsset(preferredAsset, true);
     } catch {

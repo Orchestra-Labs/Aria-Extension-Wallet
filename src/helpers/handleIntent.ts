@@ -62,7 +62,7 @@ export const handleIntent = async (
 
   const { asset } = resolved;
   const resolvedDenom = asset.denom;
-  const walletAsset = walletAssets.find(a => a.denom === resolvedDenom);
+  const walletAsset = walletAssets.find(a => (a.originDenom || a.denom) === resolvedDenom);
   const available = walletAsset ? parseFloat(walletAsset.amount) : 0;
 
   console.log('[handleIntent] Resolved denom:', resolvedDenom);

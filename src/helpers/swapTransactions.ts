@@ -1,21 +1,9 @@
-import { SwapObject, TransactionResult, RPCResponse, Asset, Uri } from '@/types';
+import { SwapObject, TransactionResult, RPCResponse, Uri } from '@/types';
 import { COSMOS_CHAIN_ENDPOINTS, SYMPHONY_PREFIX } from '@/constants';
 import { symphony } from '@orchestra-labs/symphonyjs';
 import { queryRpcNode } from './queryNodes';
 
 const { swapSend } = symphony.market.v1beta1.MessageComposer.withTypeUrl;
-
-export const isValidSwap = ({
-  sendAsset,
-  receiveAsset,
-}: {
-  sendAsset: Asset;
-  receiveAsset: Asset;
-}) => {
-  const result = !sendAsset.isIbc && !receiveAsset.isIbc && sendAsset.denom !== receiveAsset.denom;
-
-  return result;
-};
 
 // TODO: merge in with queryNodes.  add message object to query and parameter to determine which signer to use
 // const queryWithRetry = async ({
@@ -85,29 +73,37 @@ export const isValidSwap = ({
 //   throw new Error(`All node query attempts failed after ${MAX_RETRIES_PER_QUERY} attempts.`);
 // };
 
-export const swapTransaction = async (
-  fromAddress: string,
-  swapObject: SwapObject,
-  rpcUris: Uri[],
-  simulateOnly: boolean = false,
-): Promise<TransactionResult> => {
+export const swapTransaction = async ({
+  fromAddress,
+  swapObject,
+  rpcUris,
+  chainId,
+  simulateOnly = false,
+}: {
+  fromAddress: string;
+  swapObject: SwapObject;
+  rpcUris: Uri[];
+  chainId: string;
+  simulateOnly: boolean;
+}): Promise<TransactionResult> => {
   console.log('Attempting swap with object:', swapObject);
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
+  const sendObject = swapObject.sendObject;
 
   const messages = [
     swapSend({
       fromAddress,
-      toAddress: swapObject.sendObject.recipientAddress,
+      toAddress: sendObject.recipientAddress,
       offerCoin: {
-        denom: swapObject.sendObject.denom,
-        amount: swapObject.sendObject.amount,
+        denom: sendObject.denom,
+        amount: sendObject.amount,
       },
       askDenom: swapObject.resultDenom,
     }),
   ];
 
   try {
-    const feeToken = swapObject.sendObject.feeToken;
+    const feeToken = sendObject.feeToken;
     console.log('Swap fee token:', feeToken);
     const response = await queryRpcNode({
       endpoint,
@@ -115,6 +111,7 @@ export const swapTransaction = async (
       rpcUris,
       messages,
       feeToken,
+      chainId,
       simulateOnly,
     });
 
@@ -144,69 +141,6 @@ export const swapTransaction = async (
     return {
       success: false,
       message: 'Error performing swap transaction. Please try again.',
-      data: errorResponse,
-    };
-  }
-};
-
-// TODO: support swapping multiple tramsactons (fee is currently a blocker)
-export const multiSwapTransaction = async (
-  fromAddress: string,
-  swapObjects: SwapObject[],
-  rpcUris: Uri[],
-  simulateOnly: boolean = false,
-): Promise<TransactionResult> => {
-  const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
-
-  const messages = swapObjects.map(swapObject =>
-    swapSend({
-      fromAddress,
-      toAddress: swapObject.sendObject.recipientAddress,
-      offerCoin: {
-        denom: swapObject.sendObject.denom,
-        amount: swapObject.sendObject.amount,
-      },
-      askDenom: swapObject.resultDenom,
-    }),
-  );
-
-  try {
-    const feeToken = swapObjects[0].sendObject.feeToken;
-    const response = await queryRpcNode({
-      endpoint,
-      prefix: SYMPHONY_PREFIX,
-      rpcUris,
-      messages,
-      feeToken,
-      simulateOnly,
-    });
-
-    if (simulateOnly) {
-      console.log('Multi-swap simulation result:', response);
-      return {
-        success: true,
-        message: 'Simulation of multi-swap transaction completed successfully!',
-        data: response,
-      };
-    }
-
-    console.log('Successfully sent to all recipients:', response);
-    return {
-      success: true,
-      message: 'Multiple swap transactions completed successfully!',
-      data: response,
-    };
-  } catch (error: any) {
-    console.error('Error during multiple swap:', error);
-
-    const errorResponse: RPCResponse = {
-      code: error.code || 1,
-      message: error.message,
-    };
-
-    return {
-      success: false,
-      message: 'Error performing multiple swap transaction. Please try again.',
       data: errorResponse,
     };
   }

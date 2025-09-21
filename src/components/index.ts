@@ -1,6 +1,6 @@
 export * from './AddressInput';
 export * from './AssetInput';
-export * from './AssetInputSection';
+export * from './SendDataInputSection';
 export * from './AssetScroller';
 export * from './AssetTile';
 export * from './AssetSelectDialog';
@@ -28,7 +28,9 @@ export * from './SearchBar';
 export * from './SortDialog';
 export * from './TileScroller';
 export * from './Toast';
+export * from './Toggle';
 export * from './Tooltip';
+export * from './TransactionInfoPanel';
 export * from './TransactionResultsTile';
 export * from './TutorialDisplay';
 export * from './ValidatorScroller';

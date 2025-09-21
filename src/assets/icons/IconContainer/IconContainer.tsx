@@ -25,7 +25,7 @@ export const IconContainer: React.FC<IconContainerProps> = ({
   const containerStyle = {
     borderRadius: '50%',
     overflow: isFallback ? 'visible' : 'hidden',
-    display: 'flex',
+    display: '',
     alignItems: 'center',
     justifyContent: 'center',
   };

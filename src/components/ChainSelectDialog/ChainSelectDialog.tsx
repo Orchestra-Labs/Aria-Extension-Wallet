@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Button, SlideTray } from '@/ui-kit';
+import { Button, SlideTray, SlideTrayHandle } from '@/ui-kit';
 import { SortDialog } from '../SortDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
@@ -28,7 +28,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
   buttonText = undefined,
   disabled = false,
 }) => {
-  const slideTrayRef = useRef<{ closeWithAnimation: () => void }>(null);
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
 
   const { refreshData } = useRefreshData();
 
@@ -97,7 +97,7 @@ export const ChainSelectDialog: React.FC<ChainSelectDialogProps> = ({
   }, [subscribedChains, searchTerm, sortOrder]);
 
   useEffect(() => {
-    refreshData({ wallet: false, validator: true });
+    refreshData({ validator: true });
   }, [selectedChainId]);
 
   return (

@@ -90,9 +90,9 @@ export const ChangePassword: React.FC<ViewPassphraseProps> = () => {
   const handleChangePassword = () => {
     try {
       const session = getSessionToken();
-      const accountID = session?.accountID;
-      if (accountID) {
-        updateAccountPassword({ accountID, newPassword, oldPassword });
+      const accountId = session?.accountId;
+      if (accountId) {
+        updateAccountPassword({ accountId, newPassword, oldPassword });
         navigate(ROUTES.APP.ROOT);
       } else {
         console.error('Error changing password:', error);

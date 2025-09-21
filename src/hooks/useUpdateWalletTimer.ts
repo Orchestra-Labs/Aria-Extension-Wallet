@@ -14,7 +14,7 @@ export const useUpdateWalletTimer = () => {
   const updateWalletAssets = () => {
     if (hasAnyWallets) {
       console.log('Refreshing wallet assets on interval');
-      refreshData();
+      refreshData({ wallet: true, validator: true });
     }
   };
 

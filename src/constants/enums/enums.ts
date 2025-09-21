@@ -1,5 +1,6 @@
 export enum TransactionType {
   SEND = 'Send',
+  EXCHANGE = 'Exchange',
   SWAP = 'Swap',
   IBC_SEND = 'IBC Send',
   IBC_SWAP = 'IBC Swap',
@@ -12,9 +13,15 @@ export enum TransactionType {
 
 export enum TransactionStatus {
   IDLE = 'idle',
-  LOADING = 'loading',
+  PENDING = 'pending',
   SUCCESS = 'success',
   ERROR = 'error',
+}
+
+export enum TextClass {
+  ERROR = 'text-error',
+  WARNING = 'text-warning',
+  GOOD = 'text-blue',
 }
 
 export enum TextFieldStatus {
@@ -41,9 +48,19 @@ export enum NetworkLevel {
   MAINNET = 'mainnet',
 }
 
+export enum TransferMethod {
+  SKIP = 'skip',
+  STANDARD = 'standard',
+}
+
 export enum QueryType {
   GET = 'GET',
   POST = 'POST',
+}
+
+export enum CommType {
+  RPC = 'rpc',
+  REST = 'rest',
 }
 
 export enum Position {

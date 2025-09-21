@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants';
 import { useAtom } from 'jotai';
 import { userAccountAtom } from '@/atoms';
-import { saveAccountByID } from '@/helpers';
+import { saveAccountById } from '@/helpers';
 
 const PAGE_TITLE = 'Swap Tutorial';
 
@@ -71,7 +71,7 @@ export const SwapTutorial = () => {
 
       // Update state and save to local storage
       setUserAccount(updatedUserAccount);
-      saveAccountByID(updatedUserAccount);
+      saveAccountById(updatedUserAccount);
     } else {
       console.warn('[SwapTutorial] userAccount is undefined');
     }

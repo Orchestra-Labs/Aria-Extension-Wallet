@@ -7,8 +7,9 @@ import {
   networkLevelAtom,
   receiveStateAtom,
   recipientAddressAtom,
+  resetTransactionRouteAtom,
   selectedAssetAtom,
-  updateTransactionTypeAtom,
+  updateReceiveChainAtom,
 } from '@/atoms';
 import { useEffect, useState } from 'react';
 import { InputStatus } from '@/constants';
@@ -27,13 +28,14 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   updateReceiveAsset,
 }) => {
   const selectedAsset = useAtomValue(selectedAssetAtom);
-  const walletState = useAtomValue(chainWalletAtom(selectedAsset.networkID));
+  const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
+  const updateReceiveChain = useSetAtom(updateReceiveChainAtom);
   const [addressValidation, setAddressValidation] = useAtom(addressValidationAtom);
-  const setReceiveState = useSetAtom(receiveStateAtom);
-  const updateTransactionType = useSetAtom(updateTransactionTypeAtom);
+  const receiveState = useAtomValue(receiveStateAtom);
   const fullRegistry = useAtomValue(fullChainRegistryAtom);
   const networkLevel = useAtomValue(networkLevelAtom);
+  const resetTxRoute = useSetAtom(resetTransactionRouteAtom);
 
   const [allowValidateAddress, setAllowValidatePassword] = useState(false);
 
@@ -58,11 +60,25 @@ export const AddressInput: React.FC<AddressInputProps> = ({
 
     try {
       const decoded = bech32.decode(recipientAddress);
+      console.log('[AddressInput] Decoded address:', {
+        prefix: decoded.prefix,
+        words: decoded.words,
+      });
 
       if (!decoded.prefix) {
         setStatus(InputStatus.ERROR, 'Missing prefix.');
         return;
       }
+
+      // Log all available chains and their prefixes for debugging
+      console.log('[AddressInput] Available chains:', {
+        networkLevel,
+        chains: Object.values(fullRegistry[networkLevel]).map(chain => ({
+          chainId: chain.chain_id,
+          prefix: chain.bech32_prefix,
+          name: chain.chain_name,
+        })),
+      });
 
       // Find the chain info for this prefix
       const matchedChain = Object.values(fullRegistry[networkLevel]).find(
@@ -73,13 +89,14 @@ export const AddressInput: React.FC<AddressInputProps> = ({
         setStatus(InputStatus.WARNING, 'Prefix not known.');
         return;
       }
+      console.log('[AddressInput] Matched chain:', matchedChain);
 
       setStatus(InputStatus.SUCCESS);
-      setReceiveState(prevState => ({
-        ...prevState,
-        chainID: matchedChain.chain_id,
-      }));
-      updateTransactionType({});
+
+      if (receiveState.chainId !== matchedChain.chain_id) {
+        resetTxRoute();
+        updateReceiveChain(matchedChain.chain_id);
+      }
     } catch (error) {
       setStatus(InputStatus.ERROR, 'Invalid Bech32 encoding.');
     }
@@ -97,10 +114,11 @@ export const AddressInput: React.FC<AddressInputProps> = ({
     if (newAddress === '') {
       setAllowValidatePassword(false);
       setStatus();
-      updateTransactionType({});
+      resetTxRoute();
     }
 
     if (allowValidateAddress) {
+      if (Object.keys(fullRegistry[networkLevel]).length > 0 && recipientAddress) validateAddress();
       validateAddress();
     }
   };
@@ -128,8 +146,9 @@ export const AddressInput: React.FC<AddressInputProps> = ({
   };
 
   useEffect(() => {
-    validateAddress();
-  }, [recipientAddress]);
+    // Only validate if we have the full registry data
+    if (Object.keys(fullRegistry[networkLevel]).length > 0 && recipientAddress) validateAddress();
+  }, [recipientAddress, fullRegistry]);
 
   return (
     <div className={cn(`flex items-baseline ${addBottomMargin ? 'mb-4' : ''} space-x-2`)}>

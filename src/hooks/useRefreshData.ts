@@ -6,8 +6,8 @@ export function useRefreshData() {
   const { triggerValidatorDataRefresh } = useValidatorDataRefresh();
 
   const refreshData = async ({
-    wallet = true,
-    validator = true,
+    wallet = false,
+    validator = false,
   }: { wallet?: boolean; validator?: boolean; address?: string } = {}) => {
     console.log('[useRefreshData] Refreshing data', { wallet, validator });
 

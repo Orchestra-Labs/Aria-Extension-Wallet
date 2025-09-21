@@ -59,7 +59,7 @@ export const useValidatorActions = () => {
       if (!isSimulation) {
         setTransactionState(prev => ({
           ...prev,
-          status: TransactionStatus.LOADING,
+          status: TransactionStatus.PENDING,
           validatorAddress: singleTargetValidatorAddress,
         }));
       }
@@ -123,7 +123,7 @@ export const useValidatorActions = () => {
                   : TransactionType.CLAIM_TO_WALLET,
           );
           setSelectedValidators([]);
-          refreshData();
+          refreshData({ wallet: true, validator: true });
         }
         return result;
       } else {

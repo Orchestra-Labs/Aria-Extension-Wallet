@@ -24,6 +24,7 @@ const getTobinTaxRateRequest = async () => {
     queryType: QueryType.GET,
     prefix,
     restUris,
+    chainId: symphonyChainId,
   });
 
   return response as unknown as TobinTaxRateResponseDto;

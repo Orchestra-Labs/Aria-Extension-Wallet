@@ -1,10 +1,10 @@
 import { Asset } from '@/types';
-import { SlideTray, Button } from '@/ui-kit';
+import { SlideTray, Button, SlideTrayHandle } from '@/ui-kit';
 import { ScrollTile } from '../ScrollTile';
 import { ReceiveDialog } from '../ReceiveDialog';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ROUTES } from '@/constants';
+import { ICON_CHANGEOVER_TIMEOUT, Position, ROUTES } from '@/constants';
 import {
   swiperIndexState,
   selectedAssetAtom,
@@ -12,10 +12,17 @@ import {
   sendStateAtom,
   selectedCoinListAtom,
   receiveStateAtom,
+  chainWalletAtom,
+  chainInfoAtom,
+  updateReceiveAssetAndChainAtom,
+  updateSendAssetAndChainAtom,
 } from '@/atoms/';
-import { formatBalanceDisplay } from '@/helpers';
-import { IconContainer } from '@/assets/icons';
+import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
+import { IconContainer, VerifySuccess } from '@/assets/icons';
 import { InfoPanel, InfoPanelRow } from '../InfoPanel';
+import { Copy } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Tooltip } from '../Tooltip';
 
 interface AssetTileProps {
   asset: Asset;
@@ -32,23 +39,36 @@ export const AssetTile = ({
   multiSelectEnabled = false,
   onClick,
 }: AssetTileProps) => {
+  const slideTrayRef = useRef<SlideTrayHandle>(null);
+
   const navigate = useNavigate();
   const pathname = useLocation().pathname;
 
+  // TODO: dialogSelectedAssetAtom only used here.  make state instead of atom
   const [dialogSelectedAsset, setDialogSelectedAsset] = useAtom(dialogSelectedAssetAtom);
+  // const setReceiveState = useSetAtom(receiveStateAtom);
+  const updateReceiveAssetAndChain = useSetAtom(updateReceiveAssetAndChainAtom);
+  const updateSendAssetAndChain = useSetAtom(updateSendAssetAndChainAtom);
   const setActiveIndex = useSetAtom(swiperIndexState);
   const setSelectedAsset = useSetAtom(selectedAssetAtom);
   const currentState = useAtomValue(isReceiveDialog ? receiveStateAtom : sendStateAtom);
   const selectedCoins = useAtomValue(selectedCoinListAtom);
+  const walletState = useAtomValue(chainWalletAtom(asset.chainId));
+  const getChainInfo = useAtomValue(chainInfoAtom);
+
+  const [copied, setCopied] = useState(false);
+
+  const chain = getChainInfo(asset.chainId);
+  const prefix = chain?.bech32_prefix;
+  const truncatedAddress = prefix ? truncateWalletAddress(prefix, walletState.address) : '';
 
   const isChainSubscriptionsPage = pathname === ROUTES.APP.EDIT_COIN_LIST;
   const isReceivePage = pathname === ROUTES.APP.RECEIVE;
   const isSendPage = pathname === ROUTES.APP.SEND;
 
-  // TODO: some IBC assets come through with no name.  need to parse those based on others that match on denom
-  const title = asset?.name || asset?.denom || 'Unknown Asset';
-  const symbol = asset?.symbol || asset?.denom || '???';
-  const denom = asset?.denom || 'unknown';
+  const title = asset?.name || asset?.originDenom || asset?.denom || 'Unknown Asset';
+  const symbol = asset?.symbol || asset?.originDenom || asset?.denom || '???';
+  const denom = asset?.originDenom || asset?.denom || 'unknown';
   const logo = asset?.logo || '';
 
   const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);
@@ -66,7 +86,7 @@ export const AssetTile = ({
       ? '-'
       : formatBalanceDisplay(asset.exchangeRate || '1', unitSymbol);
   } else {
-    value = formatBalanceDisplay(asset.amount, symbol);
+    value = formatBalanceDisplay(asset.displayAmount || '0', symbol);
   }
 
   const isSelected = multiSelectEnabled
@@ -77,6 +97,8 @@ export const AssetTile = ({
 
   const handleSendClick = () => {
     setSelectedAsset(asset);
+    updateSendAssetAndChain(asset);
+    updateReceiveAssetAndChain(asset);
     navigate(ROUTES.APP.SEND);
   };
 
@@ -87,21 +109,68 @@ export const AssetTile = ({
     }
   };
 
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    navigator.clipboard.writeText(walletState.address);
+    setCopied(true);
+    // Reset after the icon changeover timeout
+    setTimeout(() => setCopied(false), ICON_CHANGEOVER_TIMEOUT);
+  };
+
   const scrollTile = (
-    <ScrollTile
-      title={title}
-      subtitle={subtitle}
-      value={value}
-      icon={<IconContainer src={logo} alt={symbol} />}
-      selected={isSelectable ? isSelected : undefined}
-      onClick={isSelectable ? handleClick : undefined}
-    />
+    <div
+      onClick={e => {
+        // Only handle click if it's not coming from a prevented element
+        const target = e.target as HTMLElement;
+        const isPreventedButton = target.closest('[data-prevent-tray-open]');
+
+        if (!isPreventedButton && !isSelectable) {
+          // For non-selectable tiles, let SlideTray handle the opening
+          return;
+        }
+
+        if (!isPreventedButton && isSelectable) {
+          handleClick();
+        }
+      }}
+    >
+      <ScrollTile
+        title={title}
+        value={value}
+        subtitle={subtitle}
+        subtitleClickOption={
+          isSelectable ? undefined : (
+            <Tooltip tooltipText={truncatedAddress} position={Position.BOTTOM}>
+              <Button
+                variant="secondaryReactiveIcon"
+                size="blank"
+                onClick={handleCopy}
+                className="w-5 h-5 p-0"
+                data-prevent-tray-open
+              >
+                {copied ? (
+                  <VerifySuccess className="text-success animate-scale-up h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </Button>
+            </Tooltip>
+          )
+        }
+        icon={<IconContainer src={logo || chain?.logo_uri || undefined} alt={symbol} />}
+        selected={isSelectable ? isSelected : undefined}
+        onClick={undefined}
+      />
+    </div>
   );
 
   return isSelectable ? (
     scrollTile
   ) : (
-    <SlideTray triggerComponent={<div>{scrollTile}</div>} title={title} showBottomBorder>
+    // TODO: add another copy button next to the title
+    <SlideTray ref={slideTrayRef} triggerComponent={scrollTile} title={title} showBottomBorder>
       <div className="text-center mb-2">
         <div className="truncate text-base font-medium text-neutral-1 line-clamp-1">
           Amount: <span className="text-blue">{value}</span>
@@ -127,7 +196,7 @@ export const AssetTile = ({
         >
           Send
         </Button>
-        <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.networkID} />
+        <ReceiveDialog buttonSize="medium" asset={asset} chainId={asset.chainId} />
         <Button
           size="medium"
           className="w-full"

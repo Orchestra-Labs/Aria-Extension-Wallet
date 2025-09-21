@@ -9,17 +9,26 @@ export const isValidSend = ({
   sendAsset: Asset;
   receiveAsset: Asset;
 }) => {
-  const result = sendAsset.denom === receiveAsset.denom;
+  const result =
+    (sendAsset.originDenom || sendAsset.denom) === (receiveAsset.originDenom || receiveAsset.denom);
   return result;
 };
 
-export const sendTransaction = async (
-  fromAddress: string,
-  sendObject: SendObject,
-  simulateOnly: boolean = false,
-  prefix: string,
-  rpcUris: Uri[],
-): Promise<TransactionResult> => {
+export const sendTransaction = async ({
+  fromAddress,
+  sendObject,
+  prefix,
+  rpcUris,
+  chainId,
+  simulateOnly = false,
+}: {
+  fromAddress: string;
+  sendObject: SendObject;
+  prefix: string;
+  rpcUris: Uri[];
+  chainId: string;
+  simulateOnly?: boolean;
+}): Promise<TransactionResult> => {
   const endpoint = COSMOS_CHAIN_ENDPOINTS.sendMessage;
 
   const messages = [
@@ -49,6 +58,7 @@ export const sendTransaction = async (
       rpcUris,
       messages,
       feeToken,
+      chainId,
       simulateOnly,
     });
 
@@ -69,6 +79,15 @@ export const sendTransaction = async (
     };
   } catch (error: any) {
     console.error('Error during send:', error);
+
+    // For simulation, re-throw account not found errors so they can be handled upstream
+    if (
+      simulateOnly &&
+      (error.message?.includes('does not exist on chain') ||
+        error.message?.includes('account not found'))
+    ) {
+      throw error; // Re-throw for upstream handling
+    }
 
     // Construct error response in RPCResponse type
     const errorResponse: RPCResponse = {

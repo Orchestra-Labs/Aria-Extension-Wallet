@@ -1,7 +1,12 @@
 import { SettingsOption } from '@/constants';
 
+export interface DenomSubscriptionRecord {
+  viewAll: boolean;
+  subscribedDenoms: string[];
+}
+
 export interface NetworkSubscriptionRecord {
-  [chainID: string]: string[];
+  [chainId: string]: DenomSubscriptionRecord;
 }
 
 export interface SubscriptionRecord {
@@ -23,7 +28,7 @@ interface SelectionSettings {
 export interface SettingsRecord {
   defaultSelections: SelectionSettings;
   chainSubscriptions: SubscriptionRecord;
-  activeWalletID: string;
+  activeWalletId: string;
 
   // feature access settings
   [SettingsOption.STABLECOIN_FEE]: boolean;

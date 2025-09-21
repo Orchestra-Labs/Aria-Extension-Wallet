@@ -17,10 +17,16 @@ export const SYMPHONY_MAINNET_NAME = 'symphony';
 export const SYMPHONY_MAINNET_ID = 'symphony-1';
 export const SYMPHONY_CHAIN_ID_LIST = [SYMPHONY_MAINNET_ID, SYMPHONY_TESTNET_ID];
 
+export const OSMOSIS_MAINNET_ID = 'osmosis-1';
+export const OSMOSIS_TESTNET_ID = 'osmo-test-5';
+export const DEFAULT_OSMOSIS_DENOM = 'uosmo';
+
 // IBC-related constants
 export const IBC_PREFIX = 'ibc/';
+export const GAMM_PREFIX = 'gamm/';
 export const LESSER_EXPONENT_DEFAULT = 0;
 export const GREATER_EXPONENT_DEFAULT = 6;
+export const GAMM_EXPONENT_DEFAULT = 18;
 export const DEFAULT_EXTERNAL_GAS_PRICES = { low: 0.01, average: 0.025, high: 0.04 };
 export const DEFAULT_GAS_PRICES = { low: 0.00025, average: 0.0025, high: 0.004 };
 export const DEFAULT_FEE_TOKEN = {

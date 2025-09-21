@@ -2,12 +2,12 @@ import { atom } from 'jotai';
 import {
   DEFAULT_FEE_STATE,
   DEFAULT_FEE_TOKEN,
+  TextClass,
   TransactionStatus,
   ValidatorAction,
 } from '@/constants';
 import { CalculatedFeeDisplay, FeeState } from '@/types';
 import { chainInfoAtom, selectedValidatorChainAtom } from './chainRegistryAtom';
-import { getFeeTextClass } from '@/helpers';
 
 // TODO: tie to Toast
 export interface ValidatorTransactionState {
@@ -26,8 +26,8 @@ export const validatorTransactionStateAtom = atom<ValidatorTransactionState>({
 export const validatorAmountAtom = atom(0);
 
 // Derived atoms
-export const isValidatorTxLoadingAtom = atom(
-  get => get(validatorTransactionStateAtom).status === TransactionStatus.LOADING,
+export const isValidatorTxPendingAtom = atom(
+  get => get(validatorTransactionStateAtom).status === TransactionStatus.PENDING,
 );
 
 export const isValidatorTxSuccessAtom = atom(
@@ -65,13 +65,13 @@ export const validatorFeeStateAtom = atom<
     const chain = getChainInfo(chainId);
 
     // Always reset when chain changes
-    if (currentState.chainID !== selectedChainId) {
+    if (currentState.chainId !== selectedChainId) {
       const feeToken = chain?.fees?.[0] || DEFAULT_FEE_TOKEN;
       const asset = chain?.assets?.[feeToken.denom] || DEFAULT_FEE_STATE.asset;
 
       return {
         ...DEFAULT_FEE_STATE,
-        chainID: selectedChainId,
+        chainId: selectedChainId,
         feeToken,
         asset,
       };
@@ -107,7 +107,7 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
     return {
       feeAmount: 0,
       feeUnit: '',
-      textClass: 'text-blue',
+      textClass: TextClass.GOOD,
       percentage: 0,
       calculatedFee: 0,
       gasWanted: 0,
@@ -127,7 +127,7 @@ export const validatorCalculatedFeeAtom = atom<CalculatedFeeDisplay>(get => {
     feeAmount: feeState.amount,
     feeUnit: asset.symbol,
     // NOTE: Percentage not applicable here since we don't have amount context
-    textClass: getFeeTextClass(0),
+    textClass: TextClass.GOOD,
     percentage: 0,
     calculatedFee,
     gasWanted: feeState.gasWanted,
@@ -152,7 +152,7 @@ export const resetValidatorTransactionAtom = atom(null, (get, set) => {
   set(_validatorFeeStateAtom, {
     ...get(_validatorFeeStateAtom),
     ...DEFAULT_FEE_STATE,
-    chainID: chainId,
+    chainId: chainId,
     feeToken,
     asset,
   });

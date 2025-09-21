@@ -19,17 +19,22 @@ export interface FeeToken {
 export interface Asset {
   denom: string;
   amount: string;
+  displayAmount: string;
   exchangeRate?: string;
   isIbc: boolean;
   logo: string;
   symbol: string;
   name: string;
   exponent: number;
-  isFeeToken?: boolean;
+  isFeeToken: boolean;
   networkName: string;
-  networkID: string;
+  chainId: string;
   coinGeckoId?: string;
   price: number;
+  // TODO: mark 'original' not 'origin'.  change after full testing so uses are easy to find
+  originDenom: string;
+  originChainId: string;
+  trace?: string;
 }
 
 export interface AssetRegistry {

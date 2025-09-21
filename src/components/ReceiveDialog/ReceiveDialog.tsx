@@ -1,4 +1,4 @@
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import React, { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
@@ -9,7 +9,12 @@ import { Button, CopyTextField, SlideTray } from '@/ui-kit';
 import { AssetInput } from '@/components';
 
 import { QRCodeContainer } from '../QRCodeContainer';
-import { chainWalletAtom, networkLevelAtom, subscribedChainRegistryAtom } from '@/atoms';
+import {
+  chainWalletAtom,
+  networkLevelAtom,
+  subscribedChainRegistryAtom,
+  updateReceiveAssetAndChainAtom,
+} from '@/atoms';
 
 interface ReceiveDialogProps {
   buttonSize?: 'default' | 'medium' | 'small' | 'xsmall';
@@ -29,6 +34,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({
   const [showPreferenceInput, setShowPreferenceInput] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset>(asset);
   const debouncedAmount = useDebounce(amount);
+  const updateReceiveAssetAndChain = useSetAtom(updateReceiveAssetAndChainAtom);
 
   const getPrefix = () => {
     try {
@@ -58,7 +64,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({
       showPreferenceInput
         ? JSON.stringify({
             address: walletState.address,
-            denom: selectedAsset.denom,
+            denom: selectedAsset.originDenom || selectedAsset.denom,
             amount: debouncedAmount || 0,
           })
         : walletState.address,
@@ -69,7 +75,7 @@ export const ReceiveDialog: React.FC<ReceiveDialogProps> = ({
   useEffect(() => {
     if (!showPreferenceInput) {
       setAmount(0);
-      setSelectedAsset(asset); // reset to prop
+      updateReceiveAssetAndChain(asset); // reset to prop
     }
   }, [showPreferenceInput]);
 
