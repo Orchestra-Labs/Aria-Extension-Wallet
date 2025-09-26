@@ -152,7 +152,11 @@ const performRpcQuery = async (
 ): Promise<RPCResponse> => {
   try {
     let calculatedFee = fee;
-    let gasPrice = feeToken.gasPriceStep.average;
+    let gasPrice = feeToken.gasPriceStep.low;
+    console.log('[DEBUG] Gas price:', {
+      gasPrice,
+      calculatedFee,
+    });
 
     if (!calculatedFee) {
       const feeDenom = feeToken.denom;
@@ -178,6 +182,14 @@ const performRpcQuery = async (
         ],
         gas: bufferedGasEstimation.toString(),
       };
+
+      console.log('[DEBUG] Fee calculation:', {
+        gasEstimation,
+        bufferedGasEstimation,
+        gasPrice,
+        feeAmount,
+        feeDenom,
+      });
     }
 
     if (simulateOnly) {
@@ -237,9 +249,12 @@ const getCachedSigner = async (
 
   const offlineSigner = await getCosmosDirectSigner(mnemonic, prefix);
 
+  const rpcEndpoint = uri.address;
+  //const rpcEndpoint = isSymphonyQuery ? 'https://symphony.rpc.nodeshub.online' : uri.address;
+
   const client = isSymphonyQuery
-    ? await getSigningSymphonyClient({ rpcEndpoint: uri.address, signer: offlineSigner })
-    : await SigningStargateClient.connectWithSigner(uri.address, offlineSigner);
+    ? await getSigningSymphonyClient({ rpcEndpoint, signer: offlineSigner })
+    : await SigningStargateClient.connectWithSigner(rpcEndpoint, offlineSigner);
 
   // Cache the client
   clientCache.set(cacheKey, client);
@@ -341,6 +356,8 @@ const queryWithRetry = async ({
 
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
+
+        console.error('[DEBUG][queryNodes] current Uri:', currentUri);
 
         const transactionSigner = await getCachedSigner(endpoint, currentUri, mnemonic, prefix);
 

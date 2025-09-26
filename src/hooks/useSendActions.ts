@@ -884,6 +884,8 @@ export const useSendActions = () => {
         throw new Error('No fee tokens available for Osmosis chain');
       }
 
+      // TODO: supply the route if it's been calculated already
+
       // Execute the Osmosis swap
       const result = await useOsmosisDEX({
         mnemonic: mnemonic,
@@ -897,6 +899,8 @@ export const useSendActions = () => {
         feeToken: selectedFeeToken,
         simulateOnly: isSimulation,
       });
+
+      // TODO: for simulation record, subtract fees from route input before return
 
       // Format the result to match the expected TransactionResult format
       if (result.success) {
