@@ -10,6 +10,7 @@ import {
   getValidIBCChannel,
 } from '@/helpers';
 import {
+  successfulSimTxRouteHashAtom,
   receiveStateAtom,
   sendStateAtom,
   simulationInvalidationAtom,
@@ -137,14 +138,28 @@ export const updateTxStepLogAtom = atom(
       return;
     }
 
+    const currentLogs = get(transactionLogsAtom);
+    const existingLog = currentLogs[step.hash] || {};
+
+    console.log('[DEBUG][updateTxStepLogAtom] Updating step log', {
+      stepIndex: params.stepIndex,
+      stepHash: step.hash,
+      newStatus: params.status,
+      existingFees: existingLog.fees?.map(f => ({ amount: f.amount, denom: f.asset?.denom })) || [],
+      newFeeData: params.feeData?.map(f => ({ amount: f.amount, denom: f.asset?.denom })) || [],
+    });
+
+    // Preserve existing fee data unless new fee data is explicitly provided
+    const finalFeeData = params.feeData !== undefined ? params.feeData : existingLog.fees;
+
     set(updateStepLogAtom, {
       stepHash: step.hash,
       log: {
         status: params.status,
-        ...(params.txHash && { txHash: params.txHash }),
-        ...(params.error && { error: params.error }),
+        ...(params.txHash !== undefined && { txHash: params.txHash }),
+        ...(params.error !== undefined && { error: params.error }),
       },
-      ...(params.feeData !== undefined && { feeData: params.feeData }),
+      feeData: finalFeeData,
     });
 
     set(transactionRouteAtom, {
@@ -162,12 +177,11 @@ export const updateTxStepLogAtom = atom(
 
 // TODO: add optional index.  if index is provided only that step updates to idle
 export const resetRouteStatusAtom = atom(null, (get, set, isSimulation: boolean = false) => {
-  const currentRoute = get(transactionRouteAtom);
+  const route = get(transactionRouteAtom);
   const logs = get(transactionLogsAtom);
-  console.log('[resetRouteStatusAtom] Resetting route status');
 
   // Reset all step statuses to IDLE
-  currentRoute.steps.forEach(step => {
+  route.steps.forEach(step => {
     const existingLog = logs[step.hash] || {};
 
     set(updateStepLogAtom, {
@@ -178,11 +192,12 @@ export const resetRouteStatusAtom = atom(null, (get, set, isSimulation: boolean 
         error: undefined,
         txHash: undefined,
       },
+      feeData: existingLog.fees,
     });
   });
 
   set(transactionRouteAtom, {
-    ...currentRoute,
+    ...route,
     currentStep: 0,
     isComplete: false,
     isSimulation: isSimulation,
@@ -207,7 +222,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   // const skipAssets = get(skipAssetsAtom);
   const isValidStablecoinSwap = get(isValidStablecoinSwapAtom);
   const isOsmosisSupportedDenom = get(isOsmosisSupportedDenomAtom);
-  set(resetTransactionLogsAtom);
 
   const steps: TransactionStep[] = [];
   const sendChain = getChainInfo(sendState.chainId);
@@ -250,7 +264,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     toChain: string,
     fromAsset: Asset,
     toAsset: Asset,
-    isFirstStep: boolean = false,
   ): TransactionStep => {
     const step = {
       type,
@@ -264,7 +277,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
 
     return {
       ...step,
-      hash: createStepHash(step, isFirstStep ? sendState.amount : undefined),
+      hash: createStepHash(step),
     };
   };
 
@@ -276,7 +289,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     toChainId,
     fromAsset,
     toAsset,
-    isFirstStep = false,
   }: {
     type: TransactionType;
     via: TransferMethod;
@@ -299,7 +311,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
       throw new Error(`Missing chain info for ${fromChainId} or ${toChainId}`);
     }
 
-    const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset, isFirstStep);
+    const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset);
     // TODO: this can be moved into transactionLogAtom if toAddress is included on the TransactionStep object
     const description = getStepDescription({
       step,
@@ -598,6 +610,12 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   const newHash = createRouteHash({ route: newRoute, toAddress: receiveAddress });
 
   if (currentHash !== newHash) {
+    console.log('[DEBUG][updateTransactionRouteAtom] Resetting transaction route');
+    set(resetTransactionLogsAtom);
+
+    // Reset successful simulation when route structure changes
+    set(successfulSimTxRouteHashAtom, '');
+
     console.log('[updateTransactionRouteAtom] Route changed, updating');
     set(transactionRouteAtom, newRoute);
     set(transactionRouteHashAtom, newHash);

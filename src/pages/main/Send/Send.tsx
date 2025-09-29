@@ -5,20 +5,17 @@ import { Button, Separator } from '@/ui-kit';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   recipientAddressAtom,
-  sendStateAtom,
   selectedAssetAtom,
   addressVerifiedAtom,
   chainWalletAtom,
   defaultAssetAtom,
   resetTransactionStatesAtom,
-  isTxPendingAtom,
   isTransactionSuccessAtom,
   unloadFullRegistryAtom,
   loadFullRegistryAtom,
-  loadSkipChainsAtom,
-  transactionHasValidRouteAtom,
   transactionRouteAtom,
   finalTransactionHashAtom,
+  canRunTransactionAtom,
 } from '@/atoms';
 import {
   WalletSuccessScreen,
@@ -36,7 +33,6 @@ export const Send = () => {
 
   // const symphonyAssets = useAtomValue(symphonyAssetsAtom);
   // TODO: set send state from selected asset
-  const sendState = useAtomValue(sendStateAtom);
   const [recipientAddress, setRecipientAddress] = useAtom(recipientAddressAtom);
   const addressVerified = useAtom(addressVerifiedAtom);
   const [selectedAsset, setSelectedAsset] = useAtom(selectedAssetAtom);
@@ -46,12 +42,11 @@ export const Send = () => {
   console.log("[Send] selected asset's network id", selectedAsset.chainId);
   const walletState = useAtomValue(chainWalletAtom(selectedAsset.chainId));
   console.log('[Send] initial wallet state', walletState);
-  const transactionHasValidRoute = useAtomValue(transactionHasValidRouteAtom);
-  const isTxPending = useAtomValue(isTxPendingAtom);
+  const canRunTransaction = useAtomValue(canRunTransactionAtom);
   const isSuccess = useAtomValue(isTransactionSuccessAtom);
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
-  const loadSkipChains = useSetAtom(loadSkipChainsAtom);
+  // const loadSkipChains = useSetAtom(loadSkipChainsAtom);
   const transactionRoute = useAtomValue(transactionRouteAtom);
   const finalTxHash = useAtomValue(finalTransactionHashAtom);
 
@@ -80,7 +75,7 @@ export const Send = () => {
     console.log("[Send] walletstate's address on init", walletState.address);
     setRecipientAddress(walletState.address);
     loadFullRegistry();
-    loadSkipChains();
+    // loadSkipChains();
     triggerSymphonyStablecoinsRefresh();
 
     return () => {
@@ -114,7 +109,7 @@ export const Send = () => {
           <Button
             className="w-[85%]"
             onClick={() => runTransaction()}
-            disabled={isTxPending || sendState.amount === 0 || !transactionHasValidRoute}
+            disabled={!canRunTransaction}
           >
             Send
           </Button>

@@ -10,7 +10,7 @@ export const INACTIVITY_TIMEOUT = FIFTEEN_MINUTES;
 export const TOKEN_EXPIRATION_TIME = FIFTEEN_MINUTES;
 export const STORED_DATA_TIMEOUT = ONE_DAY;
 export const DATA_FRESHNESS_TIMEOUT = ONE_SECOND * 15; // Data is considered fresh for 15 seconds
-export const SIM_TX_FRESHNESS_TIMEOUT = ONE_SECOND * 10;
+export const SIM_TX_FRESHNESS_TIMEOUT = DATA_FRESHNESS_TIMEOUT * 2;
 export const ICON_CHANGEOVER_TIMEOUT = 750; // 0.75 seconds to hold confirmation icon
 export const DELAY_BETWEEN_NODE_ATTEMPTS = 1000; //1 second between queries
 

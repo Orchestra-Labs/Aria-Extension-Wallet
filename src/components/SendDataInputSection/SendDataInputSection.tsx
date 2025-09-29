@@ -5,7 +5,6 @@ import { Swap } from '@/assets/icons';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
   hasSendErrorAtom,
-  isTxPendingAtom,
   maxAvailableAtom,
   receiveErrorAtom,
   receiveStateAtom,
@@ -23,6 +22,8 @@ import {
   transactionRouteExchangeRateAtom,
   transactionRouteAtom,
   transactionLogsAtom,
+  isSimulationRunningAtom,
+  successfulSimTxRouteHashAtom,
 } from '@/atoms';
 import { useEffect, useRef } from 'react';
 import { useSendActions } from '@/hooks';
@@ -42,7 +43,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const maxAvailable = useAtomValue(maxAvailableAtom);
   const maxDisplayAvailable = useAtomValue(maxAvailableDisplayAtom);
   const recipientAddress = useAtomValue(recipientAddressAtom);
-  const isTxPending = useAtomValue(isTxPendingAtom);
+  const isSimulationRunning = useAtomValue(isSimulationRunningAtom);
   const [sendError, setSendError] = useAtom(sendErrorAtom);
   const receiveError = useAtomValue(receiveErrorAtom);
   const hasSendError = useAtomValue(hasSendErrorAtom);
@@ -56,6 +57,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const routeExchangeRate = useAtomValue(transactionRouteExchangeRateAtom);
   const transactionRoute = useAtomValue(transactionRouteAtom);
   const transactionLogs = useAtomValue(transactionLogsAtom);
+  const setSuccessfulSimTxRouteHash = useSetAtom(successfulSimTxRouteHashAtom);
 
   // Refs for tracking
   const simulationIntervalRef = useRef<NodeJS.Timeout>();
@@ -259,53 +261,102 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     };
 
     updateTxType();
-  }, [sendState, receiveState, recipientAddress, walletState]);
+  }, [sendState, receiveState, recipientAddress, walletState, transactionRouteHash]);
 
   // Main simulation trigger effect. Runs on timeout or when conditions change
   useEffect(() => {
-    // Periodic simulation setup
-    console.log('[Periodic Simulation Setup] Starting periodic invalidation');
+    console.log('[DEBUG][SimulationEffect] Simulation effect triggered', {
+      shouldInvalidate: simulationInvalidation.shouldInvalidate,
+      canRunSimulation,
+      lastRunTimestamp: simulationInvalidation.lastRunTimestamp,
+      currentTime: Date.now(),
+      timeSinceLastRun: Date.now() - simulationInvalidation.lastRunTimestamp,
+      timeUntilNextRun: Math.max(
+        0,
+        SIM_TX_FRESHNESS_TIMEOUT - (Date.now() - simulationInvalidation.lastRunTimestamp),
+      ),
+    });
 
     // Clear any existing interval
     if (simulationIntervalRef.current) {
+      console.log('[DEBUG][Periodic Simulation] Clearing existing interval');
       clearInterval(simulationIntervalRef.current);
     }
 
-    // Set up periodic invalidation
+    // Set up periodic invalidation with proper timing
     simulationIntervalRef.current = setInterval(() => {
-      console.log('[Periodic Invalidation] Setting shouldInvalidate to true');
-      setSimulationInvalidation(prev => ({
-        ...prev,
-        shouldInvalidate: true,
-      }));
+      const timeSinceLastRun = Date.now() - simulationInvalidation.lastRunTimestamp;
+
+      // Only invalidate if enough time has passed since last simulation
+      if (timeSinceLastRun >= SIM_TX_FRESHNESS_TIMEOUT) {
+        console.log('[DEBUG][Periodic Invalidation] Setting shouldInvalidate to true');
+        setSimulationInvalidation(prev => ({
+          ...prev,
+          shouldInvalidate: true,
+        }));
+      } else {
+        console.log('[DEBUG][Periodic Invalidation] Skipping - too soon since last run', {
+          timeSinceLastRun,
+          timeRemaining: SIM_TX_FRESHNESS_TIMEOUT - timeSinceLastRun,
+        });
+      }
     }, SIM_TX_FRESHNESS_TIMEOUT);
 
     // Simulation execution logic
-    if (simulationInvalidation.shouldInvalidate && canRunSimulation) {
-      console.log('[Simulation Trigger] Running simulation due to invalidation');
+    const shouldRunSimulation =
+      simulationInvalidation.shouldInvalidate &&
+      canRunSimulation &&
+      Date.now() - simulationInvalidation.lastRunTimestamp >= SIM_TX_FRESHNESS_TIMEOUT;
+
+    if (shouldRunSimulation) {
+      console.log('[DEBUG][Simulation Execution] Conditions met, running simulation');
       lastSimulationRunRef.current = Date.now();
 
-      try {
-        runSimulation();
+      const runSimulationWithCooldown = async () => {
+        try {
+          await runSimulation();
 
-        // Reset invalidation after successful simulation
-        setSimulationInvalidation(prev => ({
-          ...prev,
-          routeHash: transactionRouteHash,
-          shouldInvalidate: false,
-        }));
-      } catch (error) {
-        console.error('[Simulation Trigger] Simulation failed:', error);
-      }
+          // Reset invalidation after successful simulation with cooldown
+          setSimulationInvalidation(prev => ({
+            ...prev,
+            routeHash: transactionRouteHash,
+            shouldInvalidate: false,
+            lastRunTimestamp: Date.now(),
+          }));
+
+          setSuccessfulSimTxRouteHash(transactionRouteHash);
+
+          console.log('[DEBUG][Simulation Execution] Invalidation state reset with cooldown');
+        } catch (error) {
+          console.error('[DEBUG][Simulation Execution] Simulation failed:', error);
+
+          // Even on failure, update the timestamp to prevent immediate retry
+          setSimulationInvalidation(prev => ({
+            ...prev,
+            lastRunTimestamp: Date.now(),
+          }));
+        }
+      };
+
+      runSimulationWithCooldown();
+    } else {
+      console.log('[DEBUG][Simulation Execution] Conditions not met', {
+        shouldInvalidate: simulationInvalidation.shouldInvalidate,
+        canRunSimulation,
+        timeSinceLastRun: Date.now() - simulationInvalidation.lastRunTimestamp,
+        meetsTimeRequirement:
+          Date.now() - simulationInvalidation.lastRunTimestamp >= SIM_TX_FRESHNESS_TIMEOUT,
+      });
     }
 
     // Cleanup on unmount
     return () => {
       if (simulationIntervalRef.current) {
+        console.log('[DEBUG][Periodic Simulation] Cleaning up interval');
         clearInterval(simulationIntervalRef.current);
       }
     };
-  }, [simulationInvalidation, canRunSimulation]);
+  }, [simulationInvalidation, canRunSimulation, transactionRouteHash]);
 
   // Prevent re-running simulations on error
   useEffect(() => {
@@ -355,7 +406,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         updateAsset={updateSendAsset}
         updateAmount={updateSendAmount}
         showClearAndMax
-        disableButtons={isTxPending}
+        disableButtons={isSimulationRunning}
         onClear={clearAmount}
         onMax={() => setMaxAmount('send')}
         includeBottomMargin={false}
@@ -378,7 +429,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         updateAsset={updateReceiveAsset}
         updateAmount={updateReceiveAmount}
         showClearAndMax
-        disableButtons={isTxPending}
+        disableButtons={isSimulationRunning}
         onClear={clearAmount}
         onMax={() => setMaxAmount('receive')}
         includeBottomMargin={false}

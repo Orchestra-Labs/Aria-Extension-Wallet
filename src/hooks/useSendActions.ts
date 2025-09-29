@@ -15,6 +15,7 @@ import {
   allWalletAssetsAtom,
   updateStepLogAtom,
   osmosisFeeTokenByDenomAtom,
+  transactionRouteHashAtom,
 } from '@/atoms';
 import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
 import {
@@ -64,6 +65,7 @@ export const useSendActions = () => {
   const setSimulationInvalidation = useSetAtom(simulationInvalidationAtom);
   const allWalletAssets = useAtomValue(allWalletAssetsAtom);
   const getOsmosisFeeTokenByDenom = useAtomValue(osmosisFeeTokenByDenomAtom);
+  const txRouteHash = useAtomValue(transactionRouteHashAtom);
 
   // TODO: clean up.  not all of these functions need to be in this file
   const checkGasBalance = async ({

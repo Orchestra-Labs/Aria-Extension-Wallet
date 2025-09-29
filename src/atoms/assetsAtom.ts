@@ -6,7 +6,7 @@ import { networkLevelAtom } from './networkLevelAtom';
 import {
   chainInfoAtom,
   fullChainRegistryAtom,
-  skipChainsAtom,
+  // skipChainsAtom,
   subscribedChainRegistryAtom,
 } from './chainRegistryAtom';
 import { receiveStateAtom } from './transactionStateAtom';
@@ -94,8 +94,8 @@ export const loadSkipAssetsAtom = atom(null, async (_, set) => {
 export const allReceivableAssetsAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);
   const fullRegistry = get(fullChainRegistryAtom)[networkLevel];
-  const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
-  const skipChains = get(skipChainsAtom);
+  // const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
+  // const skipChains = get(skipChainsAtom);
   const receiveState = get(receiveStateAtom);
   const getChainInfo = get(chainInfoAtom);
   const { chainWallets } = get(sessionWalletAtom);
@@ -117,7 +117,7 @@ export const allReceivableAssetsAtom = atom(get => {
   const assetsBySymbol = new Map<string, Asset>();
   let finalAssets: Asset[] = [];
 
-  const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
+  // const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
 
   // Process all chains in the full registry
   const createAssetEntry = (asset: any, chainInfo: SimplifiedChainInfo): Asset => {
@@ -146,13 +146,13 @@ export const allReceivableAssetsAtom = atom(get => {
     };
   };
 
-  for (const [chainId, chainInfo] of Object.entries(fullRegistry)) {
-    const isSkipSupportedChain = skipChains.includes(chainId);
-    const isSubscribed = subscribedChainIds.has(chainId);
+  for (const chainInfo of Object.values(fullRegistry)) {
+    // const isSkipSupportedChain = skipChains.includes(chainId);
+    // const isSubscribed = subscribedChainIds.has(chainId);
 
-    if (!isSkipSupportedChain && !isSubscribed) {
-      continue;
-    }
+    // if (!isSkipSupportedChain && !isSubscribed) {
+    //   continue;
+    // }
 
     const chainAssets = Object.values(chainInfo.assets || {});
     for (const asset of chainAssets) {

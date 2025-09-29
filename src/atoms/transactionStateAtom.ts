@@ -315,6 +315,7 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
 
   // Reset route hash
   set(transactionRouteHashAtom, '');
+  set(successfulSimTxRouteHashAtom, '');
 
   // Reset simulation invalidation
   set(simulationInvalidationAtom, {
@@ -351,17 +352,6 @@ export const maxAvailableDisplayAtom = atom(get => {
   const maxAmount = get(maxAvailableAtom);
 
   return maxAmount / Math.pow(10, sendAsset.exponent);
-});
-
-export const isTxPendingAtom = atom(get => {
-  const route = get(transactionRouteAtom);
-  const logs = get(transactionLogsAtom);
-
-  // Check if any step is in progress
-  return route.steps.some(step => {
-    const log = logs[step.hash];
-    return log?.status === TransactionStatus.PENDING;
-  });
 });
 
 export const isTransactionSuccessAtom = atom(get => {
@@ -441,13 +431,45 @@ export const invalidateSimulationAtom = atom(null, (get, set) => {
   });
 });
 
+export const isSimulationRunningAtom = atom(get => {
+  const route = get(transactionRouteAtom);
+  const logs = get(transactionLogsAtom);
+
+  // If no steps, simulation is not running
+  if (route.steps.length === 0) {
+    return false;
+  }
+
+  const isSimulationRunning = route.steps.some(step => {
+    const log = logs[step.hash];
+    const status = log?.status;
+    return status === TransactionStatus.PENDING;
+  });
+
+  return isSimulationRunning;
+});
+
+export const successfulSimTxRouteHashAtom = atom<string>('');
+export const canRunTransactionAtom = atom(get => {
+  const txHasError = get(hasSendErrorAtom);
+  const currentTxRouteHash = get(transactionRouteHashAtom);
+  const lastSuccessfulSimTxRouteHash = get(successfulSimTxRouteHashAtom);
+  const sendState = get(sendStateAtom);
+  const hasValidTxRoute = get(transactionHasValidRouteAtom);
+
+  const hasSuccessfulSimulation = lastSuccessfulSimTxRouteHash === currentTxRouteHash;
+  const hasNonZeroSendAmount = sendState.amount > 0;
+
+  return hasSuccessfulSimulation && !txHasError && hasNonZeroSendAmount && hasValidTxRoute;
+});
+
 export const canRunSimulationAtom = atom(get => {
   const sendState = get(sendStateAtom);
   const maxAvailable = get(maxAvailableAtom);
   const recipientAddress = get(recipientAddressAtom);
   const addressVerified = get(addressVerifiedAtom);
-  const transactionHasValidRoute = get(transactionHasValidRouteAtom);
-  const isTxPending = get(isTxPendingAtom);
+  const hasValidTxRoute = get(transactionHasValidRouteAtom);
+  const isSimulationRunning = get(isSimulationRunningAtom);
   const transactionError = get(transactionErrorAtom);
   const simulationInvalidation = get(simulationInvalidationAtom);
   const transactionRouteHash = get(transactionRouteHashAtom);
@@ -461,12 +483,11 @@ export const canRunSimulationAtom = atom(get => {
     simulationInvalidation.routeHash !== transactionRouteHash ||
     Date.now() - simulationInvalidation.lastRunTimestamp > SIM_TX_FRESHNESS_TIMEOUT;
 
+  const hasAllFields = recipientAddress && addressVerified && hasValidAmount;
   const canRun =
-    recipientAddress &&
-    addressVerified &&
-    hasValidAmount &&
-    transactionHasValidRoute &&
-    !isTxPending &&
+    hasAllFields &&
+    hasValidTxRoute &&
+    !isSimulationRunning &&
     !transactionError &&
     (needsInvalidation || !isTxSuccess);
 
@@ -474,8 +495,8 @@ export const canRunSimulationAtom = atom(get => {
     recipientAddress: !!recipientAddress,
     addressVerified,
     hasValidAmount,
-    transactionHasValidRoute,
-    isTxPending,
+    transactionHasValidRoute: hasValidTxRoute,
+    isTxPending: isSimulationRunning,
     transactionError: !!transactionError,
     needsInvalidation,
     result: canRun,

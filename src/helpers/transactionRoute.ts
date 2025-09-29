@@ -2,15 +2,12 @@ import { TransactionType } from '@/constants';
 import { SimplifiedChainInfo, TransactionRoute, TransactionStep } from '@/types';
 import { truncateWalletAddress } from './truncateString';
 
-export const createStepHash = (step: TransactionStep, amount?: number): string => {
+export const createStepHash = (step: TransactionStep): string => {
   const { type, via, fromChain, toChain, fromAsset, toAsset } = step;
 
-  const baseString = `${type}-${via}-${fromChain}-${toChain}-${fromAsset.denom}-${toAsset.denom}`;
+  const hashString = `${type}-${via}-${fromChain}-${toChain}-${fromAsset.denom}-${toAsset.denom}`;
 
-  // Include amount only for the first step
-  const amountString = amount !== undefined ? `-${amount}` : '';
-
-  return `${baseString + amountString}`;
+  return hashString;
 };
 
 export const createRouteHash = ({

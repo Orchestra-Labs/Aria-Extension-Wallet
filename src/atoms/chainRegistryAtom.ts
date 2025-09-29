@@ -26,7 +26,7 @@ import {
   getOsmosisAssetsWithResolutions,
   getOsmosisChainId,
   getStoredChainRegistry,
-  getSupportedChains,
+  // getSupportedChains,
   getSymphonyChainId,
 } from '@/helpers';
 import { userAccountAtom } from './accountAtom';
@@ -232,16 +232,16 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
   return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
 });
 
-export const skipChainsAtom = atom<string[]>([]);
-export const loadSkipChainsAtom = atom(null, async (_, set) => {
-  try {
-    const chains = await getSupportedChains();
-    const parsedChains = chains.map(chain => chain.chain_id);
-    set(skipChainsAtom, parsedChains);
-  } catch (error) {
-    console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
-  }
-});
+// export const skipChainsAtom = atom<string[]>([]);
+// export const loadSkipChainsAtom = atom(null, async (_, set) => {
+//   try {
+//     const chains = await getSupportedChains();
+//     const parsedChains = chains.map(chain => chain.chain_id);
+//     set(skipChainsAtom, parsedChains);
+//   } catch (error) {
+//     console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
+//   }
+// });
 
 export const osmosisChainsAtom = atom<string[]>([]);
 export const osmosisAssetsAtom = atom<Asset[]>([]);
