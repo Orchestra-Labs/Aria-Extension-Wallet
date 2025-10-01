@@ -25,7 +25,7 @@ import {
   isSimulationRunningAtom,
   successfulSimTxRouteHashAtom,
 } from '@/atoms';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSendActions } from '@/hooks';
 import { AddressInput } from '../AddressInput';
 import { InputStatus, SIM_TX_FRESHNESS_TIMEOUT } from '@/constants';
@@ -34,6 +34,10 @@ import { formatBalanceDisplay } from '@/helpers';
 interface SendDataInputSectionProps {}
 
 export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
+  // Refs for tracking
+  const simulationIntervalRef = useRef<NodeJS.Timeout>();
+  const lastSimulationRunRef = useRef<number>(0);
+
   // const { exchangeRate = 1 } = useStablecoinSwapExchangeRate();
   const { runSimulation } = useSendActions();
 
@@ -59,13 +63,29 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const transactionLogs = useAtomValue(transactionLogsAtom);
   const setSuccessfulSimTxRouteHash = useSetAtom(successfulSimTxRouteHashAtom);
 
-  // Refs for tracking
-  const simulationIntervalRef = useRef<NodeJS.Timeout>();
-  const lastSimulationRunRef = useRef<number>(0);
+  const [pendingSimulationRequest, setPendingSimulationRequest] = useState(false);
 
   // Derived values
   // TODO: add max receivable atom for receiving unit
   const placeHolder = `Max: ${formatBalanceDisplay(`${maxDisplayAvailable}`, sendState.asset.symbol)}`;
+
+  const requestSimulation = (immediate = false) => {
+    if (immediate) {
+      // For immediate requests (user input), set pending flag and reset invalidation
+      setPendingSimulationRequest(true);
+      setSimulationInvalidation(prev => ({
+        ...prev,
+        shouldInvalidate: true,
+        lastRunTimestamp: 0, // Force immediate execution
+      }));
+    } else {
+      // For periodic requests, use normal invalidation
+      setSimulationInvalidation(prev => ({
+        ...prev,
+        shouldInvalidate: true,
+      }));
+    }
+  };
 
   // Pure calculation function for derived state
   // Pure calculation function for derived state
@@ -214,8 +234,19 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     });
   };
 
-  const updateSendAmount = (amount: number) => handleStateUpdate({ newSendAmount: amount });
-  const updateReceiveAmount = (amount: number) => handleStateUpdate({ newReceiveAmount: amount });
+  const updateSendAmount = (amount: number) => {
+    handleStateUpdate({
+      newSendAmount: amount,
+    });
+    requestSimulation(true); // Request immediate simulation
+  };
+
+  const updateReceiveAmount = (amount: number) => {
+    handleStateUpdate({
+      newReceiveAmount: amount,
+    });
+    requestSimulation(true); // Request immediate simulation
+  };
 
   const switchFields = () => {
     handleStateUpdate({
@@ -302,14 +333,21 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
       }
     }, SIM_TX_FRESHNESS_TIMEOUT);
 
-    // Simulation execution logic
-    const shouldRunSimulation =
+    const shouldRunImmediately = pendingSimulationRequest;
+
+    const shouldRunPeriodic =
       simulationInvalidation.shouldInvalidate &&
       canRunSimulation &&
       Date.now() - simulationInvalidation.lastRunTimestamp >= SIM_TX_FRESHNESS_TIMEOUT;
 
+    const shouldRunSimulation = shouldRunImmediately || shouldRunPeriodic;
+
     if (shouldRunSimulation) {
-      console.log('[DEBUG][Simulation Execution] Conditions met, running simulation');
+      console.log('[DEBUG][Simulation Execution] Running simulation', {
+        immediate: shouldRunImmediately,
+        periodic: shouldRunPeriodic,
+      });
+
       lastSimulationRunRef.current = Date.now();
 
       const runSimulationWithCooldown = async () => {
@@ -324,6 +362,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
             lastRunTimestamp: Date.now(),
           }));
 
+          setPendingSimulationRequest(false);
           setSuccessfulSimTxRouteHash(transactionRouteHash);
 
           console.log('[DEBUG][Simulation Execution] Invalidation state reset with cooldown');
@@ -335,6 +374,11 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
             ...prev,
             lastRunTimestamp: Date.now(),
           }));
+
+          // Only clear pending request if it was immediate
+          if (shouldRunImmediately) {
+            setPendingSimulationRequest(false);
+          }
         }
       };
 
@@ -356,7 +400,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
         clearInterval(simulationIntervalRef.current);
       }
     };
-  }, [simulationInvalidation, canRunSimulation, transactionRouteHash]);
+  }, [simulationInvalidation, canRunSimulation, transactionRouteHash, pendingSimulationRequest]);
 
   // Prevent re-running simulations on error
   useEffect(() => {

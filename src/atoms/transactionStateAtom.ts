@@ -422,15 +422,6 @@ export const simulationInvalidationAtom = atom({
   shouldInvalidate: false,
 });
 
-export const invalidateSimulationAtom = atom(null, (get, set) => {
-  const currentRouteHash = get(transactionRouteHashAtom);
-  set(simulationInvalidationAtom, {
-    lastRunTimestamp: 0,
-    routeHash: currentRouteHash,
-    shouldInvalidate: true,
-  });
-});
-
 export const isSimulationRunningAtom = atom(get => {
   const route = get(transactionRouteAtom);
   const logs = get(transactionLogsAtom);
