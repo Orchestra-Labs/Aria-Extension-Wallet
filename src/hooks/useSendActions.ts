@@ -16,6 +16,7 @@ import {
   updateStepLogAtom,
   osmosisFeeTokenByDenomAtom,
   transactionRouteHashAtom,
+  isTxRunningAtom,
 } from '@/atoms';
 import { GREATER_EXPONENT_DEFAULT, TransactionStatus, TransactionType } from '@/constants';
 import {
@@ -66,6 +67,8 @@ export const useSendActions = () => {
   const allWalletAssets = useAtomValue(allWalletAssetsAtom);
   const getOsmosisFeeTokenByDenom = useAtomValue(osmosisFeeTokenByDenomAtom);
   const txRouteHash = useAtomValue(transactionRouteHashAtom);
+
+  const setIsTransactionRunning = useSetAtom(isTxRunningAtom);
 
   // TODO: clean up.  not all of these functions need to be in this file
   const checkGasBalance = async ({
@@ -1596,6 +1599,11 @@ export const useSendActions = () => {
       if (result.success && !isSimulation) {
         console.log('[executeTransactionRoute] Transaction successful, refreshing data');
         refreshData({ wallet: true });
+      } else if (result.success && isSimulation) {
+        console.log('[DEBUG][executeTransactionRoute] Setting successful simulation hash:', {
+          routeHash: txRouteHash,
+          resultSuccess: result.success,
+        });
       }
     } catch (error) {
       console.error('[executeTransactionRoute] Unexpected error:', error);
@@ -1610,7 +1618,13 @@ export const useSendActions = () => {
   };
 
   const runTransaction = async (): Promise<TransactionResult> => {
-    return executeTransactionRoute(false);
+    try {
+      setIsTransactionRunning(true);
+      const result = await executeTransactionRoute(false);
+      return result;
+    } finally {
+      setIsTransactionRunning(false);
+    }
   };
 
   // In your useSendActions, add more logging:

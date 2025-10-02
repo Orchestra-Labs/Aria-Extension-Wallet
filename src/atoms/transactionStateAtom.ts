@@ -441,17 +441,23 @@ export const isSimulationRunningAtom = atom(get => {
 });
 
 export const successfulSimTxRouteHashAtom = atom<string>('');
+
+export const isTxRunningAtom = atom(false);
 export const canRunTransactionAtom = atom(get => {
   const txHasError = get(hasSendErrorAtom);
   const currentTxRouteHash = get(transactionRouteHashAtom);
   const lastSuccessfulSimTxRouteHash = get(successfulSimTxRouteHashAtom);
   const sendState = get(sendStateAtom);
   const hasValidTxRoute = get(transactionHasValidRouteAtom);
+  const isTxRunning = get(isTxRunningAtom);
 
   const hasSuccessfulSimulation = lastSuccessfulSimTxRouteHash === currentTxRouteHash;
   const hasNonZeroSendAmount = sendState.amount > 0;
 
-  return hasSuccessfulSimulation && !txHasError && hasNonZeroSendAmount && hasValidTxRoute;
+  const txIsEnabled =
+    hasSuccessfulSimulation && !txHasError && hasNonZeroSendAmount && hasValidTxRoute;
+
+  return txIsEnabled && !isTxRunning;
 });
 
 export const canRunSimulationAtom = atom(get => {
@@ -465,6 +471,7 @@ export const canRunSimulationAtom = atom(get => {
   const simulationInvalidation = get(simulationInvalidationAtom);
   const transactionRouteHash = get(transactionRouteHashAtom);
   const isTxSuccess = get(isTransactionSuccessAtom);
+  const isTxRunning = get(isTxRunningAtom);
 
   const hasValidAmount =
     !isNaN(sendState.amount) && sendState.amount > 0 && sendState.amount <= maxAvailable;
@@ -475,12 +482,15 @@ export const canRunSimulationAtom = atom(get => {
     Date.now() - simulationInvalidation.lastRunTimestamp > SIM_TX_FRESHNESS_TIMEOUT;
 
   const hasAllFields = recipientAddress && addressVerified && hasValidAmount;
-  const canRun =
+
+  const simIsEnabled =
     hasAllFields &&
     hasValidTxRoute &&
-    !isSimulationRunning &&
     !transactionError &&
-    (needsInvalidation || !isTxSuccess);
+    (needsInvalidation || !isTxSuccess) &&
+    !isTxRunning;
+
+  const canRun = simIsEnabled && !isSimulationRunning;
 
   console.log('[canRunSimulationAtom] Evaluation:', {
     recipientAddress: !!recipientAddress,
