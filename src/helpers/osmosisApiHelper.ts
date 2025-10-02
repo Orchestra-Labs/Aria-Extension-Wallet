@@ -893,6 +893,7 @@ async function useOsmosisDirect({
   };
 }
 
+// NOTE: if switching to polaris, explore using //github.com/polaris-portal/osmosis-affiliate-swap-contract/tree/v1.0.0
 // NOTE: using https://github.com/osmosis-labs/affiliate-swap/tree/main
 // NOTE: verify use by checking mintscan at https://www.mintscan.io/osmosis/tx/8CF7BA02E16460F9EA76018E1DCE6B3AD9195C565192D5F3DD807F832FB7F6DF?height=44921665
 // NOTE: set up via daodao at https://daodao.zone/dao/osmosis
