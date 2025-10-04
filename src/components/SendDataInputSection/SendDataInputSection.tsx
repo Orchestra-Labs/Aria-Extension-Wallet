@@ -88,7 +88,6 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   };
 
   // Pure calculation function for derived state
-  // Pure calculation function for derived state
   const calculateDerivedState = (update: {
     newSendAmount?: number;
     newReceiveAmount?: number;
@@ -97,7 +96,6 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   }) => {
     // Special handling for switch operation
     if (update.newSendAsset === receiveState.asset && update.newReceiveAsset === sendState.asset) {
-      // This is a switch operation, return the swapped values directly
       return {
         sendAmount: update.newSendAmount ?? receiveState.displayAmount,
         receiveAmount: update.newReceiveAmount ?? sendState.displayAmount,

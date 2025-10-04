@@ -1,6 +1,6 @@
-import { SortedValidator, ValidatorRecord } from '@/types';
+import { SortedValidator, Uri, ValidatorRecord } from '@/types';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from './localstorage';
-import { CommType, ONE_SECOND } from '@/constants';
+import { CommType, DEFAULT_REST_TIMEOUT, ONE_DAY, ONE_SECOND } from '@/constants';
 
 const VALIDATOR_STATS_KEY = 'validatorStats';
 
@@ -60,9 +60,8 @@ export const resetDailyFailuresIfNeeded = (): ValidatorRecord => {
 
   const lastUpdated = getTimestampFromDateString(lastUpdatedMatch[1]);
   const now = Date.now();
-  const twentyFourHours = 24 * 60 * 60 * 1000;
 
-  if (now - lastUpdated < twentyFourHours) {
+  if (now - lastUpdated < ONE_DAY) {
     try {
       return JSON.parse(rawStats) as ValidatorRecord;
     } catch {
@@ -160,21 +159,38 @@ export const flushPendingRecords = (): void => {
   processPendingRecords();
 };
 
-export const getSortedValidators = (chainId: string, commType: CommType): SortedValidator[] => {
+export const getSortedValidators = (
+  chainId: string,
+  commType: CommType,
+  availableUris: Uri[],
+): SortedValidator[] => {
   const stats = resetDailyFailuresIfNeeded();
+  const validatorMap = new Map<string, SortedValidator>();
 
   if (!stats.data || !stats.data[chainId] || !stats.data[chainId][commType]) {
     return [];
   }
 
   const chainStats = stats.data[chainId][commType];
-  const validators: SortedValidator[] = Object.entries(chainStats).map(
-    ([validatorId, validatorStats]) => ({
+  Object.entries(chainStats).forEach(([validatorId, validatorStats]) => {
+    validatorMap.set(validatorId, {
       validatorId,
       failedQueries: validatorStats.failedQueries,
       longestQueryTime: validatorStats.longestQueryTime,
-    }),
-  );
+    });
+  });
+
+  availableUris.forEach(uri => {
+    if (!validatorMap.has(uri.address)) {
+      validatorMap.set(uri.address, {
+        validatorId: uri.address,
+        failedQueries: 0, // Default to 0 errors
+        longestQueryTime: DEFAULT_REST_TIMEOUT / 2, // Default to half permitted time
+      });
+    }
+  });
+
+  const validators = Array.from(validatorMap.values());
 
   return validators.sort((a, b) => {
     if (a.failedQueries !== b.failedQueries) {
@@ -184,8 +200,12 @@ export const getSortedValidators = (chainId: string, commType: CommType): Sorted
   });
 };
 
-export const getNextValidator = (chainId: string, commType: CommType): string | null => {
-  const sortedValidators = getSortedValidators(chainId, commType);
+export const getNextValidator = (
+  chainId: string,
+  commType: CommType,
+  availableUris: Uri[],
+): string | null => {
+  const sortedValidators = getSortedValidators(chainId, commType, availableUris);
   return sortedValidators.length > 0 ? sortedValidators[0].validatorId : null;
 };
 

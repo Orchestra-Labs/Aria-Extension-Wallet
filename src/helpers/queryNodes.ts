@@ -269,6 +269,7 @@ const getCachedSigner = async (
 
 const sortUrisWithCache = (uris: Uri[], sortedValidators: SortedValidator[]): Uri[] => {
   const performanceRank = new Map<string, number>();
+
   sortedValidators.forEach((validator, index) => {
     performanceRank.set(validator.validatorId, index);
   });
@@ -292,7 +293,7 @@ const getSortedUris = (chainId: string, uris: Uri[], commType: CommType): Uri[] 
     return sortUrisWithCache(uris, sortedValidatorsCache[cacheKey].validators);
   }
 
-  const sortedValidators = getSortedValidators(chainId, commType);
+  const sortedValidators = getSortedValidators(chainId, commType, uris);
   sortedValidatorsCache[cacheKey] = {
     validators: sortedValidators,
     timestamp: now,

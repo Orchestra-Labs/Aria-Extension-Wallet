@@ -3,7 +3,7 @@ export const ONE_MINUTE = 60 * 1000;
 export const FIVE_MINUTES = 5 * ONE_MINUTE;
 const FIFTEEN_MINUTES = 3 * FIVE_MINUTES; // 15 minutes in milliseconds
 const ONE_HOUR = 4 * FIFTEEN_MINUTES;
-const ONE_DAY = 24 * ONE_HOUR;
+export const ONE_DAY = 24 * ONE_HOUR;
 
 export const RECHECK_TIMEOUT = FIVE_MINUTES;
 export const INACTIVITY_TIMEOUT = FIFTEEN_MINUTES;
