@@ -33,6 +33,7 @@ import { userAccountAtom } from './accountAtom';
 
 const EMPTY_CHAIN_REGISTRY = { mainnet: {}, testnet: {} };
 
+// TODO: simplify these two to be the same object, with denotation or sub-categorization for which ones are subscribed
 export const subscribedChainRegistryAtom = atom<{
   mainnet: LocalChainRegistry;
   testnet: LocalChainRegistry;
