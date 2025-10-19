@@ -77,6 +77,7 @@ export function useRegistryDataRefresh() {
       const shouldUpdate = shouldUpdateChainRegistry();
       const needsUpdate = !storedRegistry || (shouldUpdate && (await checkChainRegistryUpdate()));
 
+      // TODO: is this running even if the fetch above runs? test and fix if verified
       if (needsUpdate) {
         console.log('[Registry] Fetching fresh registry data');
         await fetchAndStoreChainRegistry();
