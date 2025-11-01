@@ -2,6 +2,7 @@ import axios from 'axios';
 import { ChainRegistryData, CommitHashes, IbcRegistryRecord } from '@/types';
 import { processIbcData } from './ibcUtils';
 import { decompressSync } from 'fflate';
+import { fetchOrchestraIbcRegistry } from './fetchOrchestraRegistryData';
 
 const GITHUB_API_BASE = 'https://api.github.com/repos/Orchestra-Labs/cosmos-chain-registry';
 const GITHUB_COMMIT_URL = `${GITHUB_API_BASE}/commits`;
@@ -30,6 +31,17 @@ export const fetchIbcRegistry = async (
   chainRegistry: ChainRegistryData,
   commitHashes: CommitHashes,
 ): Promise<IbcRegistryRecord> => {
+  // Try Orchestra registry first with timeout
+  const orchestraIbc = await fetchOrchestraIbcRegistry();
+
+  if (orchestraIbc) {
+    console.log('[IBC] Using Orchestra IBC registry data');
+    return orchestraIbc;
+  }
+
+  console.log('[IBC] Orchestra IBC registry failed, falling back to GitHub');
+
+  // Fallback to original GitHub fetching
   try {
     // Fetch both mainnet and testnet IBC data in parallel
     const [mainnetTarball, testnetTarball] = await Promise.all([

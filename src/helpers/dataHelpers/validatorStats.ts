@@ -1,6 +1,6 @@
 import { SortedValidator, Uri, ValidatorRecord } from '@/types';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from './localstorage';
-import { CommType, DEFAULT_REST_TIMEOUT, ONE_DAY, ONE_SECOND } from '@/constants';
+import { CommType, DATA_QUERY_TIMEOUT, ONE_DAY, ONE_SECOND } from '@/constants';
 
 const VALIDATOR_STATS_KEY = 'validatorStats';
 
@@ -185,7 +185,7 @@ export const getSortedValidators = (
       validatorMap.set(uri.address, {
         validatorId: uri.address,
         failedQueries: 0, // Default to 0 errors
-        longestQueryTime: DEFAULT_REST_TIMEOUT / 2, // Default to half permitted time
+        longestQueryTime: DATA_QUERY_TIMEOUT / 2, // Default to half permitted time
       });
     }
   });

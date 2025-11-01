@@ -4,6 +4,8 @@ export * from './feeUtils';
 export * from './dataHelpers';
 export * from './fetchAccountInfo';
 export * from './fetchBech32Prefixes';
+export * from './fetchIbcRegistryData';
+export * from './fetchOrchestraRegistryData';
 export * from './fetchStakingInfo';
 export * from './fetchWalletAssets';
 export * from './formatString';

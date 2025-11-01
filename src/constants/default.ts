@@ -60,3 +60,5 @@ export const KNOWN_EPOCH_BASED_CHAINS = [
   'evmos_9001-2',
   'gravity-bridge-3',
 ];
+
+export const ORCHESTRA_REGISTRY_BASE = 'https://registry.orchestralabs.org';

@@ -1,7 +1,7 @@
 import {
   CommType,
   DEFAULT_FEE_TOKEN,
-  DEFAULT_REST_TIMEOUT,
+  DATA_QUERY_TIMEOUT,
   FIVE_MINUTES,
   MAX_RETRIES_PER_QUERY,
   ONE_SECOND,
@@ -94,7 +94,7 @@ const performRestQuery = async (
 
   const startTime = Date.now();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_REST_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), DATA_QUERY_TIMEOUT);
 
   const options: RequestInit = {
     method: queryType,

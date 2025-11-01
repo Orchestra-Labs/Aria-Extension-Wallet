@@ -9,7 +9,9 @@ import {
   Asset,
   Uri,
   FeeToken,
+  ChainRegistryData,
 } from '@/types';
+import { fetchOrchestraChainRegistry } from '../fetchOrchestraRegistryData';
 
 // TODO: show status of download to user in topbar.  "checking for update", "querying for new chains", "updating chain information"
 // TODO: change to use regularly updated json file for single file download (faster, lighter, less wasteful)
@@ -26,6 +28,31 @@ type ChainRegistryFiles = {
   assets?: Record<string, Asset>;
 };
 export type ChainRegistryCache = Record<string, ChainRegistryFiles>;
+
+export const saveChainRegistry = (registry: ChainRegistryRecord): void => {
+  setLocalStorageItem(REGISTRY_KEY, JSON.stringify(registry));
+};
+
+export const saveOrchestraChainRegistry = (
+  orchestraRegistry: ChainRegistryData,
+): ChainRegistryRecord => {
+  const payload: ChainRegistryRecord = {
+    sha: 'orchestra-registry',
+    lastUpdated: new Date().toISOString(),
+    data: orchestraRegistry,
+  };
+
+  saveChainRegistry(payload);
+  console.log(
+    '[ChainRegistry] Stored Orchestra registry:',
+    Object.keys(orchestraRegistry.mainnet).length,
+    'mainnet chains,',
+    Object.keys(orchestraRegistry.testnet).length,
+    'testnet chains',
+  );
+
+  return payload;
+};
 
 const fetchKeplrRegistryData = async (): Promise<any[]> => {
   console.groupCollapsed('[fetchKeplrRegistryData] Fetching Keplr registry data');
@@ -195,17 +222,12 @@ export const getStoredChainRegistry = (): ChainRegistryRecord | null => {
   }
 };
 
-export const chainRegistryNeedsRefresh = (): boolean => {
+export const shouldUpdateChainRegistry = (): boolean => {
   const stored = getStoredChainRegistry();
   if (!stored) return true;
 
   const lastCheckTime = new Date(stored.lastUpdated).getTime();
   return Date.now() - lastCheckTime >= STORED_DATA_TIMEOUT;
-};
-
-export const shouldUpdateChainRegistry = (): boolean => {
-  const stored = getStoredChainRegistry();
-  return !stored || chainRegistryNeedsRefresh();
 };
 
 export const fetchLatestChainRegistryCommit = async (): Promise<string | null> => {
@@ -224,12 +246,20 @@ export const fetchLatestChainRegistryCommit = async (): Promise<string | null> =
 };
 
 export const checkChainRegistryUpdate = async (): Promise<boolean> => {
-  if (!chainRegistryNeedsRefresh()) return false;
+  if (!shouldUpdateChainRegistry()) return false;
 
+  const stored = getStoredChainRegistry();
+
+  // If data is from Orchestra, always update after 24 hours
+  if (stored?.sha === 'orchestra-registry') {
+    console.log('[ChainRegistry] Orchestra data older than 24 hours, updating...');
+    return true;
+  }
+
+  // For GitHub source, check commit hash as before
   const latest = await fetchLatestChainRegistryCommit();
   if (!latest) return false;
 
-  const stored = getStoredChainRegistry();
   const hasChanged = stored?.sha !== latest;
 
   if (hasChanged) {
@@ -288,6 +318,17 @@ function extractAssets(assetlist: any, chain: any): Record<string, Asset> {
 export const fetchAndStoreChainRegistry = async (): Promise<void> => {
   try {
     console.log('[ChainRegistry] Starting full fetch & store');
+
+    // Try Orchestra registry first with timeout
+    const orchestraRegistry = await fetchOrchestraChainRegistry();
+
+    if (orchestraRegistry) {
+      console.log('[ChainRegistry] Using Orchestra registry data');
+      saveOrchestraChainRegistry(orchestraRegistry);
+      return;
+    }
+
+    console.log('[ChainRegistry] Orchestra registry failed, falling back to GitHub');
 
     const [commit, keplrData] = await Promise.all([
       fetchLatestChainRegistryCommit(),
@@ -416,7 +457,7 @@ export const fetchAndStoreChainRegistry = async (): Promise<void> => {
       },
     };
 
-    setLocalStorageItem(REGISTRY_KEY, JSON.stringify(payload));
+    saveChainRegistry(payload);
     console.log(
       '[ChainRegistry] Stored flattened mainnet registry:',
       Object.keys(mainnetRegistry).length,

@@ -2,7 +2,7 @@ import { useAtom, useAtomValue } from 'jotai';
 import { fullChainRegistryAtom, isFetchingIbcDataAtom } from '@/atoms';
 import { getIbcRegistry, saveIbcRegistry } from '@/helpers/dataHelpers/ibcRegistry';
 import { fetchIbcRegistry, getLatestCommitHashes } from '@/helpers/fetchIbcRegistryData';
-import { DATA_FRESHNESS_TIMEOUT, NetworkLevel } from '@/constants';
+import { DATA_FRESHNESS_TIMEOUT, NetworkLevel, ONE_DAY } from '@/constants';
 
 export function useIbcRegistryRefresh() {
   const [isFetching, setIsFetching] = useAtom(isFetchingIbcDataAtom);
@@ -17,15 +17,22 @@ export function useIbcRegistryRefresh() {
     setIsFetching(true);
     try {
       const savedRegistry = getIbcRegistry();
-      const latestCommitHashes = await getLatestCommitHashes();
 
       const shouldUpdate = () => {
         if (force) return true;
         if (!savedRegistry) return true;
 
-        // Check if data is stale
+        // Check if data is stale (24 hours for Orchestra, 15 seconds for GitHub)
         const lastUpdated = new Date(savedRegistry.lastUpdated).getTime();
-        const isStale = Date.now() - lastUpdated > DATA_FRESHNESS_TIMEOUT;
+        const timeSinceLastUpdate = Date.now() - lastUpdated;
+
+        // If data is from Orchestra, update every 24 hours
+        if (savedRegistry.commitHashes.mainnetHash === 'orchestra-registry') {
+          return timeSinceLastUpdate >= ONE_DAY;
+        }
+
+        // If data is from GitHub, use freshness timeout
+        const isStale = timeSinceLastUpdate > DATA_FRESHNESS_TIMEOUT;
 
         // Check if hashes match for the relevant network(s)
         let hashesMatch = true;
@@ -42,6 +49,12 @@ export function useIbcRegistryRefresh() {
 
         return isStale || !hashesMatch;
       };
+
+      // For Orchestra source, we don't need commit hashes
+      const isOrchestraSource = savedRegistry?.commitHashes?.mainnetHash === 'orchestra-registry';
+      const latestCommitHashes = isOrchestraSource
+        ? { mainnetHash: 'orchestra-registry', testnetHash: 'orchestra-registry' }
+        : await getLatestCommitHashes();
 
       if (!shouldUpdate() && savedRegistry) {
         console.log('[IBC] Using cached data');

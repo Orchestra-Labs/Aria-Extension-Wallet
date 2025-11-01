@@ -11,6 +11,8 @@ import {
   fetchAndStoreChainRegistry,
   getStoredChainRegistry,
   filterChainRegistryToSubscriptions,
+  fetchOrchestraChainRegistry,
+  saveOrchestraChainRegistry,
 } from '@/helpers';
 import { LOCAL_CHAIN_REGISTRY, NetworkLevel } from '@/constants';
 import { ChainRegistryData } from '@/types';
@@ -31,14 +33,35 @@ export function useRegistryDataRefresh() {
     setIsFetchingRegistry(true);
 
     try {
-      // Check if stored data exists
+      // FIRST: Always try Orchestra registry with timeout before checking stored data
+      console.log('[Registry] Attempting to fetch from Orchestra registry first...');
+      const orchestraRegistry = await fetchOrchestraChainRegistry();
+
+      if (orchestraRegistry) {
+        console.log('[Registry] Successfully fetched from Orchestra registry');
+
+        // Use chain registry function to save to localStorage
+        saveOrchestraChainRegistry(orchestraRegistry);
+
+        const filteredData = filterRegistryData(orchestraRegistry, userAccount);
+        setFullRegistry(orchestraRegistry);
+        setChainRegistry(filteredData);
+
+        return {
+          subscribedChainRegistry: filteredData,
+          fullChainRegistry: orchestraRegistry,
+        };
+      }
+
+      console.log('[Registry] Orchestra registry failed, falling back to stored/github data');
+
+      // SECOND: Fallback to stored data if Orchestra fails
       const storedRegistry = getStoredChainRegistry();
 
       // If data exists in local storage, use it immediately
       if (storedRegistry && Object.keys(storedRegistry.data.mainnet).length > 0) {
         console.log('[Registry] Using registry data from local storage');
         const filteredData = filterRegistryData(storedRegistry.data, userAccount);
-        console.log('[fetchWalletAssets] setting registry to:', filteredData);
         setFullRegistry(storedRegistry.data);
         setChainRegistry(filteredData);
 
@@ -72,16 +95,9 @@ export function useRegistryDataRefresh() {
         };
       }
 
-      // Only use local registry if local storage is completely empty
-      console.log('[Registry] No data in local storage, checking for updates...');
-      const shouldUpdate = shouldUpdateChainRegistry();
-      const needsUpdate = !storedRegistry || (shouldUpdate && (await checkChainRegistryUpdate()));
-
-      // TODO: is this running even if the fetch above runs? test and fix if verified
-      if (needsUpdate) {
-        console.log('[Registry] Fetching fresh registry data');
-        await fetchAndStoreChainRegistry();
-      }
+      // THIRD: If no stored data, fetch fresh data
+      console.log('[Registry] No data in local storage, fetching fresh data...');
+      await fetchAndStoreChainRegistry();
 
       // Get the latest data (either freshly fetched or from storage if it now exists)
       const latestStoredRegistry = getStoredChainRegistry();
@@ -98,7 +114,7 @@ export function useRegistryDataRefresh() {
         };
       }
 
-      // Final fallback: only use local registry if everything else fails
+      // FINAL FALLBACK: only use local registry if everything else fails
       console.warn('[Registry] No registry data available, falling back to local registry');
       const filteredData = filterRegistryData(LOCAL_CHAIN_REGISTRY, userAccount);
       setFullRegistry(LOCAL_CHAIN_REGISTRY);
@@ -138,7 +154,7 @@ export function useRegistryDataRefresh() {
     }
   };
 
-  // Helper function to filter registry data
+  // Helper function to filter registry data (keep existing)
   const filterRegistryData = (registryData: ChainRegistryData, userAccount: any) => {
     return {
       mainnet: userAccount
