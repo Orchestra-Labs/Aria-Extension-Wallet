@@ -11,6 +11,12 @@ interface CopyTextFieldProps {
   includeMargin?: boolean;
 }
 
+const CheckIcon: React.FC<React.SVGProps<SVGSVGElement>> = props => (
+  <div className="overflow-hidden">
+    <VerifySuccess {...props} className="w-full h-full" />
+  </div>
+);
+
 export const CopyTextField: React.FC<CopyTextFieldProps> = ({
   variant = 'transparent',
   displayText,
@@ -28,15 +34,20 @@ export const CopyTextField: React.FC<CopyTextFieldProps> = ({
     setTimeout(() => setCopied(false), ICON_CHANGEOVER_TIMEOUT);
   };
 
+  const iconProps = {
+    width: iconHeight,
+    height: iconHeight,
+  };
+
   switch (variant) {
     case 'text': {
       return (
         <Button variant="transparent" size="small" onClick={handleCopyToClipboard}>
           <div className="flex items-center space-x-2">
             {copied ? (
-              <VerifySuccess width={iconHeight} className="text-success animate-scale-up" />
+              <CheckIcon {...iconProps} className="text-success animate-scale-up" />
             ) : (
-              <Copy width={iconHeight} />
+              <Copy {...iconProps} />
             )}
             <span className="ml-2.5 text-base">{displayText}</span>
           </div>
@@ -44,7 +55,6 @@ export const CopyTextField: React.FC<CopyTextFieldProps> = ({
       );
     }
     default: {
-      // TODO: click to claim in balance card widens drastically.  find out why and fix
       return (
         <Button
           variant="transparentNeutral"
@@ -54,9 +64,9 @@ export const CopyTextField: React.FC<CopyTextFieldProps> = ({
         >
           <div className="flex items-center space-x-2 px-2 rounded-full border border-neutral-2">
             {copied ? (
-              <VerifySuccess width={iconHeight} className="text-success animate-scale-up" />
+              <VerifySuccess {...iconProps} className="text-success animate-scale-up" />
             ) : (
-              <Copy width={iconHeight} />
+              <Copy {...iconProps} />
             )}
             <span className="text-sm ml-2.5">{displayText}</span>
           </div>
