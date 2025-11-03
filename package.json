@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check-types": "tsc",
     "prepare-zip": "yarn build && rm -f aria-wallet.zip && zip -r aria-wallet.zip dist/",
+    "prepare-zip:windows": "yarn build && node -e \"const fs = require('fs'); const {execSync} = require('child_process'); try { fs.unlinkSync('aria-wallet.zip') } catch(e) {}; if (process.platform === 'win32') { execSync('powershell -Command \\\"Compress-Archive -Path dist/* -DestinationPath aria-wallet.zip\\\"', {stdio: 'inherit'}) } else { execSync('zip -r aria-wallet.zip dist/', {stdio: 'inherit'}) }\"",
     "reinstall": "rm -rf node_modules yarn.lock && yarn install",
     "version:show": "node -e \"console.log(require('./package.json').version)\"",
     "set-version": "NODE_OPTIONS='--loader ts-node/esm' ts-node src/scripts/set-version.ts",
