@@ -1,7 +1,7 @@
-// OptionsDialog.tsx
 import { Dialog, DialogTrigger } from '@radix-ui/react-dialog';
 import {
   EditIcon,
+  GiftIcon,
   Globe,
   GraduationCap,
   LogOut,
@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 import { useAtomValue, useSetAtom } from 'jotai';
 
 import { ArrowLeft, Discord, DotsVertical } from '@/assets/icons';
-import { ROUTES, SYMPHONY_MAINNET_ID } from '@/constants';
+import { ROUTES, SYMPHONY_MAINNET_ID, REFERRAL_SERVICE_URL, SYMPHONY_PREFIX } from '@/constants';
 import { useLogout } from '@/hooks';
 import { Button, DialogContent, CopyTextField } from '@/ui-kit';
 import { walletAddressesAtom, updateChainWalletAtom } from '@/atoms';
@@ -24,54 +24,61 @@ import {
   freshReferralCodeAtom,
   updateReferralCodeAtom,
   clearReferralCodeAtom,
-} from '@/atoms/referralcodeatom';
+} from '@/atoms';
 import { getAddressByChainPrefix, getSessionToken } from '@/helpers';
 
 const OPTIONS = [
   {
     id: 1,
+    name: 'Redeem Referral Code',
+    icon: <GiftIcon width={16} height={16} />,
+    target: '',
+    to: ROUTES.APP.REDEEM_REFERRAL,
+  },
+  {
+    id: 2,
     name: 'Settings',
     icon: <Settings width={16} height={16} />,
     target: '',
     to: ROUTES.APP.SETTINGS,
   },
   {
-    id: 2,
+    id: 3,
     name: 'Change Password',
     icon: <NotebookPenIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.CHANGE_PASSWORD,
   },
   {
-    id: 3,
+    id: 4,
     name: 'View Passphrase',
     icon: <NotebookTextIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.VIEW_PASSPHRASE,
   },
   {
-    id: 4,
+    id: 5,
     name: 'Edit Coin List',
     icon: <EditIcon width={16} height={16} />,
     target: '',
     to: ROUTES.APP.EDIT_COIN_LIST,
   },
   {
-    id: 5,
+    id: 6,
     name: 'View Tutorial',
     icon: <GraduationCap width={16} height={16} />,
     target: '',
     to: ROUTES.APP.VIEW_TUTORIAL,
   },
   {
-    id: 6,
+    id: 7,
     name: 'Contact Us',
     icon: <Discord />,
     target: '_blank',
     to: 'https://discord.gg/symphony-1162823265975279636',
   },
   {
-    id: 7,
+    id: 8,
     name: 'Connected dApps',
     icon: <Globe />,
     target: '',
@@ -86,6 +93,8 @@ const formatReferralCode = (code: string): string => {
   return cleanCode.match(/.{1,4}/g)?.join('-') || cleanCode;
 };
 
+// TODO: add loader for code before it's pulled
+// TODO: add bounce effect to checkmark
 export const OptionsDialog: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -100,6 +109,14 @@ export const OptionsDialog: React.FC = () => {
   const updateUserReferral = useSetAtom(updateReferralCodeAtom);
   const clearUserReferral = useSetAtom(clearReferralCodeAtom);
 
+  console.log('[OptionsDialog] Current state:', {
+    userReferralCode,
+    isReferralCodeFresh,
+    freshReferralCode,
+    walletAddresses: Object.keys(walletAddresses),
+    hasSymphonyAddress: !!walletAddresses[SYMPHONY_MAINNET_ID],
+  });
+
   const handleLogOut = () => {
     // Clear referral data on logout
     clearUserReferral();
@@ -109,14 +126,17 @@ export const OptionsDialog: React.FC = () => {
   // Get mnemonic from session token
   const getMnemonic = (): string | null => {
     const sessionToken = getSessionToken();
+    console.log('[OptionsDialog] Session token exists:', !!sessionToken);
     return sessionToken?.mnemonic || null;
   };
 
   // Get or create Symphony mainnet address
   const getOrCreateSymphonyAddress = async (): Promise<string | null> => {
     const existingAddress = walletAddresses[SYMPHONY_MAINNET_ID];
+    console.log('[OptionsDialog] Existing Symphony address:', existingAddress);
 
     if (existingAddress && existingAddress.length > 0) {
+      console.log('[OptionsDialog] Using existing Symphony address');
       return existingAddress;
     }
 
@@ -127,13 +147,16 @@ export const OptionsDialog: React.FC = () => {
     }
 
     try {
-      // FIX: Use 'symphony' as the prefix, not SYMPHONY_MAINNET_ID
-      const symphonyAddress = await getAddressByChainPrefix(mnemonic, 'symphony');
+      console.log('[OptionsDialog] Generating new Symphony address from mnemonic');
+      const symphonyAddress = await getAddressByChainPrefix(mnemonic, SYMPHONY_PREFIX);
+      console.log('[OptionsDialog] Generated Symphony address:', symphonyAddress);
 
       updateChainWallet({
         chainId: SYMPHONY_MAINNET_ID,
         address: symphonyAddress,
       });
+
+      console.log('[OptionsDialog] Updated chain wallet with Symphony address');
       return symphonyAddress;
     } catch (error) {
       console.error('[OptionsDialog] Failed to generate Symphony address:', error);
@@ -141,8 +164,45 @@ export const OptionsDialog: React.FC = () => {
     }
   };
 
-  // Fetch user data only when needed
-  const fetchUserAndReferralCode = async (forceRefresh = false) => {
+  // Create referral code if user exists but doesn't have one
+  const createReferralCode = async (userId: string): Promise<string | null> => {
+    console.log('[OptionsDialog] Creating referral code for user:', userId);
+    try {
+      const response = await fetch(`${REFERRAL_SERVICE_URL}/user/${userId}/referral-code`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('[OptionsDialog] Referral code creation response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[OptionsDialog] Referral code created successfully:', data.data.referral_code);
+        return data.data.referral_code;
+      } else {
+        const errorText = await response.text();
+        console.error(
+          '[OptionsDialog] Failed to create referral code:',
+          response.status,
+          errorText,
+        );
+        return null;
+      }
+    } catch (error) {
+      console.error('[OptionsDialog] Error creating referral code:', error);
+      return null;
+    }
+  };
+
+  // Fetch user data and ensure they have a referral code
+  const fetchUserAndEnsureReferralCode = async (forceRefresh = false) => {
+    console.log(
+      '[OptionsDialog] fetchUserAndEnsureReferralCode called, forceRefresh:',
+      forceRefresh,
+    );
+
     // If data is fresh and we're not forcing a refresh, don't fetch
     if (
       isReferralCodeFresh &&
@@ -150,47 +210,92 @@ export const OptionsDialog: React.FC = () => {
       userReferralCode.referralCode &&
       !forceRefresh
     ) {
+      console.log('[OptionsDialog] Data is fresh, skipping fetch');
       return;
     }
 
+    console.log('[OptionsDialog] Starting to fetch Symphony address');
     const symphonyAddress = await getOrCreateSymphonyAddress();
     if (!symphonyAddress) {
       console.error('[OptionsDialog] No Symphony address available');
       return;
     }
+    console.log('[OptionsDialog] Using Symphony address:', symphonyAddress);
 
     setLoading(true);
     try {
       let currentUserId = userReferralCode.userId;
+      let currentReferralCode = userReferralCode.referralCode;
+
+      console.log(
+        '[OptionsDialog] Current user ID:',
+        currentUserId,
+        'Current referral code:',
+        currentReferralCode,
+      );
 
       // Only fetch user if we don't have a fresh user ID
       if (!currentUserId || forceRefresh) {
-        const userResponse = await fetch('https://echo.orchestralabs.org/user', {
+        console.log('[OptionsDialog] Fetching user data with address:', symphonyAddress);
+        const userResponse = await fetch(`${REFERRAL_SERVICE_URL}/user`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             cosmos_address: symphonyAddress,
+            evm_address: null,
+            svm_address: null,
           }),
         });
 
+        console.log('[OptionsDialog] User API response status:', userResponse.status);
+
         if (!userResponse.ok) {
           const errorText = await userResponse.text();
-          console.error('[OptionsDialog] User API error:', errorText);
+          console.error('[OptionsDialog] User API error:', userResponse.status, errorText);
           throw new Error(`Failed to get/create user: ${userResponse.status} ${errorText}`);
         }
 
         const userData = await userResponse.json();
+        console.log('[OptionsDialog] User API response data:', userData);
+
         currentUserId = userData.data.id;
+        console.log('[OptionsDialog] Setting user ID:', currentUserId);
+
         // Update atom with new user ID
         updateUserReferral({ userId: currentUserId });
+
+        // If we just created/found a user but don't have a referral code, create one
+        if (currentUserId && !currentReferralCode) {
+          console.log('[OptionsDialog] User exists but no referral code, creating one...');
+          currentReferralCode = await createReferralCode(currentUserId);
+          if (currentReferralCode) {
+            console.log('[OptionsDialog] Successfully created referral code:', currentReferralCode);
+            updateUserReferral({ referralCode: currentReferralCode });
+          } else {
+            console.error('[OptionsDialog] Failed to create referral code');
+          }
+        }
       }
 
-      // Only fetch referral code if we don't have a fresh one
-      if ((!freshReferralCode || forceRefresh) && currentUserId) {
+      // If we have a user ID but no referral code, create one
+      if (currentUserId && !currentReferralCode) {
+        console.log('[OptionsDialog] User ID exists but no referral code, creating one...');
+        currentReferralCode = await createReferralCode(currentUserId);
+        if (currentReferralCode) {
+          console.log('[OptionsDialog] Successfully created referral code:', currentReferralCode);
+          updateUserReferral({ referralCode: currentReferralCode });
+        } else {
+          console.error('[OptionsDialog] Failed to create referral code');
+        }
+      }
+
+      // Only fetch existing referral code if we still don't have one
+      if ((!freshReferralCode || forceRefresh) && currentUserId && !currentReferralCode) {
+        console.log('[OptionsDialog] Fetching existing referral code for user:', currentUserId);
         const referralResponse = await fetch(
-          `https://echo.orchestralabs.org/user/${currentUserId}/referral-code`,
+          `${REFERRAL_SERVICE_URL}/user/${currentUserId}/referral-code`,
           {
             method: 'GET',
             headers: {
@@ -199,36 +304,63 @@ export const OptionsDialog: React.FC = () => {
           },
         );
 
+        console.log(
+          '[OptionsDialog] Referral code fetch response status:',
+          referralResponse.status,
+        );
+
         if (referralResponse.ok) {
           const referralData = await referralResponse.json();
-          // TODO: amend from 'code' on db side, then trim here
-          const rawCode =
-            referralData.data.referral_code ||
-            referralData.data.code ||
-            referralData.data.referralCode;
+          console.log('[OptionsDialog] Referral code fetch response data:', referralData);
+          const rawCode = referralData.data.referral_code;
           // Update atom with new referral code
           updateUserReferral({ referralCode: rawCode });
+          console.log('[OptionsDialog] Updated referral code:', rawCode);
         } else {
           const errorText = await referralResponse.text();
-          console.error('[OptionsDialog] Referral API error:', errorText);
+          console.error('[OptionsDialog] Referral API error:', referralResponse.status, errorText);
         }
       }
+
+      console.log(
+        '[OptionsDialog] Final state - User ID:',
+        currentUserId,
+        'Referral Code:',
+        currentReferralCode,
+      );
     } catch (error) {
       console.error('[OptionsDialog] Failed to fetch user or referral code:', error);
     } finally {
+      console.log('[OptionsDialog] Finished fetch process');
       setLoading(false);
     }
   };
 
   // Fetch data on component mount if needed
   useEffect(() => {
+    console.log('[OptionsDialog] useEffect triggered', {
+      isReferralCodeFresh,
+      hasUserId: !!userReferralCode.userId,
+      hasReferralCode: !!userReferralCode.referralCode,
+    });
+
     if (!isReferralCodeFresh || !userReferralCode.userId || !userReferralCode.referralCode) {
-      fetchUserAndReferralCode();
+      console.log('[OptionsDialog] Conditions met, fetching data...');
+      fetchUserAndEnsureReferralCode();
+    } else {
+      console.log('[OptionsDialog] Conditions not met, skipping fetch');
     }
   }, []);
 
   const hasSymphonyAddress = !!walletAddresses[SYMPHONY_MAINNET_ID];
   const displayReferralCode = freshReferralCode || userReferralCode.referralCode;
+
+  console.log('[OptionsDialog] Render state:', {
+    loading,
+    hasSymphonyAddress,
+    displayReferralCode,
+    formattedCode: displayReferralCode ? formatReferralCode(displayReferralCode) : 'none',
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

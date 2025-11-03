@@ -3,6 +3,7 @@ export * from './ChangePassword';
 export * from './ChainSubscriptions';
 export * from './Main';
 export * from './MediaOnboarding';
+export * from './RedeemReferral';
 export * from './Send';
 export * from './Settings';
 export * from './SwapTutorial';

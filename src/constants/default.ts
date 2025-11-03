@@ -61,4 +61,7 @@ export const KNOWN_EPOCH_BASED_CHAINS = [
   'gravity-bridge-3',
 ];
 
+// Registry Service URL
 export const ORCHESTRA_REGISTRY_BASE = 'https://registry.orchestralabs.org';
+// Referral service URL
+export const REFERRAL_SERVICE_URL = 'https://echo.orchestralabs.org';

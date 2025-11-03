@@ -1,6 +1,5 @@
 import React, { lazy } from 'react';
 import { Navigate, useRoutes } from 'react-router-dom';
-
 import { ROUTES } from '@/constants';
 import { AuthGuard, GuestGuard } from '@/guards';
 import { ExpandedLayout } from '@/layouts';
@@ -26,6 +25,7 @@ import {
   WalletConnectLoader,
   WalletConnectPairings,
   WalletConnectSignTransaction,
+  RedeemReferral,
 } from '@/pages';
 
 const AuthLayout = lazy(() => import('@/layouts/auth/AuthLayout'));
@@ -95,6 +95,7 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
           path: ROUTES.APP.SETTINGS,
           element: <Settings />,
         },
+        { path: ROUTES.APP.REDEEM_REFERRAL, element: <RedeemReferral /> },
         {
           path: ROUTES.APP.VIEW_PASSPHRASE,
           element: <ViewPassphrase />,
