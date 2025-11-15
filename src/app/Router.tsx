@@ -27,6 +27,7 @@ import {
   WalletConnectSignTransaction,
   RedeemReferral,
 } from '@/pages';
+import { ReferralEarnings } from '@/pages/main/ReferralEarnings';
 
 const AuthLayout = lazy(() => import('@/layouts/auth/AuthLayout'));
 const MainLayout = lazy(() => import('@/layouts/main/MainLayout'));
@@ -96,6 +97,7 @@ export const AppRouter: React.FC = (): React.ReactElement | null =>
           element: <Settings />,
         },
         { path: ROUTES.APP.REDEEM_REFERRAL, element: <RedeemReferral /> },
+        { path: ROUTES.APP.REFERRAL_EARNINGS, element: <ReferralEarnings /> },
         {
           path: ROUTES.APP.VIEW_PASSPHRASE,
           element: <ViewPassphrase />,

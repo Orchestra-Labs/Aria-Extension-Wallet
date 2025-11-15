@@ -1,7 +1,11 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { fullChainRegistryAtom, isFetchingIbcDataAtom } from '@/atoms';
-import { getIbcRegistry, saveIbcRegistry } from '@/helpers/dataHelpers/ibcRegistry';
-import { fetchIbcRegistry, getLatestCommitHashes } from '@/helpers/fetchIbcRegistryData';
+import {
+  getIbcRegistry,
+  saveIbcRegistry,
+  fetchIbcRegistry,
+  getLatestCommitHashes,
+} from '@/helpers';
 import { DATA_FRESHNESS_TIMEOUT, NetworkLevel, ONE_DAY } from '@/constants';
 
 export function useIbcRegistryRefresh() {

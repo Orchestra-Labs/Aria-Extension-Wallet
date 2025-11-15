@@ -13,6 +13,7 @@ export const ROUTES = {
     EDIT_COIN_LIST: '/edit-coin-list',
     SETTINGS: '/settings',
     REDEEM_REFERRAL: '/redeem-referral',
+    REFERRAL_EARNINGS: '/app/referral-earnings',
     VIEW_PASSPHRASE: '/view-passphrase',
     CHANGE_PASSWORD: '/change-password',
     VIEW_TUTORIAL: '/view-tutorial',
