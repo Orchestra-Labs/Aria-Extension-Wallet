@@ -386,6 +386,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
         }),
       );
     }
+    // Case 4: Exchange on Osmosis
   } else if (!sendAndReceiveAssetsMatch && coinExchangeIsSupported) {
     const osmosisChainId = getOsmosisChainId(networkLevel);
 

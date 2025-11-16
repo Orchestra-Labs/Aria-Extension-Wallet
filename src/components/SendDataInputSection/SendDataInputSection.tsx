@@ -224,12 +224,14 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
     handleStateUpdate({
       newSendAsset: newAsset,
     });
+    requestSimulation(true);
   };
 
   const updateReceiveAsset = (newAsset: Asset) => {
     handleStateUpdate({
       newReceiveAsset: newAsset,
     });
+    requestSimulation(true);
   };
 
   const updateSendAmount = (amount: number) => {
