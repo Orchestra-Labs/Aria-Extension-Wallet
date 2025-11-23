@@ -19,6 +19,7 @@ export * from './osmosisApiHelper';
 export * from './priceCache';
 export * from './queryNodes';
 export * from './reachabilityHelper';
+export * from './revenueHelper';
 export * from './sendTransactions';
 export * from './signers';
 export * from './skipApiHelper';

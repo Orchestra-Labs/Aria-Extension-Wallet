@@ -233,28 +233,49 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     return;
   }
 
-  // Create a Set of all Skip-supported denoms
-  // const skipSupportedDenoms = new Set<string>();
-  // for (const asset of Object.values(skipAssets)) {
-  //   skipSupportedDenoms.add(asset.originDenom);
-  // }
-
   // Check denom support
-  // const isOriginalSendDenomSupported = skipSupportedDenoms.has(sendState.asset.originDenom);
-  // const isOriginalReceiveDenomSupported = skipSupportedDenoms.has(receiveState.asset.originDenom);
   const isSendDenomSupported = isOsmosisSupportedDenom(sendState.asset.originDenom);
   const isReceiveDenomSupported = isOsmosisSupportedDenom(receiveState.asset.originDenom);
   const coinExchangeIsSupported = isSendDenomSupported && isReceiveDenomSupported;
-
-  // // Check chain support
-  // const areChainsSkipSupported =
-  //   skipChains.includes(sendState.chainId) && skipChains.includes(receiveState.chainId);
 
   const sendAndReceiveAssetsMatch = sendState.asset.originDenom === receiveState.asset.originDenom;
   const sendAndReceiveChainsMatch = sendState.chainId === receiveState.chainId;
 
   // Check if this is a simple send (same asset on same chain)
   const isSimpleSend = sendAndReceiveChainsMatch && sendAndReceiveAssetsMatch;
+
+  console.log('[DEBUG][updateTransactionRouteAtom] Route matching conditions:', {
+    // Basic conditions
+    sendAndReceiveChainsMatch,
+    sendAndReceiveAssetsMatch,
+    isSimpleSend,
+
+    // Asset support conditions
+    isSendDenomSupported,
+    isReceiveDenomSupported,
+    coinExchangeIsSupported,
+
+    // Special cases
+    isValidStablecoinSwap,
+
+    // Asset details
+    sendAsset: {
+      symbol: sendState.asset.symbol,
+      originDenom: sendState.asset.originDenom,
+      originChainId: sendState.asset.originChainId,
+      currentChainId: sendState.chainId,
+    },
+    receiveAsset: {
+      symbol: receiveState.asset.symbol,
+      originDenom: receiveState.asset.originDenom,
+      originChainId: receiveState.asset.originChainId,
+      currentChainId: receiveState.chainId,
+    },
+
+    // Chain details
+    sendChainId: sendState.chainId,
+    receiveChainId: receiveState.chainId,
+  });
 
   // Helper function to create a transaction step (without log)
   const createStep = (
@@ -525,76 +546,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
       );
     }
   }
-
-  // // Case 4: Exchange (different assets) - handle bridge before/after as needed
-  // else if (!sendAndReceiveAssetsMatch && areChainsSkipSupported) {
-  //   console.log('[updateTransactionRouteAtom] Creating exchange route with bridge logic');
-
-  //   const needsBridgeBefore = !isSendAssetOnNativeChain && isOriginalSendDenomSupported;
-  //   const needsBridgeAfter = !isReceiveAssetOnNativeChain && isOriginalReceiveDenomSupported;
-
-  //   const exchangeFromAsset = {
-  //     ...sendState.asset,
-  //     denom: sendState.asset.originDenom,
-  //     chainId: sendState.asset.originChainId,
-  //   };
-  //   const exchangeToAsset = {
-  //     ...receiveState.asset,
-  //     denom: receiveState.asset.originDenom,
-  //     chainId: receiveState.asset.originChainId,
-  //   };
-
-  //   // Step 1: Bridge to native chain (if needed)
-  //   if (needsBridgeBefore) {
-  //     const useSkip =
-  //       skipChains.includes(sendState.chainId) &&
-  //       skipChains.includes(sendState.asset.originChainId);
-
-  //     steps.push(
-  //       createAndDescribeStep({
-  //         type: TransactionType.IBC_SEND,
-  //         via: useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
-  //         fromChainId: sendState.chainId,
-  //         toChainId: sendState.asset.originChainId,
-  //         fromAsset: sendState.asset,
-  //         toAsset: exchangeFromAsset,
-  //         isFirstStep: true,
-  //       }),
-  //     );
-  //   }
-
-  //   // Step 2: Exchange on native chains
-  //   steps.push(
-  //     createAndDescribeStep({
-  //       type: TransactionType.EXCHANGE,
-  //       via: TransferMethod.SKIP,
-  //       fromChainId: sendState.asset.originChainId,
-  //       toChainId: receiveState.asset.originChainId,
-  //       fromAsset: exchangeFromAsset,
-  //       toAsset: exchangeToAsset,
-  //       isFirstStep: !needsBridgeBefore,
-  //     }),
-  //   );
-
-  //   // Step 3: Bridge to destination chain (if needed)
-  //   if (needsBridgeAfter) {
-  //     const useSkip =
-  //       skipChains.includes(receiveState.asset.originChainId) &&
-  //       skipChains.includes(receiveState.chainId);
-
-  //     steps.push(
-  //       createAndDescribeStep({
-  //         type: TransactionType.IBC_SEND,
-  //         via: useSkip ? TransferMethod.SKIP : TransferMethod.STANDARD,
-  //         fromChainId: receiveState.asset.originChainId,
-  //         toChainId: receiveState.chainId,
-  //         fromAsset: exchangeToAsset,
-  //         toAsset: receiveState.asset,
-  //         isFirstStep: false,
-  //       }),
-  //     );
-  //   }
-  // }
 
   if (steps.length === 0) {
     console.warn('[updateTransactionRouteAtom] No route conditions were met');

@@ -5,6 +5,7 @@ import {
   IBC_PREFIX,
   NetworkLevel,
   OSMOSIS_ENDPOINTS,
+  OSMOSIS_REVENUE_CONFIG,
 } from '@/constants';
 import { Asset, FeeToken, LocalChainRegistry, SimplifiedChainInfo, Uri } from '@/types';
 import { queryRestNode } from './queryNodes';
@@ -18,10 +19,6 @@ import { getKeplrStyleGasEstimates } from './exchangeTransactions';
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 
 const { swapExactAmountIn } = osmosis.gamm.v1beta1.MessageComposer.withTypeUrl;
-
-const SWAP_CONTRACT_ADDRESS = 'osmo1xwlfclwa356qjxwdrgccx4r9733d32w9t55knfqt7wvajwtdyq2s2ferqt';
-const FEE_COLLECTOR_ADDRESS = 'osmo1cpel203ms5c8q8ycycm773a0szmhmag70n9drq';
-const FEE_PERCENT = '0.5';
 
 export interface OsmosisPoolAsset {
   token: { denom: string; amount: string };
@@ -489,22 +486,18 @@ export async function getOsmosisDEXRoutes(
     const data: RouteResponse = await response.json();
 
     // Convert route response to osmojs format
-    const routes = data.route.flatMap(routeSegment =>
-      routeSegment.pools.map(pool => ({
-        poolId: pool.id.toString(),
-        tokenOutDenom: pool.token_out_denom,
-      })),
-    );
+    const routes = data.route
+      .flatMap(routeSegment =>
+        routeSegment.pools.map(pool => ({
+          poolId: pool.id.toString(),
+          tokenOutDenom: pool.token_out_denom,
+        })),
+      )
+      .filter(route => route.tokenOutDenom !== tokenInDenom); // Filter out invalid hops
 
     // Calculate tokenOutMinAmount with 1% slippage tolerance
     const amountOut = data.amount_out;
     const minAmount = Math.floor(parseInt(amountOut) * 0.99).toString();
-
-    console.log('[DEBUG][getOsmosisDEXRoutes] route response:', {
-      routes,
-      amountOut,
-      tokenOutMinAmount: minAmount,
-    });
 
     return {
       routes,
@@ -760,6 +753,9 @@ async function simulateDirectSwap({
   };
 }
 
+// TODO: fix.  currently on 1 usdc to osmo, shows 1.89 in fees at 0.0001% fee of total, so percent and fee are both wrong.
+// sending 2 usdc to osmo correctly shows 0.49 usdc fee.
+// seems to be fixed after some number of timed refreshes
 async function simulateUseSmartContract({
   signingClient,
   senderAddress,
@@ -788,8 +784,54 @@ async function simulateUseSmartContract({
   msg: any;
   gasEstimated: number;
 }> {
-  // Prepare smart contract message
-  // TODO: factor fee percent into tokenOutMinAmount
+  console.log('[DEBUG][simulateUseSmartContract] Validating routes:', {
+    inputDenom: tokenIn.denom,
+    outputDenom: tokenOutDenom,
+    routeCount: routes.length,
+    routes: routes.map((r, i) => ({
+      hop: i + 1,
+      poolId: r.poolId,
+      tokenOutDenom: r.tokenOutDenom,
+    })),
+  });
+
+  // VALIDATE ROUTES: Check that no hop has same input/output denom
+  let currentDenom = tokenIn.denom;
+  for (let i = 0; i < routes.length; i++) {
+    const route = routes[i];
+
+    if (route.tokenOutDenom === currentDenom) {
+      console.error('[DEBUG][simulateUseSmartContract] Invalid route - same denom in hop:', {
+        hop: i + 1,
+        currentDenom,
+        routeTokenOut: route.tokenOutDenom,
+        poolId: route.poolId,
+      });
+
+      // Fix: Get the correct route structure from SQS response
+      throw new Error(`Invalid route: Hop ${i + 1} has same input/output denom (${currentDenom})`);
+    }
+
+    currentDenom = route.tokenOutDenom;
+  }
+
+  // Final validation: last hop should output to desired tokenOutDenom
+  if (currentDenom !== tokenOutDenom) {
+    console.warn('[DEBUG][simulateUseSmartContract] Route final output mismatch:', {
+      expected: tokenOutDenom,
+      actual: currentDenom,
+      routes: routes.map(r => r.tokenOutDenom),
+    });
+
+    // For smart contract, we need to ensure the final output matches
+    // Create a corrected routes array
+    const correctedRoutes = [...routes];
+    if (correctedRoutes.length > 0) {
+      correctedRoutes[correctedRoutes.length - 1].tokenOutDenom = tokenOutDenom;
+    }
+  }
+
+  // Prepare smart contract message with validated routes
   const swapMsg: SwapMessage = {
     swap: {
       routes: routes.map(route => ({
@@ -800,16 +842,21 @@ async function simulateUseSmartContract({
         denom: tokenOutDenom,
         amount: tokenOutMinAmount,
       },
-      fee_percentage: FEE_PERCENT,
-      fee_collector: FEE_COLLECTOR_ADDRESS,
+      fee_percentage: OSMOSIS_REVENUE_CONFIG.FEE_PERCENT_STRING,
+      fee_collector: OSMOSIS_REVENUE_CONFIG.FEE_COLLECTOR_ADDRESS,
     },
   };
+
+  console.log('[DEBUG][simulateUseSmartContract] Final swap message:', {
+    routes: swapMsg.swap.routes,
+    tokenOutMinAmount: swapMsg.swap.token_out_min_amount,
+  });
 
   const executeMsg = {
     typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
     value: {
       sender: senderAddress,
-      contract: SWAP_CONTRACT_ADDRESS,
+      contract: OSMOSIS_REVENUE_CONFIG.CONTRACT_ADDRESS,
       msg: Buffer.from(JSON.stringify(swapMsg)),
       funds: [coin(tokenIn.amount, tokenIn.denom)],
     },
@@ -824,19 +871,28 @@ async function simulateUseSmartContract({
   try {
     gasEstimated = await signingClient.simulate(senderAddress, [executeMsg], memo);
     gasWithBuffer = Math.ceil(gasEstimated * gasMultiplier);
-    console.log('[DEBUG][generateSmartContractSwapData] Using simulated gas:', gasWithBuffer);
+    console.log('[DEBUG][simulateUseSmartContract] Using simulated gas:', gasWithBuffer);
   } catch (simulationError) {
     console.warn(
-      '[DEBUG][generateSmartContractSwapData] Simulation failed, using fallback estimate:',
+      '[DEBUG][simulateUseSmartContract] Simulation failed, using route-based fallback:',
       simulationError,
     );
-    const fallbackGas = 400000;
+
+    // IMPROVED FALLBACK: Calculate gas based on route complexity
+    const baseGasPerHop = 200000;
+    const gasPerHop = routes.length > 1 ? 300000 : 200000; // Multi-hop needs more gas
+    const fallbackGas = baseGasPerHop + routes.length * gasPerHop;
+
     gasEstimated = fallbackGas;
     gasWithBuffer = Math.ceil(gasEstimated * gasMultiplier);
-    console.log(
-      '[DEBUG][generateSmartContractSwapData] Using fallback gas estimate:',
+
+    console.log('[DEBUG][simulateUseSmartContract] Using route-based fallback gas:', {
+      routes: routes.length,
+      baseGas: baseGasPerHop,
+      gasPerHop,
+      fallbackGas,
       gasWithBuffer,
-    );
+    });
   }
 
   const feeAmount = Math.ceil(gasWithBuffer * gasPrice);
@@ -845,7 +901,12 @@ async function simulateUseSmartContract({
     gas: gasWithBuffer.toString(),
   };
 
-  console.log('[DEBUG][generateSmartContractSwapData] Calculated fee amount:', feeAmount);
+  console.log('[DEBUG][simulateUseSmartContract] Calculated fee:', {
+    feeAmount,
+    gasWithBuffer,
+    gasPrice,
+    selectedFeeTokenDenom,
+  });
 
   return {
     fee,

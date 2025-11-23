@@ -33,7 +33,6 @@ export const fetchOrchestraChainRegistry = async (): Promise<ChainRegistryData |
     if (response.data.data.mainnet) {
       for (const [chainId, chainData] of Object.entries(response.data.data.mainnet)) {
         const chain = chainData as any;
-        console.log(`[OrchestraRegistry] Processing mainnet chain ${chainId}:`, chain);
 
         transformedData.mainnet[chainId] = {
           chain_name: chain.chain_name,
@@ -58,7 +57,6 @@ export const fetchOrchestraChainRegistry = async (): Promise<ChainRegistryData |
     if (response.data.data.testnet) {
       for (const [chainId, chainData] of Object.entries(response.data.data.testnet)) {
         const chain = chainData as any;
-        console.log(`[OrchestraRegistry] Processing testnet chain ${chainId}:`, chain);
 
         transformedData.testnet[chainId] = {
           chain_name: chain.chain_name,

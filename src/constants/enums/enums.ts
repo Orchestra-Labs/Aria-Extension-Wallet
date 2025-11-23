@@ -75,3 +75,11 @@ export enum SettingsOption {
   VALIDATOR_STATUS = 'viewValidatorsByStatus',
   TESTNET_ACCESS = 'enableTestnetAccess',
 }
+
+export enum RevenueEventType {
+  ON_RAMPING = 'on_ramping',
+  OFF_RAMPING = 'off_ramping',
+  CURRENCY_TRADE = 'currency_trade',
+  AI_SUBSCRIPTION = 'ai_subscription',
+  STAKING_SERVICE_FEE = 'staking_service_fee',
+}

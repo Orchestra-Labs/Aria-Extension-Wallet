@@ -8,7 +8,7 @@ import {
   transactionRouteAtom,
 } from '@/atoms';
 import { formatLowBalanceDisplay } from '@/helpers';
-import { getStepLogAtom } from '@/atoms/transactionLogsAtom';
+import { getStepLogAtom } from '@/atoms';
 import { TransactionStep } from '@/types';
 
 export const TransactionInfoPanel = () => {

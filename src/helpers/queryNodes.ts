@@ -358,8 +358,6 @@ const queryWithRetry = async ({
         const mnemonic = sessionToken.mnemonic;
         const address = await getAddressByChainPrefix(mnemonic, prefix);
 
-        console.error('[DEBUG][queryNodes] current Uri:', currentUri);
-
         const transactionSigner = await getCachedSigner(endpoint, currentUri, mnemonic, prefix);
 
         const result = await performRpcQuery(

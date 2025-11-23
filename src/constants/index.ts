@@ -1,6 +1,7 @@
 export * from './default';
 export * from './endpoints';
 export * from './localRegistry';
+export * from './revenue';
 export * from './enums';
 export * from './routes';
 export * from './time';
