@@ -34,7 +34,7 @@ export async function recordRevenueEvent(
   eventData: RevenueEventRequest,
 ): Promise<RevenueEventResponse> {
   try {
-    const response = await fetch(`${REFERRAL_SERVICE_URL}/revenue/record`, {
+    const response = await fetch(`${REFERRAL_SERVICE_URL}/revenue`, {
       method: QueryType.POST,
       headers: {
         'Content-Type': 'application/json',
