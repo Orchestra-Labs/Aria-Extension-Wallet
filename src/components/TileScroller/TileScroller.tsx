@@ -49,6 +49,9 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
     const [isRefreshComplete, setIsRefreshComplete] = useState(true);
     const [dragDistance, setDragDistance] = useState(0);
 
+    // Determine if refresh functionality is enabled
+    const isRefreshEnabled = !!onRefresh;
+
     const { observe, unobserve } = useIntersectionObserver(
       entries => {
         entries.forEach(entry => {
@@ -318,15 +321,18 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
           }}
           {...bind()}
         >
-          <animated.div
-            className="absolute top-[-52px] left-0 right-0 flex justify-center items-center h-12 select-none"
-            style={{
-              opacity: loaderOpacity,
-              transform: y.to(v => `translateY(${Math.max(v - 52, -52)}px)`),
-            }}
-          >
-            <Loader isSpinning={isRefreshTriggered || isRefreshing} />
-          </animated.div>
+          {/* Conditionally render the loader container only when refresh is enabled */}
+          {isRefreshEnabled && (
+            <animated.div
+              className="absolute top-[-52px] left-0 right-0 flex justify-center items-center h-12 select-none"
+              style={{
+                opacity: loaderOpacity,
+                transform: y.to(v => `translateY(${Math.max(v - 52, -52)}px)`),
+              }}
+            >
+              <Loader isSpinning={isRefreshTriggered || isRefreshing} />
+            </animated.div>
+          )}
 
           {React.Children.toArray(children).slice(0, visibleCount)}
         </animated.div>

@@ -45,7 +45,7 @@ export const AssetScroller: React.FC<AssetScrollerProps> = ({
     <TileScroller
       ref={tileScrollerRef}
       isRefreshing={isFetching}
-      onRefresh={handleRefresh}
+      onRefresh={isReceiveDialog ? undefined : handleRefresh}
       lazyLoad={lazyLoad}
     >
       {assets.length === 0 ? (
