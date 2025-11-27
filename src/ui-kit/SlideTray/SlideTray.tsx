@@ -84,20 +84,31 @@ export const SlideTray = forwardRef<SlideTrayHandle, SlideTrayProps>(
     const calculateDismissThreshold = () => {
       if (trayRef.current) {
         const threshold = trayRef.current.clientHeight * dismissThresholdPercentage;
-
         return threshold;
       }
       return 0;
     };
 
-    // Gesture handling for swipe to dismiss
+    // Improved gesture handling for swipe to dismiss
     const bind = useGesture({
       onDrag: ({
         movement: [, my],
         memo = trayRef.current?.getBoundingClientRect().top,
         event,
+        target,
       }) => {
         event.stopPropagation();
+
+        // Prevent drag if the event originated from a scrollbar or scrollable content
+        const element = target as HTMLElement;
+        if (
+          element.closest('.scroll-area') ||
+          element.closest('[data-radix-scroll-area-viewport]') ||
+          element.classList.contains('scrollbar') ||
+          element.closest('[role="scrollbar"]')
+        ) {
+          return memo;
+        }
 
         if (isMouseDown) {
           setIsDragging(true);
@@ -109,8 +120,20 @@ export const SlideTray = forwardRef<SlideTrayHandle, SlideTrayProps>(
         }
         return memo;
       },
-      onDragEnd: ({ movement: [, my] }) => {
+      onDragEnd: ({ movement: [, my], target }) => {
         setIsDragging(false);
+
+        // Prevent dismiss if the event originated from a scrollbar
+        const element = target as HTMLElement;
+        if (
+          element.closest('.scroll-area') ||
+          element.closest('[data-radix-scroll-area-viewport]') ||
+          element.classList.contains('scrollbar') ||
+          element.closest('[role="scrollbar"]')
+        ) {
+          resetTrayPosition();
+          return;
+        }
 
         if (trayRef.current) {
           const threshold = calculateDismissThreshold();
@@ -179,7 +202,6 @@ export const SlideTray = forwardRef<SlideTrayHandle, SlideTrayProps>(
       dismissTray();
     };
 
-    // TODO: darken slidetray
     return (
       <DialogPrimitive.Root
         open={open}

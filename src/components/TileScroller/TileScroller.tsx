@@ -47,6 +47,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
     const [dragStarted, setDragStarted] = useState(false);
     const [isRefreshTriggered, setIsRefreshTriggered] = useState(false);
     const [isRefreshComplete, setIsRefreshComplete] = useState(true);
+    const [_, setIsScrollbarInteraction] = useState(false);
 
     const { observe, unobserve } = useIntersectionObserver(
       entries => {
@@ -155,6 +156,18 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
       }
     }, [isRefreshing, isRefreshTriggered, api]);
 
+    // Check if interaction is with scrollbar
+    const isScrollbarClick = (event: React.MouseEvent | MouseEvent) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return false;
+
+      const rect = viewport.getBoundingClientRect();
+      const scrollbarWidth = 6; // Approximate scrollbar width
+      const isNearRightEdge = event.clientX > rect.right - scrollbarWidth - 5;
+
+      return isNearRightEdge && event.clientX <= rect.right;
+    };
+
     const bind = useDrag(
       ({
         movement: [, my],
@@ -163,8 +176,21 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
         dragging,
         last,
         velocity,
+        target,
       }) => {
         event.stopPropagation();
+
+        // Check if this is a scrollbar interaction
+        const element = target as HTMLElement;
+        const isScrollbar =
+          isScrollbarClick(event as MouseEvent) ||
+          element.closest('[role="scrollbar"]') ||
+          element.classList.contains('scrollbar');
+
+        if (isScrollbar) {
+          setIsScrollbarInteraction(true);
+          return memo;
+        }
 
         if (!isMouseDown || !event.target || (event.target as HTMLElement).closest('.slide-tray')) {
           return memo;
@@ -216,10 +242,18 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
       },
     );
 
-    const handleMouseDown = () => setIsMouseDown(true);
+    const handleMouseDown = (e: React.MouseEvent) => {
+      if (isScrollbarClick(e)) {
+        setIsScrollbarInteraction(true);
+        return;
+      }
+      setIsMouseDown(true);
+    };
+
     const handleMouseUp = () => {
       setIsMouseDown(false);
       setDragStarted(false);
+      setIsScrollbarInteraction(false);
       if (!isRefreshTriggered) {
         api.start({ y: 0, loaderOpacity: 0 });
       }
@@ -229,6 +263,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
       const resetDrag = () => {
         setIsMouseDown(false);
         setDragStarted(false);
+        setIsScrollbarInteraction(false);
         if (!isRefreshTriggered) {
           api.start({ y: 0, loaderOpacity: 0 });
         }
@@ -247,7 +282,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
 
     return (
       <ScrollArea
-        className="flex-grow w-full overflow-y-auto border border-neutral-3 rounded-md select-none"
+        className="flex-grow w-full overflow-y-auto border border-neutral-3 rounded-md select-none scroll-area"
         type="always"
         scrollbarProps={{}}
         viewportRef={viewportRef}
