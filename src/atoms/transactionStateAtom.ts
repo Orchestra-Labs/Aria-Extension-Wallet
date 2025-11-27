@@ -473,8 +473,9 @@ export const canRunSimulationAtom = atom(get => {
   const isTxSuccess = get(isTransactionSuccessAtom);
   const isTxRunning = get(isTxRunningAtom);
 
+  const hasNonZeroAmount = sendState.amount > 0 && sendState.displayAmount > 0;
   const hasValidAmount =
-    !isNaN(sendState.amount) && sendState.amount > 0 && sendState.amount <= maxAvailable;
+    !isNaN(sendState.amount) && hasNonZeroAmount && sendState.amount <= maxAvailable;
 
   const needsInvalidation =
     simulationInvalidation.shouldInvalidate ||

@@ -70,6 +70,12 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   const placeHolder = `Max: ${formatBalanceDisplay(`${maxDisplayAvailable}`, sendState.asset.symbol)}`;
 
   const requestSimulation = (immediate = false) => {
+    // NOTE: may be redundant.  remove if redundant (but TEST)
+    const hasNonZeroAmount = sendState.amount > 0 && sendState.displayAmount > 0;
+    const hasValidAmount =
+      !isNaN(sendState.amount) && hasNonZeroAmount && sendState.amount <= maxAvailable;
+    if (!hasValidAmount) return;
+
     if (immediate) {
       // For immediate requests (user input), set pending flag and reset invalidation
       setPendingSimulationRequest(true);
