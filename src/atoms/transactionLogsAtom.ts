@@ -25,6 +25,12 @@ export const updateStepLogAtom = atom(
     const route = get(transactionRouteAtom);
     const step = route.steps.find(s => s.hash === params.stepHash);
 
+    // NOTE: Handle description: preserve existing if not provided
+    let finalDescription = existingLog.description;
+    if (params.log.description !== undefined) {
+      finalDescription = params.log.description;
+    }
+
     // Handle fee data update - preserve existing if not provided
     let finalFeeData = existingLog.fees || [];
     // Priority 1: Use explicitly provided feeData
@@ -94,10 +100,7 @@ export const updateStepLogAtom = atom(
 
     // Merge all properties with proper preservation logic
     const updatedLog: TransactionLog = {
-      description:
-        params.log.description !== undefined
-          ? params.log.description
-          : existingLog.description || '',
+      description: finalDescription,
       status:
         params.log.status !== undefined
           ? params.log.status
@@ -137,40 +140,49 @@ export const createStepLogAtom = atom(
   ) => {
     const stepHash = params.step.hash;
     const currentLogs = get(transactionLogsAtom);
+
     const getChainInfo = get(chainInfoAtom);
 
-    if (!currentLogs[stepHash]) {
-      // Get chain info to determine default fee token
-      const chainInfo = getChainInfo(params.step.fromChain);
+    // ALWAYS update the description, even if log exists
+    const existingLog = currentLogs[stepHash] || {};
 
-      // Determine the fee token based on the send asset
-      const feeTokenResult = determineFeeToken(params.step.fromAsset, chainInfo);
-      const feeToken = feeTokenResult?.feeToken || DEFAULT_FEE_TOKEN;
-      const gasPrice = feeToken?.gasPriceStep?.average || 0;
+    // Get chain info to determine default fee token
+    const chainInfo = getChainInfo(params.step.fromChain);
 
-      // Get the symbol for display
-      const feeSymbol = feeTokenResult?.symbol || feeToken.denom;
-      const feeObject = {
-        amount: 0,
-        asset: params.step.fromAsset,
-        chainId: params.step.fromChain,
-        feeToken: feeToken,
-        gasWanted: 0,
-        gasPrice: gasPrice,
-      };
+    // Determine the fee token based on the send asset
+    const feeTokenResult = determineFeeToken(params.step.fromAsset, chainInfo);
+    const feeToken = feeTokenResult?.feeToken || DEFAULT_FEE_TOKEN;
+    const gasPrice = feeToken?.gasPriceStep?.average || 0;
 
-      set(transactionLogsAtom, {
-        ...currentLogs,
-        [stepHash]: {
-          description: params.description,
-          status: TransactionStatus.IDLE,
-          fees: [feeObject],
-          feeSymbol: feeSymbol,
-          inputAmount: params.initialAmounts?.inputAmount || '0',
-          outputAmount: params.initialAmounts?.outputAmount || '0',
-        },
-      });
-    }
+    // Get the symbol for display
+    const feeSymbol = feeTokenResult?.symbol || feeToken.denom;
+    const feeObject = {
+      amount: 0,
+      asset: params.step.fromAsset,
+      chainId: params.step.fromChain,
+      feeToken: feeToken,
+      gasWanted: 0,
+      gasPrice: gasPrice,
+    };
+
+    // Create or update the log with the new description
+    const updatedLog: TransactionLog = {
+      description: params.description, // ALWAYS use the provided description
+      status: existingLog.status || TransactionStatus.IDLE,
+      fees: existingLog.fees || [feeObject],
+      feeSymbol: existingLog.feeSymbol || feeSymbol,
+      inputAmount: params.initialAmounts?.inputAmount || existingLog.inputAmount || '0',
+      outputAmount: params.initialAmounts?.outputAmount || existingLog.outputAmount || '0',
+      txHash: existingLog.txHash,
+      error: existingLog.error,
+      skipRoute: existingLog.skipRoute,
+      exchangeRate: existingLog.exchangeRate,
+    };
+
+    set(transactionLogsAtom, {
+      ...currentLogs,
+      [stepHash]: updatedLog,
+    });
 
     return stepHash;
   },
