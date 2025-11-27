@@ -116,8 +116,6 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
             onClick={handleAssetSelection}
             isSelectable
             isReceiveDialog={isReceiveDialog}
-            // NOTE: lazyload is breaking here.  don't know why
-            lazyLoad={false}
           />
         )}
 
