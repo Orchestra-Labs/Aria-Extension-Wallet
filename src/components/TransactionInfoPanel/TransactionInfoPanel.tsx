@@ -40,6 +40,7 @@ export const TransactionInfoPanel = () => {
       stepType: step.type,
       stepHash: step.hash,
       hasLog: !!log,
+      log: log,
       description: log?.description,
       status: log?.status,
     });

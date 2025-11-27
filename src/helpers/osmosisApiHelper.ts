@@ -485,18 +485,21 @@ export async function getOsmosisDEXRoutes(
 
     const data: RouteResponse = await response.json();
 
-    // Convert route response to osmojs format
-    const routes = data.route
-      .flatMap(routeSegment =>
-        routeSegment.pools.map(pool => ({
-          poolId: pool.id.toString(),
-          tokenOutDenom: pool.token_out_denom,
-        })),
-      )
-      .filter(route => route.tokenOutDenom !== tokenInDenom); // Filter out invalid hops
+    if (!data.route || data.route.length === 0) {
+      throw new Error('No routes returned from Osmosis SQS');
+    }
 
-    // Calculate tokenOutMinAmount with 1% slippage tolerance
-    const amountOut = data.amount_out;
+    // Use 'out_amount' (not amount_out) for sorting individual routes
+    const bestRoute = data.route.sort((a, b) => Number(b.out_amount) - Number(a.out_amount))[0];
+
+    // Map the pools from the single best route
+    const routes = bestRoute.pools.map(pool => ({
+      poolId: pool.id.toString(),
+      tokenOutDenom: pool.token_out_denom,
+    }));
+
+    // Use 'out_amount' from the specific best route
+    const amountOut = bestRoute.out_amount;
     const minAmount = Math.floor(parseInt(amountOut) * 0.99).toString();
 
     return {
@@ -509,7 +512,6 @@ export async function getOsmosisDEXRoutes(
     throw error;
   }
 }
-
 // TODO: allow for setting via amount out
 // NOTE: documentation at https://docs.osmosis.zone/osmojs/#doing-a-swap
 export async function useOsmosisDEX({
