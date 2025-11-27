@@ -47,7 +47,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
     const [dragStarted, setDragStarted] = useState(false);
     const [isRefreshTriggered, setIsRefreshTriggered] = useState(false);
     const [isRefreshComplete, setIsRefreshComplete] = useState(true);
-    const [_, setIsScrollbarInteraction] = useState(false);
+    const [dragDistance, setDragDistance] = useState(0);
 
     const { observe, unobserve } = useIntersectionObserver(
       entries => {
@@ -137,13 +137,14 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
     }, []);
 
     useImperativeHandle(ref, () => ({
-      shouldPreventClick: () => dragStarted || isRefreshTriggered,
+      shouldPreventClick: () => dragStarted || isRefreshTriggered || dragDistance > 5,
     }));
 
     const TOP_OVERSCROLL_LIMIT = 52;
     const OVERSCROLL_ACTIVATION_THRESHOLD = TOP_OVERSCROLL_LIMIT * 0.75;
     const BOTTOM_OVERSCROLL_PERCENTAGE = 0.075;
     const MAX_REFRESH_VELOCITY = 0.5;
+    const DRAG_THRESHOLD = 5;
 
     const [{ y, loaderOpacity }, api] = useSpring(() => ({ y: 0, loaderOpacity: 0 }));
 
@@ -177,6 +178,7 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
         last,
         velocity,
         target,
+        distance,
       }) => {
         event.stopPropagation();
 
@@ -188,7 +190,6 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
           element.classList.contains('scrollbar');
 
         if (isScrollbar) {
-          setIsScrollbarInteraction(true);
           return memo;
         }
 
@@ -196,7 +197,13 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
           return memo;
         }
 
-        if (!dragStarted && my !== 0) setDragStarted(true);
+        // Update drag distance for click prevention (use the y distance)
+        const yDistance = Math.abs(distance[1]);
+        setDragDistance(yDistance);
+
+        if (!dragStarted && yDistance > DRAG_THRESHOLD) {
+          setDragStarted(true);
+        }
 
         if (viewportRef.current) {
           const viewport = viewportRef.current;
@@ -234,7 +241,11 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
               api.start({ y: 0, loaderOpacity: 0 });
             }
 
-            setDragStarted(false);
+            // Reset drag states after a short delay to ensure click prevention
+            setTimeout(() => {
+              setDragStarted(false);
+              setDragDistance(0);
+            }, 100);
           }
         }
 
@@ -244,28 +255,39 @@ export const TileScroller = forwardRef<TileScrollerHandle, TileScrollerProps>(
 
     const handleMouseDown = (e: React.MouseEvent) => {
       if (isScrollbarClick(e)) {
-        setIsScrollbarInteraction(true);
         return;
       }
       setIsMouseDown(true);
+      setDragDistance(0);
     };
 
     const handleMouseUp = () => {
       setIsMouseDown(false);
-      setDragStarted(false);
-      setIsScrollbarInteraction(false);
+
+      // Only reset dragStarted if we're not in a refresh state
       if (!isRefreshTriggered) {
         api.start({ y: 0, loaderOpacity: 0 });
+
+        // Reset drag states after a short delay
+        setTimeout(() => {
+          setDragStarted(false);
+          setDragDistance(0);
+        }, 100);
       }
     };
 
     useEffect(() => {
       const resetDrag = () => {
         setIsMouseDown(false);
-        setDragStarted(false);
-        setIsScrollbarInteraction(false);
+
         if (!isRefreshTriggered) {
           api.start({ y: 0, loaderOpacity: 0 });
+
+          // Reset drag states after a short delay
+          setTimeout(() => {
+            setDragStarted(false);
+            setDragDistance(0);
+          }, 100);
         }
       };
 

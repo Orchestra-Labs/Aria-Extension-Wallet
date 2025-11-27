@@ -30,6 +30,7 @@ interface AssetTileProps {
   isReceiveDialog?: boolean;
   multiSelectEnabled?: boolean;
   onClick?: (asset: Asset) => void;
+  shouldPreventClick?: () => boolean;
 }
 
 export const AssetTile = ({
@@ -38,6 +39,7 @@ export const AssetTile = ({
   isReceiveDialog = false,
   multiSelectEnabled = false,
   onClick,
+  shouldPreventClick,
 }: AssetTileProps) => {
   const slideTrayRef = useRef<SlideTrayHandle>(null);
 
@@ -102,7 +104,14 @@ export const AssetTile = ({
     navigate(ROUTES.APP.SEND);
   };
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // Check if click should be prevented
+    if (shouldPreventClick?.()) {
+      return;
+    }
+
     if (onClick) {
       setDialogSelectedAsset(asset);
       onClick(asset);
@@ -119,23 +128,19 @@ export const AssetTile = ({
     setTimeout(() => setCopied(false), ICON_CHANGEOVER_TIMEOUT);
   };
 
+  // For selectable tiles, handle click directly on the tile
+  const handleTileClick = (e: React.MouseEvent) => {
+    // Only handle click if it's not coming from a prevented element
+    const target = e.target as HTMLElement;
+    const isPreventedButton = target.closest('[data-prevent-tray-open]');
+
+    if (!isPreventedButton && isSelectable && onClick) {
+      handleClick(e);
+    }
+  };
+
   const scrollTile = (
-    <div
-      onClick={e => {
-        // Only handle click if it's not coming from a prevented element
-        const target = e.target as HTMLElement;
-        const isPreventedButton = target.closest('[data-prevent-tray-open]');
-
-        if (!isPreventedButton && !isSelectable) {
-          // For non-selectable tiles, let SlideTray handle the opening
-          return;
-        }
-
-        if (!isPreventedButton && isSelectable) {
-          handleClick();
-        }
-      }}
-    >
+    <div onClick={handleTileClick}>
       <ScrollTile
         title={title}
         value={value}
