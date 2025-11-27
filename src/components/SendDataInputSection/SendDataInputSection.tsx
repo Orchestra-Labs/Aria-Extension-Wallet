@@ -241,6 +241,12 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   };
 
   const updateSendAmount = (amount: number) => {
+    // If input is empty (NaN), treat it as a full clear action
+    if (isNaN(amount)) {
+      clearAmount();
+      return;
+    }
+
     handleStateUpdate({
       newSendAmount: amount,
     });
@@ -248,6 +254,12 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   };
 
   const updateReceiveAmount = (amount: number) => {
+    // If input is empty (NaN), treat it as a full clear action
+    if (isNaN(amount)) {
+      clearAmount();
+      return;
+    }
+
     handleStateUpdate({
       newReceiveAmount: amount,
     });
