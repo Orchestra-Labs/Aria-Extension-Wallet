@@ -407,19 +407,20 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
         }),
       );
     }
-    // Case 4: Exchange on Osmosis
-  } else if (!sendAndReceiveAssetsMatch && coinExchangeIsSupported) {
+  }
+  // Case 4: Exchange on Osmosis
+  else if (!sendAndReceiveAssetsMatch && coinExchangeIsSupported) {
     const osmosisChainId = getOsmosisChainId(networkLevel);
 
-    const isSendAssetOnOsmosis = sendState.chainId === osmosisChainId;
-    const isReceiveAssetOnOsmosis = receiveState.chainId === osmosisChainId;
+    const isSendChainOsmosis = sendState.chainId === osmosisChainId;
+    const receiveChainIsNotOsmosis = receiveState.chainId !== osmosisChainId;
 
     // Check if assets are on their native chains
     const isSendAssetOnNativeChain = sendState.chainId === sendState.asset.originChainId;
-    const isReceiveAssetOnNativeChain = receiveState.chainId === receiveState.asset.originChainId;
+    const destinationIsNotNativeChain = receiveState.chainId !== receiveState.asset.originChainId;
 
-    const needsBridgeToOsmosis = !isSendAssetOnOsmosis && isSendDenomSupported;
-    const needsBridgeFromOsmosis = !isReceiveAssetOnOsmosis && isReceiveDenomSupported;
+    const needsBridgeToOsmosis = !isSendChainOsmosis && isSendDenomSupported;
+    const needsBridgeFromOsmosis = receiveChainIsNotOsmosis;
 
     // Create Osmosis versions of the assets
     const osmosisSendAsset = {
@@ -435,7 +436,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     };
 
     // Step 0: If send asset is not on native chain and not on Osmosis, bridge to native chain first
-    if (!isSendAssetOnNativeChain && !isSendAssetOnOsmosis && isSendDenomSupported) {
+    if (!isSendAssetOnNativeChain && !isSendChainOsmosis && isSendDenomSupported) {
       const nativeSendAsset = {
         ...sendState.asset,
         denom: sendState.asset.originDenom,
@@ -499,7 +500,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
             : sendState.asset,
         toAsset: needsBridgeFromOsmosis
           ? osmosisReceiveAsset
-          : isReceiveAssetOnNativeChain
+          : destinationIsNotNativeChain
             ? {
                 ...receiveState.asset,
                 denom: receiveState.asset.originDenom,
@@ -511,7 +512,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     );
 
     // Step 3: Bridge from Osmosis to destination (if needed)
-    if (needsBridgeFromOsmosis) {
+    if (receiveChainIsNotOsmosis) {
       steps.push(
         createAndDescribeStep({
           type: TransactionType.IBC_SEND,
@@ -526,7 +527,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     }
 
     // Step 4: If receive asset needs to be on its native chain but destination is different
-    if (!isReceiveAssetOnNativeChain && receiveState.chainId !== receiveState.asset.originChainId) {
+    if (receiveChainIsNotOsmosis && destinationIsNotNativeChain) {
       const nativeReceiveAsset = {
         ...receiveState.asset,
         denom: receiveState.asset.originDenom,
