@@ -47,7 +47,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const isGeneratingAddresses = useAtomValue(isGeneratingAddressesAtom);
   const isFetchingWallet = useAtomValue(isFetchingWalletDataAtom);
   const isFetchingValidators = useAtomValue(isFetchingValidatorDataAtom);
-  // const loadSkipAssets = useSetAtom(loadSkipAssetsAtom);
+
   const loadOsmosisAssets = useSetAtom(loadOsmosisDataAtom);
 
   const [phase1LoadComplete, setPhase1LoadComplete] = useState(false);
