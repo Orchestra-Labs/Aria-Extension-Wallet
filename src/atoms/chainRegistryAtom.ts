@@ -233,17 +233,6 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
   return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
 });
 
-// export const skipChainsAtom = atom<string[]>([]);
-// export const loadSkipChainsAtom = atom(null, async (_, set) => {
-//   try {
-//     const chains = await getSupportedChains();
-//     const parsedChains = chains.map(chain => chain.chain_id);
-//     set(skipChainsAtom, parsedChains);
-//   } catch (error) {
-//     console.error('[loadSkipChainsAtom] Failed to load Skip chains:', error);
-//   }
-// });
-
 export const osmosisChainsAtom = atom<string[]>([]);
 export const osmosisAssetsAtom = atom<Asset[]>([]);
 export const loadOsmosisDataAtom = atom(null, async (get, set) => {
@@ -269,8 +258,43 @@ export const loadOsmosisDataAtom = atom(null, async (get, set) => {
 });
 
 export const isOsmosisSupportedDenomAtom = atom(get => (originDenom: string): boolean => {
-  const osmosisAssets = get(osmosisAssetsAtom);
-  return osmosisAssets.some(asset => asset.originDenom === originDenom);
+  const networkLevel = get(networkLevelAtom);
+  const fullChainRegistry = get(fullChainRegistryAtom)[networkLevel];
+  const osmosisChainId = getOsmosisChainId(networkLevel);
+  const osmosisChain = fullChainRegistry[osmosisChainId];
+
+  if (!osmosisChain?.assets) {
+    console.warn('[isOsmosisSupportedDenomAtom] Osmosis chain or assets not found');
+    return false;
+  }
+
+  const isSupported = originDenom in osmosisChain.assets;
+
+  return isSupported;
+});
+
+export const getOsmosisAssetAtom = atom(get => (originDenom: string): Asset | null => {
+  const networkLevel = get(networkLevelAtom);
+  const fullChainRegistry = get(fullChainRegistryAtom)[networkLevel];
+  const osmosisChainId = getOsmosisChainId(networkLevel);
+  const osmosisChain = fullChainRegistry[osmosisChainId];
+
+  if (!osmosisChain?.assets) {
+    console.warn('[getOsmosisAssetForDenomAtom] Osmosis chain or assets not found');
+    return null;
+  }
+
+  // First try direct key lookup (originDenom as key)
+  if (originDenom in osmosisChain.assets) {
+    return osmosisChain.assets[originDenom];
+  }
+
+  // Then search through all assets for matching denom or originDenom
+  const matchingAsset = Object.values(osmosisChain.assets).find(
+    asset => asset.denom === originDenom || asset.originDenom === originDenom,
+  );
+
+  return matchingAsset || null;
 });
 
 export const osmosisFeeTokensAtom = atom((get): FeeToken[] => {

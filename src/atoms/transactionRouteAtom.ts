@@ -1,7 +1,7 @@
 import { atom } from 'jotai';
 import { TransactionType, TransactionStatus, TransferMethod } from '@/constants';
 import { TransactionRoute, TransactionStep, Asset, FeeState } from '@/types';
-import { fullRegistryChainInfoAtom, isOsmosisSupportedDenomAtom } from './chainRegistryAtom';
+import { fullRegistryChainInfoAtom, getOsmosisAssetAtom } from './chainRegistryAtom';
 import {
   createRouteHash,
   createStepHash,
@@ -210,6 +210,10 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   const sendState = get(sendStateAtom);
   const receiveState = get(receiveStateAtom);
   const walletAddress = get(chainWalletAtom(sendState.chainId)).address;
+  const getOsmosisAsset = get(getOsmosisAssetAtom);
+
+  const resolvedOsmosisSendAsset = getOsmosisAsset(sendState.asset.denom);
+  const resolvedOsmosisReceiveAsset = getOsmosisAsset(receiveState.asset.denom);
 
   if (!sendState.asset || !receiveState.asset || !walletAddress) {
     console.error('[updateTransactionRouteAtom] Missing assets');
@@ -218,10 +222,7 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
 
   const getChainInfo = get(fullRegistryChainInfoAtom);
   const receiveAddress = get(recipientAddressAtom);
-  // const skipChains = get(skipChainsAtom);
-  // const skipAssets = get(skipAssetsAtom);
   const isValidStablecoinSwap = get(isValidStablecoinSwapAtom);
-  const isOsmosisSupportedDenom = get(isOsmosisSupportedDenomAtom);
 
   const steps: TransactionStep[] = [];
   const sendChain = getChainInfo(sendState.chainId);
@@ -234,8 +235,8 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   }
 
   // Check denom support
-  const isSendDenomSupported = isOsmosisSupportedDenom(sendState.asset.originDenom);
-  const isReceiveDenomSupported = isOsmosisSupportedDenom(receiveState.asset.originDenom);
+  const isSendDenomSupported = !!resolvedOsmosisSendAsset;
+  const isReceiveDenomSupported = !!resolvedOsmosisReceiveAsset;
   const coinExchangeIsSupported = isSendDenomSupported && isReceiveDenomSupported;
 
   const sendAndReceiveAssetsMatch = sendState.asset.originDenom === receiveState.asset.originDenom;
@@ -243,39 +244,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
 
   // Check if this is a simple send (same asset on same chain)
   const isSimpleSend = sendAndReceiveChainsMatch && sendAndReceiveAssetsMatch;
-
-  console.log('[DEBUG][updateTransactionRouteAtom] Route matching conditions:', {
-    // Basic conditions
-    sendAndReceiveChainsMatch,
-    sendAndReceiveAssetsMatch,
-    isSimpleSend,
-
-    // Asset support conditions
-    isSendDenomSupported,
-    isReceiveDenomSupported,
-    coinExchangeIsSupported,
-
-    // Special cases
-    isValidStablecoinSwap,
-
-    // Asset details
-    sendAsset: {
-      symbol: sendState.asset.symbol,
-      originDenom: sendState.asset.originDenom,
-      originChainId: sendState.asset.originChainId,
-      currentChainId: sendState.chainId,
-    },
-    receiveAsset: {
-      symbol: receiveState.asset.symbol,
-      originDenom: receiveState.asset.originDenom,
-      originChainId: receiveState.asset.originChainId,
-      currentChainId: receiveState.chainId,
-    },
-
-    // Chain details
-    sendChainId: sendState.chainId,
-    receiveChainId: receiveState.chainId,
-  });
 
   // Helper function to create a transaction step (without log)
   const createStep = (
@@ -425,13 +393,13 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     // Create Osmosis versions of the assets
     const osmosisSendAsset = {
       ...sendState.asset,
-      denom: sendState.asset.originDenom,
+      originDenom: resolvedOsmosisSendAsset.originDenom,
       chainId: osmosisChainId,
     };
 
     const osmosisReceiveAsset = {
       ...receiveState.asset,
-      denom: receiveState.asset.originDenom,
+      originDenom: resolvedOsmosisReceiveAsset.originDenom,
       chainId: osmosisChainId,
     };
 
@@ -489,24 +457,8 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
         via: TransferMethod.STANDARD,
         fromChainId: osmosisChainId,
         toChainId: osmosisChainId,
-        fromAsset: needsBridgeToOsmosis
-          ? osmosisSendAsset
-          : isSendAssetOnNativeChain
-            ? {
-                ...sendState.asset,
-                denom: sendState.asset.originDenom,
-                chainId: sendState.asset.originChainId,
-              }
-            : sendState.asset,
-        toAsset: needsBridgeFromOsmosis
-          ? osmosisReceiveAsset
-          : destinationIsNotNativeChain
-            ? {
-                ...receiveState.asset,
-                denom: receiveState.asset.originDenom,
-                chainId: receiveState.asset.originChainId,
-              }
-            : receiveState.asset,
+        fromAsset: needsBridgeToOsmosis ? osmosisSendAsset : sendState.asset,
+        toAsset: needsBridgeFromOsmosis ? osmosisReceiveAsset : receiveState.asset,
         isFirstStep: steps.length === 0,
       }),
     );

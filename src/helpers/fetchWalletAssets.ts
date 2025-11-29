@@ -263,14 +263,12 @@ export async function fetchWalletAssets(
             chainId,
             fullChainRegistry,
           );
+
           baseDenom = denom;
           isIbc = true;
           originDenom = resolvedDenom;
           originChainId = resolvedOriginChainId || '';
           trace = path;
-          console.log(
-            `[fetchWalletAssets ${chainId}] Resolved IBC denom ${denom} to ${resolvedDenom} from chain ${originChainId}`,
-          );
         } catch (error) {
           console.warn(
             `[fetchWalletAssets ${chainId}] Failed to resolve IBC denom ${denom}:`,

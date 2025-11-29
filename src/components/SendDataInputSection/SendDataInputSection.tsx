@@ -382,11 +382,7 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
 
           setPendingSimulationRequest(false);
           setSuccessfulSimTxRouteHash(transactionRouteHash);
-
-          console.log('[DEBUG][Simulation Execution] Invalidation state reset with cooldown');
         } catch (error) {
-          console.error('[DEBUG][Simulation Execution] Simulation failed:', error);
-
           // Even on failure, update the timestamp to prevent immediate retry
           setSimulationInvalidation(prev => ({
             ...prev,

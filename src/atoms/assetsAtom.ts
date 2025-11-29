@@ -1,16 +1,11 @@
 import { DEFAULT_MAINNET_ASSET, DEFAULT_TESTNET_ASSET } from '@/constants';
-import { Asset, AssetRegistry, SimplifiedChainInfo } from '@/types';
+import { Asset, AssetRegistry } from '@/types';
 import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
-import {
-  chainInfoAtom,
-  fullChainRegistryAtom,
-  // skipChainsAtom,
-  subscribedChainRegistryAtom,
-} from './chainRegistryAtom';
-import { receiveStateAtom } from './transactionStateAtom';
-import { getSkipSupportedAssets } from '@/helpers';
+import { fullChainRegistryAtom, subscribedChainRegistryAtom } from './chainRegistryAtom';
+import { sendStateAtom } from './transactionStateAtom';
+import { getOsmosisChainId, getSkipSupportedAssets } from '@/helpers';
 import { sessionWalletAtom } from './walletAtom';
 
 export const showAllAssetsAtom = atom<boolean>(true);
@@ -94,127 +89,84 @@ export const loadSkipAssetsAtom = atom(null, async (_, set) => {
 export const allReceivableAssetsAtom = atom(get => {
   const networkLevel = get(networkLevelAtom);
   const fullRegistry = get(fullChainRegistryAtom)[networkLevel];
-  // const subscribedRegistry = get(subscribedChainRegistryAtom)[networkLevel];
-  // const skipChains = get(skipChainsAtom);
-  const receiveState = get(receiveStateAtom);
-  const getChainInfo = get(chainInfoAtom);
+  const sendState = get(sendStateAtom);
   const { chainWallets } = get(sessionWalletAtom);
 
-  const receiveChainId = receiveState.chainId;
-  const receiveChain = getChainInfo(receiveChainId);
   const allWalletAssets = Object.values(chainWallets).flatMap(wallet => wallet.assets);
 
-  // Create a map of wallet assets by denom for quick lookup
-  const walletAssetsByDenom = new Map<string, Asset>();
-  for (const walletAsset of allWalletAssets) {
-    walletAssetsByDenom.set(walletAsset.denom, walletAsset);
-    if (walletAsset.originDenom) {
-      walletAssetsByDenom.set(walletAsset.originDenom, walletAsset);
+  // Get Osmosis chain ID
+  const osmosisChainId = getOsmosisChainId(networkLevel);
+  const osmosisChain = fullRegistry[osmosisChainId];
+
+  if (!osmosisChain) {
+    console.error('[allReceivableAssetsAtom] Osmosis chain not found in registry');
+    return [];
+  }
+
+  const finalAssets: Asset[] = [];
+  const assetsBySymbol = new Map<string, Asset>();
+
+  // 1. Always include the sending asset
+  if (sendState.asset) {
+    assetsBySymbol.set(sendState.asset.symbol.toLowerCase(), sendState.asset);
+    finalAssets.push(sendState.asset);
+  }
+
+  // 2. Add all assets from Osmosis chain registry
+  const osmosisAssets = Object.values(osmosisChain.assets || {});
+
+  for (const osmosisAsset of osmosisAssets) {
+    const symbolKey = osmosisAsset.symbol.toLowerCase();
+    const existingAsset = assetsBySymbol.get(symbolKey);
+
+    if (!existingAsset) {
+      // Create asset entry for Osmosis asset
+      const newAsset: Asset = {
+        denom: osmosisAsset.denom,
+        amount: '0', // Default to zero, will be updated if wallet has balance
+        displayAmount: '0',
+        exchangeRate: osmosisAsset.exchangeRate || '-',
+        isIbc: osmosisAsset.isIbc || false,
+        logo: osmosisAsset.logo || '',
+        symbol: osmosisAsset.symbol,
+        name: osmosisAsset.name,
+        exponent: osmosisAsset.exponent,
+        isFeeToken: osmosisAsset.isFeeToken || false,
+        networkName: osmosisChain.pretty_name || osmosisChain.chain_name,
+        chainId: osmosisChainId,
+        coinGeckoId: osmosisAsset.coinGeckoId,
+        price: osmosisAsset.price || 0,
+        originDenom: osmosisAsset.originDenom || osmosisAsset.denom,
+        originChainId: osmosisAsset.originChainId || osmosisChainId,
+        trace: osmosisAsset.trace,
+      };
+
+      assetsBySymbol.set(symbolKey, newAsset);
+      finalAssets.push(newAsset);
     }
   }
 
-  const assetsByDenom = new Map<string, Asset>();
-  const assetsBySymbol = new Map<string, Asset>();
-  let finalAssets: Asset[] = [];
+  // 3. Update with wallet balances for assets we've included
+  for (const walletAsset of allWalletAssets) {
+    const symbolKey = walletAsset.symbol.toLowerCase();
+    const existingAsset = assetsBySymbol.get(symbolKey);
 
-  // const subscribedChainIds = new Set(Object.keys(subscribedRegistry));
+    if (existingAsset) {
+      // Check if this wallet asset matches the existing asset by origin denom and chain
+      const existingOriginDenom = existingAsset.originDenom || existingAsset.denom;
+      const walletOriginDenom = walletAsset.originDenom || walletAsset.denom;
 
-  // Process all chains in the full registry
-  const createAssetEntry = (asset: any, chainInfo: SimplifiedChainInfo): Asset => {
-    // Try to find matching wallet asset to enhance with IBC info
-    const walletAsset =
-      walletAssetsByDenom.get(asset.denom) || walletAssetsByDenom.get(asset.originDenom || '');
-
-    return {
-      denom: asset.denom,
-      amount: '0',
-      displayAmount: '0',
-      exchangeRate: asset.exchangeRate || '-',
-      isIbc: walletAsset?.isIbc || false,
-      logo: asset.logo,
-      symbol: asset.symbol,
-      name: asset.name,
-      exponent: asset.exponent,
-      isFeeToken: asset.isFeeToken,
-      networkName: receiveChain.chain_name,
-      chainId: receiveChain.chain_id,
-      coinGeckoId: asset.coinGeckoId,
-      price: asset.price || 0,
-      originDenom: walletAsset?.originDenom || asset.originDenom || asset.denom,
-      originChainId: walletAsset?.originChainId || asset.originChainId || chainInfo.chain_id,
-      trace: walletAsset?.trace || asset.trace,
-    };
-  };
-
-  for (const chainInfo of Object.values(fullRegistry)) {
-    // const isSkipSupportedChain = skipChains.includes(chainId);
-    // const isSubscribed = subscribedChainIds.has(chainId);
-
-    // if (!isSkipSupportedChain && !isSubscribed) {
-    //   continue;
-    // }
-
-    const chainAssets = Object.values(chainInfo.assets || {});
-    for (const asset of chainAssets) {
-      const assetDenom = asset.originDenom || asset.denom;
-      const existingByDenom = assetsByDenom.get(assetDenom);
-      const existingBySymbol = assetsBySymbol.get(asset.symbol);
-      const isPreferredDenom = assetDenom === `u${asset.symbol.toLowerCase()}`;
-
-      // Case 1: Neither denom nor symbol exists yet
-      if (!existingByDenom && !existingBySymbol) {
-        const newAsset = createAssetEntry(asset, chainInfo);
-        assetsByDenom.set(assetDenom, newAsset);
-        assetsBySymbol.set(asset.symbol, newAsset);
-        finalAssets.push(newAsset);
-      }
-      // Case 2: Only denom exists, but symbol is new
-      else if (existingByDenom && !existingBySymbol) {
-        // Keep the existing denom entry, but add this symbol
-        assetsBySymbol.set(asset.symbol, existingByDenom);
-      }
-      // Case 3: Only symbol exists, but denom is new
-      else if (!existingByDenom && existingBySymbol) {
-        // Replace if this is a preferred denom format
-        if (isPreferredDenom) {
-          // Remove old symbol entry
-          const oldAsset = existingBySymbol;
-          assetsBySymbol.delete(oldAsset.symbol);
-          finalAssets = finalAssets.filter(
-            a => (a.originDenom || a.denom) !== (oldAsset.originDenom || oldAsset.denom),
-          );
-
-          // Add new preferred asset
-          const newAsset = createAssetEntry(asset, chainInfo);
-          assetsByDenom.set(assetDenom, newAsset);
-          assetsBySymbol.set(asset.symbol, newAsset);
-          finalAssets.push(newAsset);
-        }
-      }
-      // Case 4: Both denom and symbol exist (conflict)
-      else {
-        // Prefer the u[symbol] format if this asset has it
-        if (isPreferredDenom) {
-          // Remove old entries
-          const oldDenomAsset = existingByDenom;
-          const oldSymbolAsset = existingBySymbol;
-
-          if (!oldDenomAsset || !oldSymbolAsset) continue;
-
-          assetsByDenom.delete(oldDenomAsset.originDenom || oldDenomAsset.denom);
-          assetsBySymbol.delete(oldSymbolAsset.symbol);
-          finalAssets = finalAssets.filter(
-            a =>
-              (a.originDenom || a.denom) !== (oldDenomAsset.originDenom || oldDenomAsset.denom) &&
-              a.symbol !== oldSymbolAsset.symbol,
-          );
-
-          // Add new preferred asset
-          const newAsset = createAssetEntry(asset, chainInfo);
-          assetsByDenom.set(assetDenom, newAsset);
-          assetsBySymbol.set(asset.symbol, newAsset);
-          finalAssets.push(newAsset);
-        }
+      // Only update if it's the same asset (same origin denom and on Osmosis chain)
+      if (existingOriginDenom === walletOriginDenom && walletAsset.chainId === osmosisChainId) {
+        // Update the existing asset with wallet balance and IBC info
+        Object.assign(existingAsset, {
+          amount: walletAsset.amount,
+          displayAmount: walletAsset.displayAmount,
+          isIbc: walletAsset.isIbc,
+          originDenom: walletAsset.originDenom,
+          originChainId: walletAsset.originChainId,
+          trace: walletAsset.trace,
+        });
       }
     }
   }

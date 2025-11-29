@@ -46,7 +46,6 @@ export const Send = () => {
   const isSuccess = useAtomValue(isTransactionSuccessAtom);
   const loadFullRegistry = useSetAtom(loadFullRegistryAtom);
   const unloadFullRegistry = useSetAtom(unloadFullRegistryAtom);
-  // const loadSkipChains = useSetAtom(loadSkipChainsAtom);
   const transactionRoute = useAtomValue(transactionRouteAtom);
   const finalTxHash = useAtomValue(finalTransactionHashAtom);
 

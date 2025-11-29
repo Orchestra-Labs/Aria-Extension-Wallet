@@ -803,13 +803,6 @@ async function simulateUseSmartContract({
     const route = routes[i];
 
     if (route.tokenOutDenom === currentDenom) {
-      console.error('[DEBUG][simulateUseSmartContract] Invalid route - same denom in hop:', {
-        hop: i + 1,
-        currentDenom,
-        routeTokenOut: route.tokenOutDenom,
-        poolId: route.poolId,
-      });
-
       // Fix: Get the correct route structure from SQS response
       throw new Error(`Invalid route: Hop ${i + 1} has same input/output denom (${currentDenom})`);
     }
