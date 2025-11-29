@@ -965,8 +965,32 @@ export const useSendActions = () => {
 
             case TransactionType.SWAP:
             case TransactionType.EXCHANGE:
-              // For swaps: output = expected_output - fees
-              netOutput = (expectedOutput - totalFees).toString();
+              // For swaps: fees are taken from input, then swap happens
+              // So: netInput = input - fees, then swap netInput -> output
+              const netInput = BigInt(currentInputAmount) - totalFees;
+
+              if (netInput <= 0) {
+                // Not enough for fees + swap
+
+                result = {
+                  success: false,
+                  message: `Insufficient amount for fees.`,
+                };
+                netOutput = '0';
+              } else {
+                // TODO: this imprecise update by ratio is a temporary fix.  Test a double-pass approach to final input calculation
+                // Convert all values to numbers for precise calculation
+                const originalInputNum = Number(currentInputAmount);
+                const originalOutputNum = Number(result?.data?.estimatedAmountOut);
+                const netInputNum = Number(netInput);
+
+                // Calculate the ratio and scale the output
+                const netInputRatio = netInputNum / originalInputNum;
+                const adjustedOutputNum = Math.floor(originalOutputNum * netInputRatio);
+
+                // Convert back to string for the output
+                netOutput = adjustedOutputNum.toString();
+              }
               break;
 
             default:
