@@ -23,6 +23,7 @@ import { networkLevelAtom } from './networkLevelAtom';
 import {
   filterAndSortAssets,
   filterAndSortChains,
+  getOsmosisAssetsWithResolutions,
   getOsmosisChainId,
   getStoredChainRegistry,
   // getSupportedChains,
@@ -234,6 +235,27 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
 
 export const osmosisChainsAtom = atom<string[]>([]);
 export const osmosisAssetsAtom = atom<Asset[]>([]);
+export const loadOsmosisDataAtom = atom(null, async (get, set) => {
+  try {
+    const networkLevel = get(networkLevelAtom);
+    const fullChainRegistry = get(fullChainRegistryAtom);
+    const subscribedChainRegistry = get(subscribedChainRegistryAtom);
+
+    // Get Osmosis chain ID
+    const osmosisChainId = getOsmosisChainId(networkLevel);
+    set(osmosisChainsAtom, [osmosisChainId]);
+
+    // Fetch Osmosis assets
+    const osmosisAssets = await getOsmosisAssetsWithResolutions(
+      networkLevel,
+      subscribedChainRegistry[networkLevel],
+      fullChainRegistry[networkLevel],
+    );
+    set(osmosisAssetsAtom, osmosisAssets);
+  } catch (error) {
+    console.error('[loadOsmosisDataAtom] Failed to load Osmosis data:', error);
+  }
+});
 
 export const isOsmosisSupportedDenomAtom = atom(get => (originDenom: string): boolean => {
   const networkLevel = get(networkLevelAtom);
