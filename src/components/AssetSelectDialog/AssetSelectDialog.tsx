@@ -64,7 +64,7 @@ export const AssetSelectDialog: React.FC<AssetSelectDialogProps> = ({
 
   const resetDefaults = () => {
     setSearchTerm('');
-    setSortOrder(SortOrder.DESC);
+    setSortOrder(SortOrder.ASC);
     setSortType(AssetSortType.NAME);
   };
 
