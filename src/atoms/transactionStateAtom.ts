@@ -328,7 +328,6 @@ export const resetTransactionStatesAtom = atom(null, (get, set) => {
   set(_feeStateAtom, DEFAULT_FEE_STATE);
 });
 
-// TODO: consider later steps and the maximums inherent to those as well
 export const maxAvailableAtom = atom(get => {
   const sendAsset = get(sendStateAtom).asset;
   const walletAssets = get(allWalletAssetsAtom);

@@ -267,12 +267,18 @@ export const SendDataInputSection: React.FC<SendDataInputSectionProps> = () => {
   };
 
   const switchFields = () => {
+    if (isNaN(sendState.amount) || isNaN(receiveState.amount)) {
+      clearAmount();
+      return;
+    }
+
     handleStateUpdate({
       newSendAsset: receiveState.asset,
       newReceiveAsset: sendState.asset,
       newSendAmount: receiveState.displayAmount,
       newReceiveAmount: sendState.displayAmount,
     });
+    requestSimulation(true); // Request immediate simulation
   };
 
   const setMaxAmount = (type: 'send' | 'receive') => {

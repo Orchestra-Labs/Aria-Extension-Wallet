@@ -135,7 +135,6 @@ export const CreateWallet = () => {
 
   /* Interchain-compatibility TODOs (mobile version before this) */
   // TODO: ensure pipeline to other registries is functional.  change here auto-PRs there
-  // TODO: integrate skip protocol or automated use of exchange to allow swapping between chains
   // TODO: add link to github repo for registry
   // TODO: modify claim, restake, and unstake functions to withdraw from all unique delegator addresses
   // TODO: add show/hide function to validator list (by chain)
