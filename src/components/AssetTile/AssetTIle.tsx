@@ -16,6 +16,7 @@ import {
   chainInfoAtom,
   updateReceiveAssetAndChainAtom,
   updateSendAssetAndChainAtom,
+  fullRegistryChainInfoAtom,
 } from '@/atoms/';
 import { formatBalanceDisplay, truncateWalletAddress } from '@/helpers';
 import { IconContainer, VerifySuccess } from '@/assets/icons';
@@ -57,10 +58,12 @@ export const AssetTile = ({
   const selectedCoins = useAtomValue(selectedCoinListAtom);
   const walletState = useAtomValue(chainWalletAtom(asset.chainId));
   const getChainInfo = useAtomValue(chainInfoAtom);
+  const getFullRegistryChainInfo = useAtomValue(fullRegistryChainInfoAtom);
 
   const [copied, setCopied] = useState(false);
 
   const chain = getChainInfo(asset.chainId);
+  const originalChain = getFullRegistryChainInfo(asset.originChainId);
   const prefix = chain?.bech32_prefix;
   const truncatedAddress = prefix ? truncateWalletAddress(prefix, walletState.address) : '';
 
@@ -74,7 +77,15 @@ export const AssetTile = ({
   const logo = asset?.logo || '';
 
   const network = asset.networkName.charAt(0).toUpperCase() + asset.networkName.slice(1);
-  const subtitle = isChainSubscriptionsPage ? symbol : network || 'Unknown Network';
+
+  const subtitle = isChainSubscriptionsPage
+    ? symbol
+    : isReceiveDialog
+      ? originalChain?.pretty_name ||
+        originalChain?.chain_name ||
+        asset.originChainId ||
+        'Unknown Origin'
+      : network || 'Unknown Network';
 
   const hasZeroBalance = asset.amount === '0';
 

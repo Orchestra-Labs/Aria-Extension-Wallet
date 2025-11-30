@@ -99,7 +99,6 @@ export const allReceivableAssetsAtom = atom(get => {
 
   const allWalletAssets = Object.values(chainWallets).flatMap(wallet => wallet.assets);
   const osmosisChainId = getOsmosisChainId(networkLevel);
-  const osmosisChain = fullRegistry[osmosisChainId];
 
   const finalAssets: Asset[] = [];
   // ✅ Use DENOM as key (the actual IBC hash on Osmosis), not symbol
@@ -112,28 +111,29 @@ export const allReceivableAssetsAtom = atom(get => {
   }
 
   // 2. Add all assets from Osmosis
-  for (const osmosisAsset of osmosisAssets) {
-    const denomKey = osmosisAsset.denom; // ✅ Use actual denom (IBC hash)
+  for (const receivableAsset of osmosisAssets) {
+    const denomKey = receivableAsset.denom; // ✅ Use actual denom (IBC hash)
+    const receivableAssetChain = fullRegistry[receivableAsset.chainId];
 
     if (!assetsByDenom.has(denomKey)) {
       const newAsset: Asset = {
-        denom: osmosisAsset.denom,
+        denom: receivableAsset.denom,
         amount: '0',
         displayAmount: '0',
-        exchangeRate: osmosisAsset.exchangeRate || '-',
-        isIbc: osmosisAsset.isIbc || false,
-        logo: osmosisAsset.logo || '',
-        symbol: osmosisAsset.symbol,
-        name: osmosisAsset.name,
-        exponent: osmosisAsset.exponent,
-        isFeeToken: osmosisAsset.isFeeToken || false,
-        networkName: osmosisChain.pretty_name || osmosisChain.chain_name,
-        chainId: osmosisAsset.chainId,
-        coinGeckoId: osmosisAsset.coinGeckoId,
-        price: osmosisAsset.price || 0,
-        originDenom: osmosisAsset.originDenom || osmosisAsset.denom,
-        originChainId: osmosisAsset.originChainId || osmosisChainId,
-        trace: osmosisAsset.trace,
+        exchangeRate: receivableAsset.exchangeRate || '-',
+        isIbc: receivableAsset.isIbc || false,
+        logo: receivableAsset.logo || '',
+        symbol: receivableAsset.symbol,
+        name: receivableAsset.name,
+        exponent: receivableAsset.exponent,
+        isFeeToken: receivableAsset.isFeeToken || false,
+        networkName: receivableAssetChain.pretty_name || receivableAssetChain.chain_name,
+        chainId: receivableAsset.chainId,
+        coinGeckoId: receivableAsset.coinGeckoId,
+        price: receivableAsset.price || 0,
+        originDenom: receivableAsset.originDenom || receivableAsset.denom,
+        originChainId: receivableAsset.originChainId || osmosisChainId,
+        trace: receivableAsset.trace,
       };
 
       assetsByDenom.set(denomKey, newAsset);
