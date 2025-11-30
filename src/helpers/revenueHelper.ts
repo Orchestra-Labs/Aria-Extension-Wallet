@@ -104,15 +104,6 @@ export async function recordExchangeRevenue(
   transactionHash?: string,
   refereeId?: string,
 ): Promise<RevenueEventResponse> {
-  console.log('[DEBUG][recordExchangeRevenue] Final event data being sent:', {
-    chain_id: chainId,
-    currency: coinDenom,
-    amount,
-    event_type: RevenueEventType.CURRENCY_TRADE,
-    transaction_hash: transactionHash,
-    referee_id: refereeId,
-  });
-
   return recordRevenueEvent({
     chain_id: chainId,
     currency: coinDenom,

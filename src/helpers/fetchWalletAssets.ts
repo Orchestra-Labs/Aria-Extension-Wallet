@@ -1,22 +1,8 @@
-import {
-  IBC_PREFIX,
-  COSMOS_CHAIN_ENDPOINTS,
-  NetworkLevel,
-  GAMM_PREFIX,
-  GAMM_EXPONENT_DEFAULT,
-  GREATER_EXPONENT_DEFAULT,
-} from '@/constants';
-import { Uri, Asset, SubscriptionRecord, LocalChainRegistry, IbcRegistry } from '@/types';
-import { queryRestNode } from './queryNodes';
+import { IBC_PREFIX, COSMOS_CHAIN_ENDPOINTS, NetworkLevel } from '@/constants';
+import { Uri, Asset, SubscriptionRecord, LocalChainRegistry } from '@/types';
 import { safeTrimLowerCase } from './formatString';
 import { getCachedPrices } from './priceCache';
-import { getIbcRegistry } from './dataHelpers';
-
-// TODO: move to utils
-const adjustAmountByExponent = (amount: string, exponent: number): string => {
-  const divisor = Math.pow(10, exponent);
-  return (parseFloat(amount) / divisor).toFixed(exponent);
-};
+import { createAssetWithOriginInfo, resolveAndCreateIbcAsset } from './assetResolution';
 
 const fetchAssetPrices = async (
   coinGeckoIds: string[],
@@ -58,92 +44,6 @@ const fetchAssetPrices = async (
   } catch (error) {
     console.error('Error in fetchCoinGeckoPrices:', error);
     return {};
-  }
-};
-
-export const resolveIbcAsset = async (
-  ibcDenom: string,
-  prefix: string,
-  restUris: Uri[],
-  currentChainId: string,
-  chainRegistry: LocalChainRegistry,
-): Promise<{
-  baseDenom: string;
-  path: string;
-  originChainId: string;
-}> => {
-  try {
-    const denomHash = ibcDenom.slice(4);
-    const response = await queryRestNode({
-      prefix,
-      endpoint: `${COSMOS_CHAIN_ENDPOINTS.getIBCInfo}${denomHash}`,
-      restUris,
-      chainId: currentChainId,
-    });
-
-    if (!response.denom_trace?.base_denom) {
-      throw new Error(`No denom trace found for ${ibcDenom}`);
-    }
-
-    const baseDenom = safeTrimLowerCase(response.denom_trace.base_denom);
-    const path = response.denom_trace.path || '';
-    let originChainId = '';
-
-    // Extract channel ID from path (format: "transfer/channel-X")
-    const pathParts = path.split('/');
-    if (pathParts.length >= 2) {
-      const channelId = pathParts[1];
-      const ibcRegistry = getIbcRegistry();
-      const networkLevel = chainRegistry[currentChainId].network_level;
-
-      // Get the correct network registry (mainnet or testnet)
-      const networkRegistry =
-        networkLevel === NetworkLevel.TESTNET ? ibcRegistry.data.testnet : ibcRegistry.data.mainnet;
-
-      if (!networkRegistry) {
-        throw new Error(`No IBC registry found for network level: ${networkLevel}`);
-      }
-
-      // Properly typed iteration through IBC registry entries
-      for (const [connectionKey, connection] of Object.entries(networkRegistry as IbcRegistry)) {
-        // Check if this connection involves our current chain
-        if (connectionKey.includes(currentChainId)) {
-          const [chain1, chain2] = connectionKey.split(',');
-          const isCurrentChainFirst = chain1 === currentChainId;
-
-          // Get the channel info for current chain specifically
-          const currentChainIBCInfo = connection[currentChainId];
-
-          // Only proceed if the channel ID matches current chain's channel
-          if (currentChainIBCInfo?.channel_id === channelId) {
-            // The counterparty is the other chain in this connection
-            originChainId = isCurrentChainFirst ? chain2 : chain1;
-            break;
-          }
-        }
-      }
-    }
-
-    // TODO: handle multi-hop paths.  add all to list and use that list with tx router
-    // Fallback: If not found, check if this is a multihop IBC transfer
-    if (!originChainId && path.includes('/transfer/')) {
-      // For multihop transfers, the origin chain might be earlier in the path
-      // Example: "transfer/channel-1/transfer/channel-2/denom"
-      const hops = path.split('/transfer/');
-      if (hops.length > 2) {
-        // This is a multihop transfer - we'd need more complex logic to trace
-        console.warn(`Multihop IBC transfer detected for ${ibcDenom}, path: ${path}`);
-      }
-    }
-
-    return {
-      baseDenom,
-      path,
-      originChainId,
-    };
-  } catch (error) {
-    console.error(`Error resolving IBC denom ${ibcDenom}:`, error);
-    throw error;
   }
 };
 
@@ -236,153 +136,76 @@ export async function fetchWalletAssets(
     ? Object.keys(assets)
     : networkSubscriptions[chainId]?.subscribedDenoms || [];
 
-  // 3. Process all balances into assets
+  // 3. Process all balances into assets using Standardized Asset Resolution
   console.log(`[fetchWalletAssets ${chainId}] Processing ${rawBalances.length} raw balances...`);
+
   const processedAssets = await Promise.all(
     rawBalances.map(async ({ denom, amount }) => {
-      console.log(`[fetchWalletAssets ${chainId}] Processing denom: ${denom}`);
-      let baseDenom = denom;
-      let isIbc = false;
-      let originDenom = denom;
-      let originChainId = chainId;
-      let trace = '';
-      let exponent = GREATER_EXPONENT_DEFAULT;
-
-      // Handle IBC assets
-      if (denom.startsWith(IBC_PREFIX)) {
-        console.log(`[fetchWalletAssets ${chainId}] Detected IBC denom: ${denom}`);
-        try {
-          const {
-            baseDenom: resolvedDenom,
-            path,
-            originChainId: resolvedOriginChainId,
-          } = await resolveIbcAsset(
+      try {
+        // Handle IBC assets
+        if (denom.startsWith(IBC_PREFIX)) {
+          console.log(`[fetchWalletAssets ${chainId}] Detected IBC denom: ${denom}`);
+          const asset = await resolveAndCreateIbcAsset(
             denom,
+            chainId,
             bech32_prefix,
             rest_uris || [],
-            chainId,
             fullChainRegistry,
+            networkName,
+            amount,
           );
 
-          baseDenom = denom;
-          isIbc = true;
-          originDenom = resolvedDenom;
-          originChainId = resolvedOriginChainId || '';
-          trace = path;
-        } catch (error) {
-          console.warn(
-            `[fetchWalletAssets ${chainId}] Failed to resolve IBC denom ${denom}:`,
-            error,
-          );
-          if (!shouldFetchAllAssets) return null;
-        }
-      }
-
-      if (denom.startsWith(GAMM_PREFIX)) {
-        baseDenom = denom.replace(GAMM_PREFIX, '');
-        isIbc = true;
-        originDenom = denom;
-      }
-
-      // Find matching asset metadata in full chain registry
-      const normalizedBaseDenom = safeTrimLowerCase(baseDenom);
-      let assetMetadata: Asset | undefined = undefined;
-
-      // Look in current chain's assets first (this is where native assets should be)
-      if (chainInfo.assets) {
-        assetMetadata = Object.values(chainInfo.assets).find(
-          asset => safeTrimLowerCase(asset.denom) === normalizedBaseDenom,
-        );
-      }
-
-      // If not found in current chain, search through full registry for IBC assets
-      if (!assetMetadata && isIbc) {
-        for (const chain of Object.values(fullChainRegistry)) {
-          if (!chain.assets) continue;
-
-          const found = Object.values(chain.assets).find(
-            asset =>
-              safeTrimLowerCase(asset.denom) === normalizedBaseDenom ||
-              safeTrimLowerCase(asset.originDenom || '') === normalizedBaseDenom,
-          );
-
-          if (found) {
-            assetMetadata = found;
-            break;
+          // Update price if we have CoinGecko data
+          if (asset.coinGeckoId && coinGeckoPrices[asset.coinGeckoId]) {
+            asset.price = coinGeckoPrices[asset.coinGeckoId];
           }
+
+          // Check subscription (respect shouldFetchAllAssets)
+          const isSubscribed =
+            shouldFetchAllAssets ||
+            thisChainSubscribedDenoms.some(
+              subDenom => safeTrimLowerCase(asset.originDenom) === safeTrimLowerCase(subDenom),
+            );
+
+          return isSubscribed ? asset : null;
         }
-      }
 
-      if (!assetMetadata && !shouldFetchAllAssets) {
-        console.log(
-          `[fetchWalletAssets ${chainId}] No metadata found for ${baseDenom} and not fetching all assets`,
+        // Handle non-IBC assets (Native, GAMM, Factory)
+        const asset = createAssetWithOriginInfo(
+          denom,
+          chainId,
+          fullChainRegistry,
+          networkName,
+          amount,
+          false, // isIbc
         );
-        return null;
+
+        // Update price if we have CoinGecko data
+        if (asset.coinGeckoId && coinGeckoPrices[asset.coinGeckoId]) {
+          asset.price = coinGeckoPrices[asset.coinGeckoId];
+        }
+
+        // Check subscription
+        const isSubscribed =
+          shouldFetchAllAssets ||
+          thisChainSubscribedDenoms.some(
+            subDenom => safeTrimLowerCase(asset.originDenom) === safeTrimLowerCase(subDenom),
+          );
+
+        return isSubscribed ? asset : null;
+      } catch (error) {
+        console.warn(`[fetchWalletAssets ${chainId}] Failed to process asset ${denom}:`, error);
+        // Only include failed assets if viewAll is enabled
+        return shouldFetchAllAssets || null;
       }
-
-      // Set exponent from metadata if found, otherwise use default
-      if (assetMetadata?.exponent !== undefined) {
-        exponent = assetMetadata.exponent;
-      }
-
-      // For non-IBC, non-GAMM native assets without explicit metadata, use default exponent
-      if (!isIbc && !denom.startsWith(GAMM_PREFIX) && !assetMetadata) {
-        exponent = GREATER_EXPONENT_DEFAULT; // Default for native tokens
-      }
-
-      const isGammToken = denom.startsWith('gamm/pool/');
-      exponent = isGammToken ? GAMM_EXPONENT_DEFAULT : exponent;
-      const displayAmount = adjustAmountByExponent(amount, exponent);
-      const price = assetMetadata?.coinGeckoId
-        ? coinGeckoPrices[assetMetadata.coinGeckoId] || 0
-        : 0;
-
-      console.log(
-        `[fetchWalletAssets ${chainId}] Processed asset: ${baseDenom}, amount: ${amount}, display amount: ${displayAmount}, price: ${price}, isIbc: ${isIbc}`,
-      );
-
-      return {
-        ...(assetMetadata || {
-          denom: baseDenom,
-          symbol: baseDenom,
-          name: baseDenom,
-          exponent,
-          logo: '',
-          isFeeToken: false,
-          coinGeckoId: undefined,
-        }),
-        amount,
-        displayAmount,
-        price,
-        isIbc,
-        chainId: chainId,
-        networkName,
-        originDenom,
-        originChainId,
-        trace,
-      };
     }),
   );
 
-  // 4. Filter down to subscribed assets
-  console.log(`[${chainId}] Filtering to subscribed assets...`);
-  const subscribedAssets = processedAssets.filter(asset => {
-    // Check if this asset matches any subscribed denom (case-insensitive)
-    const isSubscribed = thisChainSubscribedDenoms.some(
-      denom => safeTrimLowerCase(asset?.originDenom) === safeTrimLowerCase(denom),
-    );
-
-    if (!isSubscribed && shouldFetchAllAssets) {
-      // If viewAll is true, include all assets from this chain
-      return safeTrimLowerCase(asset?.chainId) === safeTrimLowerCase(chainId);
-    }
-
-    return isSubscribed;
-  }) as Asset[];
+  // 4. Filter out nulls and return subscribed assets
+  const subscribedAssets = processedAssets.filter((asset): asset is Asset => asset !== null);
 
   console.log(
-    `[fetchWalletAssets ${chainId}] Total subscribed assets:`,
-    subscribedAssets.length,
+    `[fetchWalletAssets ${chainId}] Total subscribed assets: ${subscribedAssets.length}`,
     subscribedAssets,
   );
 

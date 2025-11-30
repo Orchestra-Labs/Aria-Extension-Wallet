@@ -1,3 +1,4 @@
+export * from './assetResolution';
 export * from './closeAllExtensionPopups';
 export * from './exchangeTransactions';
 export * from './feeUtils';

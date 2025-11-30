@@ -3,7 +3,11 @@ import { Asset, AssetRegistry } from '@/types';
 import { atom, WritableAtom } from 'jotai';
 import { userAccountAtom } from './accountAtom';
 import { networkLevelAtom } from './networkLevelAtom';
-import { fullChainRegistryAtom, subscribedChainRegistryAtom } from './chainRegistryAtom';
+import {
+  fullChainRegistryAtom,
+  osmosisAssetsAtom,
+  subscribedChainRegistryAtom,
+} from './chainRegistryAtom';
 import { sendStateAtom } from './transactionStateAtom';
 import { getOsmosisChainId, getSkipSupportedAssets } from '@/helpers';
 import { sessionWalletAtom } from './walletAtom';
@@ -91,39 +95,30 @@ export const allReceivableAssetsAtom = atom(get => {
   const fullRegistry = get(fullChainRegistryAtom)[networkLevel];
   const sendState = get(sendStateAtom);
   const { chainWallets } = get(sessionWalletAtom);
+  const osmosisAssets = get(osmosisAssetsAtom);
 
   const allWalletAssets = Object.values(chainWallets).flatMap(wallet => wallet.assets);
-
-  // Get Osmosis chain ID
   const osmosisChainId = getOsmosisChainId(networkLevel);
   const osmosisChain = fullRegistry[osmosisChainId];
 
-  if (!osmosisChain) {
-    console.error('[allReceivableAssetsAtom] Osmosis chain not found in registry');
-    return [];
-  }
-
   const finalAssets: Asset[] = [];
-  const assetsBySymbol = new Map<string, Asset>();
+  // ✅ Use DENOM as key (the actual IBC hash on Osmosis), not symbol
+  const assetsByDenom = new Map<string, Asset>();
 
   // 1. Always include the sending asset
   if (sendState.asset) {
-    assetsBySymbol.set(sendState.asset.symbol.toLowerCase(), sendState.asset);
+    assetsByDenom.set(sendState.asset.denom, sendState.asset);
     finalAssets.push(sendState.asset);
   }
 
-  // 2. Add all assets from Osmosis chain registry
-  const osmosisAssets = Object.values(osmosisChain.assets || {});
-
+  // 2. Add all assets from Osmosis
   for (const osmosisAsset of osmosisAssets) {
-    const symbolKey = osmosisAsset.symbol.toLowerCase();
-    const existingAsset = assetsBySymbol.get(symbolKey);
+    const denomKey = osmosisAsset.denom; // ✅ Use actual denom (IBC hash)
 
-    if (!existingAsset) {
-      // Create asset entry for Osmosis asset
+    if (!assetsByDenom.has(denomKey)) {
       const newAsset: Asset = {
         denom: osmosisAsset.denom,
-        amount: '0', // Default to zero, will be updated if wallet has balance
+        amount: '0',
         displayAmount: '0',
         exchangeRate: osmosisAsset.exchangeRate || '-',
         isIbc: osmosisAsset.isIbc || false,
@@ -133,7 +128,7 @@ export const allReceivableAssetsAtom = atom(get => {
         exponent: osmosisAsset.exponent,
         isFeeToken: osmosisAsset.isFeeToken || false,
         networkName: osmosisChain.pretty_name || osmosisChain.chain_name,
-        chainId: osmosisChainId,
+        chainId: osmosisAsset.chainId,
         coinGeckoId: osmosisAsset.coinGeckoId,
         price: osmosisAsset.price || 0,
         originDenom: osmosisAsset.originDenom || osmosisAsset.denom,
@@ -141,33 +136,26 @@ export const allReceivableAssetsAtom = atom(get => {
         trace: osmosisAsset.trace,
       };
 
-      assetsBySymbol.set(symbolKey, newAsset);
+      assetsByDenom.set(denomKey, newAsset);
       finalAssets.push(newAsset);
     }
   }
 
-  // 3. Update with wallet balances for assets we've included
+  // 3. Update with wallet balances
   for (const walletAsset of allWalletAssets) {
-    const symbolKey = walletAsset.symbol.toLowerCase();
-    const existingAsset = assetsBySymbol.get(symbolKey);
+    const denomKey = walletAsset.denom; // ✅ Match by actual denom
+    const existingAsset = assetsByDenom.get(denomKey);
 
-    if (existingAsset) {
-      // Check if this wallet asset matches the existing asset by origin denom and chain
-      const existingOriginDenom = existingAsset.originDenom || existingAsset.denom;
-      const walletOriginDenom = walletAsset.originDenom || walletAsset.denom;
-
-      // Only update if it's the same asset (same origin denom and on Osmosis chain)
-      if (existingOriginDenom === walletOriginDenom && walletAsset.chainId === osmosisChainId) {
-        // Update the existing asset with wallet balance and IBC info
-        Object.assign(existingAsset, {
-          amount: walletAsset.amount,
-          displayAmount: walletAsset.displayAmount,
-          isIbc: walletAsset.isIbc,
-          originDenom: walletAsset.originDenom,
-          originChainId: walletAsset.originChainId,
-          trace: walletAsset.trace,
-        });
-      }
+    if (existingAsset && walletAsset.chainId === osmosisChainId) {
+      // Update with wallet balance
+      Object.assign(existingAsset, {
+        amount: walletAsset.amount,
+        displayAmount: walletAsset.displayAmount,
+        isIbc: walletAsset.isIbc,
+        originDenom: walletAsset.originDenom,
+        originChainId: walletAsset.originChainId,
+        trace: walletAsset.trace,
+      });
     }
   }
 

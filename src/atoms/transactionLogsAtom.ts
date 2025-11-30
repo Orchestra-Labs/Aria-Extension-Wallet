@@ -36,17 +36,14 @@ export const updateStepLogAtom = atom(
     // Priority 1: Use explicitly provided feeData
     if (params.feeData !== undefined) {
       finalFeeData = params.feeData;
-      console.log('[DEBUG][updateStepLogAtom] Using explicitly provided feeData');
     }
     // Priority 2: Use fees from log if provided
     else if (params.log.fees !== undefined) {
       finalFeeData = params.log.fees;
-      console.log('[DEBUG][updateStepLogAtom] Using fees from log parameter');
     }
     // Priority 3: Preserve existing fees
     else {
       finalFeeData = existingLog.fees || [];
-      console.log('[DEBUG][updateStepLogAtom] Preserving existing fees');
     }
 
     // Handle feeSymbol update - preserve existing if not provided

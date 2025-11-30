@@ -141,14 +141,6 @@ export const updateTxStepLogAtom = atom(
     const currentLogs = get(transactionLogsAtom);
     const existingLog = currentLogs[step.hash] || {};
 
-    console.log('[DEBUG][updateTxStepLogAtom] Updating step log', {
-      stepIndex: params.stepIndex,
-      stepHash: step.hash,
-      newStatus: params.status,
-      existingFees: existingLog.fees?.map(f => ({ amount: f.amount, denom: f.asset?.denom })) || [],
-      newFeeData: params.feeData?.map(f => ({ amount: f.amount, denom: f.asset?.denom })) || [],
-    });
-
     // Preserve existing fee data unless new fee data is explicitly provided
     const finalFeeData = params.feeData !== undefined ? params.feeData : existingLog.fees;
 
@@ -515,7 +507,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
   const newHash = createRouteHash({ route: newRoute, toAddress: receiveAddress });
 
   if (currentHash !== newHash) {
-    console.log('[DEBUG][updateTransactionRouteAtom] Resetting transaction route');
     set(resetTransactionLogsAtom);
 
     // Reset successful simulation when route structure changes

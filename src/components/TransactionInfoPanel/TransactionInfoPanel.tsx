@@ -35,16 +35,6 @@ export const TransactionInfoPanel = () => {
   const TransactionStepItem = ({ step, index }: { step: TransactionStep; index: number }) => {
     const log = useAtomValue(getStepLogAtom(step.hash));
 
-    console.log('[DEBUG] TransactionStepItem:', {
-      stepIndex: index,
-      stepType: step.type,
-      stepHash: step.hash,
-      hasLog: !!log,
-      log: log,
-      description: log?.description,
-      status: log?.status,
-    });
-
     return (
       <div
         key={`${step.type}-${index}`}

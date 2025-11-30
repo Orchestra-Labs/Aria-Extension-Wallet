@@ -59,15 +59,5 @@ export const getStepDescription = ({
       description = `Processing ${step.type} transaction`;
   }
 
-  // Add logging for the description
-  console.log(`[Debug] Transaction Step Description: ${description}`, {
-    transactionType: step.type,
-    fromAsset: step.fromAsset.symbol,
-    toAsset: step.type !== TransactionType.SEND ? step.toAsset?.symbol : undefined,
-    fromChain: step.fromChain,
-    toChain: step.toChain,
-    recipientAddress: shortToAddress,
-  });
-
   return description;
 };

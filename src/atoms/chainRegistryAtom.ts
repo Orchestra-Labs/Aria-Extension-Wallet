@@ -233,7 +233,6 @@ export const subscribedChainsAtom = atom<SimplifiedChainInfo[]>(get => {
   return Object.values(subscribedRegistry).filter((chain): chain is SimplifiedChainInfo => !!chain);
 });
 
-export const osmosisChainsAtom = atom<string[]>([]);
 export const osmosisAssetsAtom = atom<Asset[]>([]);
 export const loadOsmosisDataAtom = atom(null, async (get, set) => {
   try {
@@ -241,16 +240,13 @@ export const loadOsmosisDataAtom = atom(null, async (get, set) => {
     const fullChainRegistry = get(fullChainRegistryAtom);
     const subscribedChainRegistry = get(subscribedChainRegistryAtom);
 
-    // Get Osmosis chain ID
-    const osmosisChainId = getOsmosisChainId(networkLevel);
-    set(osmosisChainsAtom, [osmosisChainId]);
-
     // Fetch Osmosis assets
     const osmosisAssets = await getOsmosisAssetsWithResolutions(
       networkLevel,
       subscribedChainRegistry[networkLevel],
       fullChainRegistry[networkLevel],
     );
+
     set(osmosisAssetsAtom, osmosisAssets);
   } catch (error) {
     console.error('[loadOsmosisDataAtom] Failed to load Osmosis data:', error);
