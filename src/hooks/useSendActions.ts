@@ -970,12 +970,20 @@ export const useSendActions = () => {
 
               if (netInput <= 0) {
                 // Not enough for fees + swap
+                const errorMessage = `Insufficient amount for fees.`;
 
                 result = {
                   success: false,
-                  message: `Insufficient amount for fees.`,
+                  message: errorMessage,
                 };
                 netOutput = '0';
+
+                // IMPORTANT: Update the step log with the error
+                updateTxStepLog({
+                  stepIndex: i,
+                  status: TransactionStatus.ERROR,
+                  error: errorMessage,
+                });
               } else {
                 // TODO: this imprecise update by ratio is a temporary fix.  Test a double-pass approach to final input calculation
                 // Convert all values to numbers for precise calculation
