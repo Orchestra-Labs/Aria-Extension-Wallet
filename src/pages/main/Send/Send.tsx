@@ -74,7 +74,6 @@ export const Send = () => {
     console.log("[Send] walletstate's address on init", walletState.address);
     setRecipientAddress(walletState.address);
     loadFullRegistry();
-    // loadSkipChains();
     triggerSymphonyStablecoinsRefresh();
 
     return () => {
