@@ -259,7 +259,6 @@ export const getKeplrStyleGasEstimates = (
   }
 };
 
-// TODO: this isn't working.  400 "not found" errors and 501 "not implemented" errors.  fix
 export const simulateOsmosisSwap = async ({
   sender,
   swapOperations,

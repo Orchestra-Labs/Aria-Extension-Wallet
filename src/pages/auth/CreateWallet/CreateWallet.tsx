@@ -105,11 +105,9 @@ export const CreateWallet = () => {
   }, [use24Words]);
 
   // TODO: add saved addresses (name and address)
-
   // TODO: add search icon to search field, add onclick
 
-  // TODO: fix copytextfield issue of enlarged border on click
-  // TODO: Add remember me
+  // TODO: Add remember me button for password login
 
   // TODO: make toasts copy-on-click
   // TODO: make toast animate in, animate out, and swipe-away
@@ -151,7 +149,7 @@ export const CreateWallet = () => {
   // TODO: get google analytics going
   // TODO: keep track of current page for case of re-open before timeout and for close of options pages
   // TODO: make data text in asset and validator tiles scrollable
-  // TODO: ensure logout after blur + timeout (blur is click outside application to close).  to remove sensitive data after time period
+  // TODO: ensure logout after blur + timeout (blur is click outside application to close).  to remove sensitive data after time period.  try save of blur time to localstorage, then check time on re-open
   // TODO: speed up resolution on rpc queries (send, stake, unstake, claim)
 
   /* Wallet UI TODOs */

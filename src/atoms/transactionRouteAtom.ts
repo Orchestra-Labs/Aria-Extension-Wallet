@@ -293,7 +293,6 @@ export const updateTransactionRouteAtom = atom(null, async (get, set) => {
     }
 
     const step = createStep(type, via, fromChainId, toChainId, fromAsset, toAsset);
-    // TODO: this can be moved into transactionLogAtom if toAddress is included on the TransactionStep object
     const description = getStepDescription({
       step,
       toAddress: receiveAddress,

@@ -817,7 +817,6 @@ export const useSendActions = () => {
             });
 
             if (!gasCheck.hasSufficientBalance) {
-              // TODO: match symbol for this
               const errorMessage = `Insufficient ${stepLog.feeSymbol} for gas.`;
 
               console.error(
