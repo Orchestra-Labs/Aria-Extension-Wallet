@@ -55,13 +55,6 @@ export const resolveIbcDenom = async (
         throw new Error(`Could not determine network level for chain ${currentChainId}`);
       }
 
-      // Get the current chain's name (not ID) for registry lookup
-      const currentChainName = chainRegistry[currentChainId]?.chain_name;
-
-      if (!currentChainName) {
-        throw new Error(`Could not find chain_name for chain ID: ${currentChainId}`);
-      }
-
       // Get the correct network registry (mainnet or testnet)
       const networkRegistry =
         networkLevel === NetworkLevel.TESTNET ? ibcRegistry.data.testnet : ibcRegistry.data.mainnet;
@@ -72,23 +65,19 @@ export const resolveIbcDenom = async (
 
       // Find the connection that involves this channel
       for (const [connectionKey, connection] of Object.entries(networkRegistry as IbcRegistry)) {
-        // Split the connection key to get the two chain names
-        const chainNames = connectionKey.split('-');
+        const chainIds = connectionKey.split(',');
 
-        // Check if this connection involves the current chain (by name, not ID)
-        if (chainNames.includes(currentChainName)) {
-          // CRITICAL: Get the IBC info for the CURRENT chain's side (by chain ID)
+        if (chainIds.includes(currentChainId)) {
+          // Get the IBC info for the current chain's side
           const currentChainIBCInfo = connection[currentChainId];
 
-          // Check if THIS chain's channel matches what we're looking for
+          // Check if this chain's channel matches what we're looking for
           if (currentChainIBCInfo?.channel_id === channelId) {
-            // Find the OTHER chain ID in this connection
-            // The connection object has keys for both chain IDs
-            const counterpartyChainId = Object.keys(connection).find(id => id !== currentChainId);
+            // Find the counterparty chain ID from the connection key
+            const counterpartyChainId = chainIds.find(id => id !== currentChainId);
 
             if (counterpartyChainId) {
               originChainId = counterpartyChainId;
-
               break;
             }
           }
