@@ -12,6 +12,21 @@ import { safeTrimLowerCase } from './formatString';
 import { getIbcRegistry } from './dataHelpers';
 
 /**
+ * Checks if an asset should skip asset resolution.
+ * Returns true if the denom contains "/" AND originDenom differs from denom.
+ * This prevents unnecessary resolution queries for assets with mismatched origin denoms.
+ * Covers ibc/, gamm/, factory/, and other prefixed denoms.
+ */
+export const shouldSkipAssetResolution = (denom: string, originDenom?: string): boolean => {
+  const hasSlashPrefix = denom.includes('/');
+  const hasOriginDenom = originDenom !== undefined && originDenom !== '';
+  const originDenomDiffers =
+    hasOriginDenom && safeTrimLowerCase(originDenom) !== safeTrimLowerCase(denom);
+
+  return !hasSlashPrefix || originDenomDiffers;
+};
+
+/**
  * Resolves an IBC hash to its base denom, path (trace), and origin chain ID.
  * Supports single-hop IBC transfers. Multi-hop transfers are detected but not fully resolved.
  */
@@ -224,6 +239,7 @@ export const createAssetWithOriginInfo = (
 /**
  * Resolves an IBC denom and creates a standardized Asset object.
  * Handles resolution failures gracefully with fallback asset creation.
+ * Skips resolution if the asset already has a resolved originDenom in the registry.
  */
 export const resolveAndCreateIbcAsset = async (
   ibcDenom: string,
@@ -234,6 +250,26 @@ export const resolveAndCreateIbcAsset = async (
   networkName: string,
   amount: string = '0',
 ): Promise<Asset> => {
+  // Check registry for existing asset metadata
+  const existingMetadata = findAssetMetadata(ibcDenom, chainRegistry, undefined, chainId);
+  const existingOriginDenom = existingMetadata?.originDenom;
+
+  // Skip resolution if the asset has ibc/gamm prefix and a mismatched originDenom
+  if (shouldSkipAssetResolution(ibcDenom, existingOriginDenom)) {
+    console.log(
+      `[resolveAndCreateIbcAsset] Skipping resolution for ${ibcDenom} - originDenom mismatch (${existingOriginDenom})`,
+    );
+    return createAssetWithOriginInfo(
+      ibcDenom,
+      chainId,
+      chainRegistry,
+      networkName,
+      amount,
+      true, // isIbc
+      existingOriginDenom,
+    );
+  }
+
   try {
     const resolved = await resolveIbcDenom(ibcDenom, prefix, restUris, chainId, chainRegistry);
 
