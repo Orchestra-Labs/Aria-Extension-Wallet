@@ -127,7 +127,7 @@ export const allReceivableAssetsAtom = atom(get => {
         name: receivableAsset.name,
         exponent: receivableAsset.exponent,
         isFeeToken: receivableAsset.isFeeToken || false,
-        networkName: receivableAssetChain.pretty_name || receivableAssetChain.chain_name,
+        networkName: receivableAssetChain?.pretty_name || receivableAssetChain?.chain_name || receivableAsset.chainId,
         chainId: receivableAsset.chainId,
         coinGeckoId: receivableAsset.coinGeckoId,
         price: receivableAsset.price || 0,
