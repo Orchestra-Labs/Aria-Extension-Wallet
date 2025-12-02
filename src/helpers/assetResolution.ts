@@ -223,7 +223,7 @@ export const createAssetWithOriginInfo = (
     symbol:
       assetMetadata?.symbol ||
       (isGammToken ? `${denom.replace(GAMM_PREFIX, '')}` : denom.split('/').pop() || denom),
-    name: assetMetadata?.name || (isGammToken ? `Pool ${denom.replace(GAMM_PREFIX, '')}` : denom),
+    name: assetMetadata?.name || (isGammToken ? `${denom.replace(GAMM_PREFIX, '')}` : denom),
     exponent,
     isFeeToken: assetMetadata?.isFeeToken || false,
     networkName,

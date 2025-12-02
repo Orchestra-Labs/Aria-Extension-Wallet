@@ -43,13 +43,13 @@ export function useWalletDataRefresh() {
         Object.keys(currentNetworkChains),
       );
 
-      // Iterate through all chains in the current network level
-      for (const [chainId, chainInfo] of Object.entries(currentNetworkChains)) {
+      // Fetch all chain assets concurrently for better performance
+      const fetchPromises = Object.entries(currentNetworkChains).map(async ([chainId, chainInfo]) => {
         const wallet = sessionWallet.chainWallets[chainId];
 
         if (!wallet?.address) {
           // console.log(`[refreshWallet] No wallet address for ${chainId}, skipping`);
-          continue;
+          return null;
         }
 
         // Get subscribed denoms for this chain
@@ -74,15 +74,28 @@ export function useWalletDataRefresh() {
 
           if (assets.length > 0) {
             console.log(`[refreshWallet] Found assets for ${chainId}:`, assets);
-            console.log(`[refreshWallet] Current wallet:`, sessionWallet);
-            updateChainWallet({ chainId, assets });
+            return { chainId, assets };
           } else {
             console.log(`[refreshWallet] No assets found for ${chainId}`);
+            return null;
           }
         } catch (error) {
           console.error(`[refreshWallet] Error fetching assets for ${chainId}:`, error);
+          return null;
         }
-      }
+      });
+
+      // Wait for all fetches to complete
+      const results = await Promise.all(fetchPromises);
+
+      // Update wallets with fetched assets
+      results.forEach(result => {
+        if (result && result.assets.length > 0) {
+          console.log(`[refreshWallet] Updating wallet for ${result.chainId}`);
+          console.log(`[refreshWallet] Current wallet:`, sessionWallet);
+          updateChainWallet({ chainId: result.chainId, assets: result.assets });
+        }
+      });
     } catch (error) {
       console.error('[UseWalletDataRefresh] Error:', error);
     } finally {
