@@ -31,7 +31,6 @@ export interface Asset {
   chainId: string;
   coinGeckoId?: string;
   price: number;
-  // TODO: mark 'original' not 'origin'.  change after full testing so uses are easy to find
   originDenom: string;
   originChainId: string;
   trace?: string;
