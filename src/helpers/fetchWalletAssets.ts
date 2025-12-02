@@ -21,24 +21,38 @@ const fetchAssetPrices = async (
     const batchSize = 50;
     const priceData = { ...cachedPrices };
 
+    // Create batches
+    const batches: string[][] = [];
     for (let i = 0; i < idsToFetch.length; i += batchSize) {
-      const batch = idsToFetch.slice(i, i + batchSize);
-      try {
+      batches.push(idsToFetch.slice(i, i + batchSize));
+    }
+
+    // Fetch all batches concurrently
+    const batchResults = await Promise.allSettled(
+      batches.map(async batch => {
         const response = await fetch(
           `https://api.coingecko.com/api/v3/simple/price?ids=${batch.join(',')}&vs_currencies=usd`,
           { signal: AbortSignal.timeout(2000) },
         );
 
-        if (!response.ok) continue;
+        if (!response.ok) {
+          throw new Error(`Failed to fetch prices: ${response.statusText}`);
+        }
 
-        const data = (await response.json()) as Record<string, { usd: number }>;
-        Object.entries(data).forEach(([id, { usd }]) => {
+        return (await response.json()) as Record<string, { usd: number }>;
+      }),
+    );
+
+    // Merge results from all batches
+    batchResults.forEach(result => {
+      if (result.status === 'fulfilled') {
+        Object.entries(result.value).forEach(([id, { usd }]) => {
           priceData[id] = usd;
         });
-      } catch (error) {
-        console.error('Error fetching CoinGecko prices batch:', error);
+      } else {
+        console.error('Error fetching CoinGecko prices batch:', result.reason);
       }
-    }
+    });
 
     return priceData;
   } catch (error) {
@@ -117,10 +131,9 @@ export async function fetchWalletAssets(
     }),
     (async () => {
       const coinGeckoIds = new Set<string>();
-      Object.values(chainRegistry).forEach(chain => {
-        Object.values(chain.assets || {}).forEach(asset => {
-          if (asset.coinGeckoId) coinGeckoIds.add(asset.coinGeckoId);
-        });
+      // Only fetch prices for assets in the current chain's registry
+      Object.values(assets).forEach(asset => {
+        if (asset.coinGeckoId) coinGeckoIds.add(asset.coinGeckoId);
       });
       console.log(
         `[fetchWalletAssets ${chainId}] Fetching prices for ${coinGeckoIds.size} CoinGecko Ids`,
